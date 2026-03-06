@@ -1,0 +1,92 @@
+// Schema do banco de dados — Sistema de Controle de Ativos de TI
+// Execute: npx prisma db push para criar as tabelas
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Tabela de Fornecedores
+model Fornecedor {
+  id            String         @id @default(cuid())
+  nome          String
+  contato       String?
+  email         String?
+  telefone      String?
+  site          String?
+  criadoEm      DateTime       @default(now()) @map("criado_em")
+  atualizadoEm  DateTime       @updatedAt @map("atualizado_em")
+  ativos        Ativo[]
+  movimentacoes Movimentacao[]
+
+  @@map("fornecedores")
+}
+
+// Tabela de Setores
+model Setor {
+  id            String         @id @default(cuid())
+  nome          String         @unique
+  criadoEm      DateTime       @default(now()) @map("criado_em")
+  movimentacoes Movimentacao[]
+
+  @@map("setores")
+}
+
+// Tabela de Usuarios
+model Usuario {
+  id            String         @id @default(cuid())
+  nome          String
+  email         String         @unique
+  perfil        String         @default("usuario") // "admin" | "usuario"
+  criadoEm      DateTime       @default(now()) @map("criado_em")
+  movimentacoes Movimentacao[]
+
+  @@map("usuarios")
+}
+
+// Tabela de Ativos (Produtos de TI)
+model Ativo {
+  id            String         @id @default(cuid())
+  nome          String
+  codigo        String         @unique
+  etiqueta      String?        @unique
+  fornecedorId  String?        @map("fornecedor_id")
+  fornecedor    Fornecedor?    @relation(fields: [fornecedorId], references: [id])
+  linkCompra    String?        @map("link_compra")
+  valorUnitario Float          @default(0) @map("valor_unitario")
+  quantidade    Int            @default(0)
+  estoqueMinimo Int            @default(5) @map("estoque_minimo")
+  dataCompra    DateTime?      @map("data_compra")
+  observacoes   String?
+  criadoEm      DateTime       @default(now()) @map("criado_em")
+  atualizadoEm  DateTime       @updatedAt @map("atualizado_em")
+  movimentacoes Movimentacao[]
+
+  @@map("ativos")
+}
+
+// Tabela de Movimentacoes (Entradas e Saidas)
+model Movimentacao {
+  id            String      @id @default(cuid())
+  tipo          String      // "ENTRADA" | "SAIDA"
+  ativoId       String      @map("ativo_id")
+  ativo         Ativo       @relation(fields: [ativoId], references: [id])
+  quantidade    Int
+  valorUnitario Float       @default(0) @map("valor_unitario")
+  data          DateTime    @default(now())
+  fornecedorId  String?     @map("fornecedor_id")
+  fornecedor    Fornecedor? @relation(fields: [fornecedorId], references: [id])
+  setorId       String?     @map("setor_id")
+  setor         Setor?      @relation(fields: [setorId], references: [id])
+  usuarioId     String?     @map("usuario_id")
+  usuario       Usuario?    @relation(fields: [usuarioId], references: [id])
+  responsavel   String?
+  observacoes   String?
+  criadoEm      DateTime    @default(now()) @map("criado_em")
+
+  @@map("movimentacoes")
+}
