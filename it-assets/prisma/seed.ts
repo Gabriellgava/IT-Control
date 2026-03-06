@@ -3,140 +3,110 @@ import { PrismaClient } from '@prisma/client'
 const prisma = new PrismaClient()
 
 async function main() {
-  // Create Suppliers
-  const supplier1 = await prisma.supplier.upsert({
-    where: { id: 'supplier-1' },
+  const fornecedor1 = await prisma.fornecedor.upsert({
+    where: { id: 'fornecedor-1' },
     update: {},
     create: {
-      id: 'supplier-1',
-      name: 'Dell Technologies',
-      contact: 'Vendas Dell',
+      id: 'fornecedor-1',
+      nome: 'Dell Technologies',
+      contato: 'Vendas Dell',
       email: 'vendas@dell.com',
-      phone: '(11) 4004-0100',
-      website: 'https://dell.com',
+      telefone: '(11) 4004-0100',
+      site: 'https://dell.com',
     },
   })
 
-  const supplier2 = await prisma.supplier.upsert({
-    where: { id: 'supplier-2' },
+  const fornecedor2 = await prisma.fornecedor.upsert({
+    where: { id: 'fornecedor-2' },
     update: {},
     create: {
-      id: 'supplier-2',
-      name: 'HP Inc.',
+      id: 'fornecedor-2',
+      nome: 'HP Inc.',
       email: 'vendas@hp.com',
-      phone: '(11) 4004-0200',
-      website: 'https://hp.com',
+      telefone: '(11) 4004-0200',
+      site: 'https://hp.com',
     },
   })
 
-  const supplier3 = await prisma.supplier.upsert({
-    where: { id: 'supplier-3' },
+  const fornecedor3 = await prisma.fornecedor.upsert({
+    where: { id: 'fornecedor-3' },
     update: {},
     create: {
-      id: 'supplier-3',
-      name: 'Logitech',
+      id: 'fornecedor-3',
+      nome: 'Logitech',
       email: 'vendas@logitech.com',
-      website: 'https://logitech.com',
+      site: 'https://logitech.com',
     },
   })
 
-  // Create Sectors
-  const sectors = ['TI', 'Financeiro', 'RH', 'Comercial', 'Operações', 'Marketing']
-  for (const sectorName of sectors) {
-    await prisma.sector.upsert({
-      where: { name: sectorName },
+  const nomesSetores = ['TI', 'Financeiro', 'RH', 'Comercial', 'Operações', 'Marketing']
+  for (const nomeSetor of nomesSetores) {
+    await prisma.setor.upsert({
+      where: { nome: nomeSetor },
       update: {},
-      create: { name: sectorName },
+      create: { nome: nomeSetor },
     })
   }
 
-  // Create Users
-  await prisma.user.upsert({
+  await prisma.usuario.upsert({
     where: { email: 'admin@empresa.com' },
     update: {},
-    create: {
-      name: 'Admin TI',
-      email: 'admin@empresa.com',
-      role: 'admin',
-    },
+    create: { nome: 'Admin TI', email: 'admin@empresa.com', perfil: 'admin' },
   })
 
-  await prisma.user.upsert({
+  await prisma.usuario.upsert({
     where: { email: 'joao@empresa.com' },
     update: {},
-    create: {
-      name: 'João Silva',
-      email: 'joao@empresa.com',
-      role: 'user',
-    },
+    create: { nome: 'João Silva', email: 'joao@empresa.com', perfil: 'usuario' },
   })
 
-  // Create Assets
-  const asset1 = await prisma.asset.upsert({
-    where: { code: 'NOTE-001' },
+  await prisma.ativo.upsert({
+    where: { codigo: 'NOTE-001' },
     update: {},
     create: {
-      name: 'Notebook Dell Latitude 5520',
-      code: 'NOTE-001',
-      tag: 'ETQ-0001',
-      supplierId: supplier1.id,
-      purchaseLink: 'https://dell.com/latitude-5520',
-      unitValue: 4500.00,
-      quantity: 8,
-      minStock: 3,
-      purchaseDate: new Date('2024-01-15'),
-      notes: 'Notebooks para equipe de TI',
+      nome: 'Notebook Dell Latitude 5520',
+      codigo: 'NOTE-001',
+      etiqueta: 'ETQ-0001',
+      fornecedorId: fornecedor1.id,
+      linkCompra: 'https://dell.com/latitude-5520',
+      valorUnitario: 4500.00,
+      quantidade: 8,
+      estoqueMinimo: 3,
+      dataCompra: new Date('2024-01-15'),
     },
   })
 
-  const asset2 = await prisma.asset.upsert({
-    where: { code: 'MON-001' },
+  await prisma.ativo.upsert({
+    where: { codigo: 'MON-001' },
     update: {},
     create: {
-      name: 'Monitor HP 24" Full HD',
-      code: 'MON-001',
-      tag: 'ETQ-0010',
-      supplierId: supplier2.id,
-      purchaseLink: 'https://hp.com/monitor-24',
-      unitValue: 1200.00,
-      quantity: 2,
-      minStock: 5,
-      purchaseDate: new Date('2024-02-10'),
-      notes: 'Monitores para escritório',
+      nome: 'Monitor HP 24" Full HD',
+      codigo: 'MON-001',
+      etiqueta: 'ETQ-0010',
+      fornecedorId: fornecedor2.id,
+      valorUnitario: 1200.00,
+      quantidade: 2,
+      estoqueMinimo: 5,
+      dataCompra: new Date('2024-02-10'),
     },
   })
 
-  const asset3 = await prisma.asset.upsert({
-    where: { code: 'TECLADO-001' },
+  await prisma.ativo.upsert({
+    where: { codigo: 'TECLADO-001' },
     update: {},
     create: {
-      name: 'Teclado Logitech MX Keys',
-      code: 'TECLADO-001',
-      tag: 'ETQ-0020',
-      supplierId: supplier3.id,
-      purchaseLink: 'https://logitech.com/mx-keys',
-      unitValue: 450.00,
-      quantity: 15,
-      minStock: 10,
-      purchaseDate: new Date('2024-03-05'),
+      nome: 'Teclado Logitech MX Keys',
+      codigo: 'TECLADO-001',
+      etiqueta: 'ETQ-0020',
+      fornecedorId: fornecedor3.id,
+      valorUnitario: 450.00,
+      quantidade: 15,
+      estoqueMinimo: 10,
+      dataCompra: new Date('2024-03-05'),
     },
   })
 
-  await prisma.asset.upsert({
-    where: { code: 'CABO-USB' },
-    update: {},
-    create: {
-      name: 'Cabo USB-C 2m',
-      code: 'CABO-USB',
-      supplierId: supplier3.id,
-      unitValue: 35.00,
-      quantity: 3,
-      minStock: 10,
-      purchaseDate: new Date('2024-03-10'),
-    },
-  })
-
-  console.log('✅ Seed concluído com sucesso!')
+  console.log('✅ Seed concluído!')
 }
 
 main()
