@@ -1,25 +1,29 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useSession } from 'next-auth/react'
 import { Button, Input, Select, Textarea } from '@/components/ui'
-import type { Ativo, Fornecedor, Setor, Usuario } from '@/types'
+import type { Ativo, Fornecedor, Setor } from '@/types'
 
 export function MovimentacaoForm({ tipo }: { tipo: 'ENTRADA' | 'SAIDA' }) {
   const router = useRouter()
+  const { data: session } = useSession()
   const [loading, setLoading] = useState(false)
   const [erro, setErro] = useState('')
   const [ativos, setAtivos] = useState<Ativo[]>([])
   const [fornecedores, setFornecedores] = useState<Fornecedor[]>([])
   const [setores, setSetores] = useState<Setor[]>([])
-  const [usuarios, setUsuarios] = useState<Usuario[]>([])
-  const [form, setForm] = useState({ ativoId: '', quantidade: '1', valorUnitario: '', data: new Date().toISOString().split('T')[0], fornecedorId: '', setorId: '', usuarioId: '', responsavel: '', observacoes: '' })
+  const [form, setForm] = useState({
+    ativoId: '', quantidade: '1', valorUnitario: '',
+    data: new Date().toISOString().split('T')[0],
+    fornecedorId: '', setorId: '', observacoes: '',
+  })
   const s = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }))
 
   useEffect(() => {
     fetch('/api/ativos').then(r => r.json()).then(setAtivos)
     fetch('/api/fornecedores').then(r => r.json()).then(setFornecedores)
     fetch('/api/setores').then(r => r.json()).then(setSetores)
-    fetch('/api/usuarios').then(r => r.json()).then(setUsuarios)
   }, [])
 
   const ativoSel = ativos.find(a => a.id === form.ativoId)
@@ -30,7 +34,12 @@ export function MovimentacaoForm({ tipo }: { tipo: 'ENTRADA' | 'SAIDA' }) {
     const res = await fetch('/api/movimentacoes', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...form, tipo }),
+      body: JSON.stringify({
+        ...form,
+        tipo,
+        usuarioId: session?.user.id,
+        responsavel: session?.user.name ?? session?.user.email,
+      }),
     })
     const data = await res.json()
     if (!res.ok) { setErro(data.error || 'Erro ao salvar'); setLoading(false); return }
@@ -40,9 +49,19 @@ export function MovimentacaoForm({ tipo }: { tipo: 'ENTRADA' | 'SAIDA' }) {
   return (
     <div className="max-w-2xl space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{tipo === 'ENTRADA' ? '📥 Entrada de Estoque' : '📤 Saída de Estoque'}</h1>
-        <p className="text-sm text-gray-500 mt-1">{tipo === 'ENTRADA' ? 'Registre a chegada de itens no estoque' : 'Registre a saída de itens do estoque'}</p>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+          {tipo === 'ENTRADA' ? '📥 Entrada de Estoque' : '📤 Saída de Estoque'}
+        </h1>
+        <p className="text-sm text-gray-500 mt-1">
+          {tipo === 'ENTRADA' ? 'Registre a chegada de itens no estoque' : 'Registre a saída de itens do estoque'}
+        </p>
       </div>
+
+      {session?.user && (
+        <div className="flex items-center gap-2 px-4 py-2.5 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-xl text-sm text-blue-700 dark:text-blue-400">
+          <span className="font-semibold">Responsável:</span> {session.user.name ?? session.user.email}
+        </div>
+      )}
 
       {erro && <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-sm text-red-600">{erro}</div>}
 
@@ -53,7 +72,9 @@ export function MovimentacaoForm({ tipo }: { tipo: 'ENTRADA' | 'SAIDA' }) {
         </Select>
 
         {ativoSel && tipo === 'SAIDA' && ativoSel.quantidade <= ativoSel.estoqueMinimo && (
-          <div className="p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg text-xs text-amber-700 dark:text-amber-400">⚠️ Atenção: este produto está com estoque baixo ({ativoSel.quantidade} unidades)</div>
+          <div className="p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg text-xs text-amber-700 dark:text-amber-400">
+            ⚠️ Atenção: este produto está com estoque baixo ({ativoSel.quantidade} unidades)
+          </div>
         )}
 
         <div className="grid grid-cols-2 gap-4">
@@ -76,14 +97,6 @@ export function MovimentacaoForm({ tipo }: { tipo: 'ENTRADA' | 'SAIDA' }) {
             {setores.map(s => <option key={s.id} value={s.id}>{s.nome}</option>)}
           </Select>
         )}
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Select label="Usuário" value={form.usuarioId} onChange={e => s('usuarioId', e.target.value)}>
-            <option value="">Selecionar usuário</option>
-            {usuarios.map(u => <option key={u.id} value={u.id}>{u.nome}</option>)}
-          </Select>
-          <Input label="Responsável" value={form.responsavel} onChange={e => s('responsavel', e.target.value)} placeholder="Nome do responsável" />
-        </div>
 
         <Textarea label="Observações" value={form.observacoes} onChange={e => s('observacoes', e.target.value)} placeholder="Informações adicionais..." rows={3} />
       </div>

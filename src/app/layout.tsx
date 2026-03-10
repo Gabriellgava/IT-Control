@@ -1,15 +1,18 @@
 import type { Metadata } from 'next'
 import './globals.css'
+import { Providers } from '@/components/layout/Providers'
 
 export const metadata: Metadata = {
-  title: 'Estoque TI',
-  description: 'Sistema de controle de ativos e estoque de TI',
+  title: 'IT Control',
+  description: 'Sistema de controle de ativos de TI',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="pt-BR" suppressHydrationWarning>
-      <body>{children}</body>
+      <body>
+        <Providers>{children}</Providers>
+      </body>
     </html>
   )
 }
