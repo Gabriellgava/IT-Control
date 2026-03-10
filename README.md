@@ -53,12 +53,6 @@ E no `prisma/schema.prisma`, mude `provider = "sqlite"` para `provider = "postgr
 
 ## 🌐 Deploy na Vercel
 
-1. Faça push do projeto para GitHub
-2. Conecte no Vercel
-3. Configure a variável de ambiente `DATABASE_URL`
-4. Deploy!
-
-> Para produção, recomendamos PostgreSQL (Vercel Postgres, Supabase ou Neon).
 
 ## 📁 Estrutura do projeto
 
@@ -89,7 +83,6 @@ src/
     └── index.ts           # Types TypeScript
 prisma/
 ├── schema.prisma          # Schema do banco
-└── seed.ts                # Dados de exemplo
 ```
 
 ## 🛠️ Tecnologias
@@ -98,14 +91,14 @@ prisma/
 - **TypeScript** — Tipagem estática
 - **TailwindCSS** — Estilização
 - **Prisma** — ORM
-- **SQLite/PostgreSQL** — Banco de dados
+- **PostgreSQL** — Banco de dados
 - **Recharts** — Gráficos interativos
 - **Lucide React** — Ícones
 
 ## 📋 Tabelas do banco
 
-- `Asset` — Produtos/ativos de TI
-- `Supplier` — Fornecedores
-- `Movement` — Histórico de entradas e saídas
-- `Sector` — Setores da empresa
-- `User` — Usuários do sistema
+- `Ativos` — Produtos/ativos de TI
+- `Fornecedores` — Fornecedores
+- `Movimentacoes` — Histórico de entradas e saídas
+- `setor` — Setores da empresa
+- `usuario` — Usuários do sistema

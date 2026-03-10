@@ -1,6 +1,3 @@
-// Schema do banco de dados — Sistema de Controle de Ativos de TI
-// Execute: npx prisma db push para criar as tabelas
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -10,7 +7,6 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// Tabela de Fornecedores
 model Fornecedor {
   id            String         @id @default(cuid())
   nome          String
@@ -26,7 +22,6 @@ model Fornecedor {
   @@map("fornecedores")
 }
 
-// Tabela de Setores
 model Setor {
   id            String         @id @default(cuid())
   nome          String         @unique
@@ -36,19 +31,17 @@ model Setor {
   @@map("setores")
 }
 
-// Tabela de Usuarios
 model Usuario {
   id            String         @id @default(cuid())
   nome          String
   email         String         @unique
-  perfil        String         @default("usuario") // "admin" | "usuario"
+  perfil        String         @default("usuario")
   criadoEm      DateTime       @default(now()) @map("criado_em")
   movimentacoes Movimentacao[]
 
   @@map("usuarios")
 }
 
-// Tabela de Ativos (Produtos de TI)
 model Ativo {
   id            String         @id @default(cuid())
   nome          String
@@ -69,10 +62,9 @@ model Ativo {
   @@map("ativos")
 }
 
-// Tabela de Movimentacoes (Entradas e Saidas)
 model Movimentacao {
   id            String      @id @default(cuid())
-  tipo          String      // "ENTRADA" | "SAIDA"
+  tipo          String
   ativoId       String      @map("ativo_id")
   ativo         Ativo       @relation(fields: [ativoId], references: [id])
   quantidade    Int

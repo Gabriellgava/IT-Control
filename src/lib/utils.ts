@@ -1,47 +1,34 @@
-import { type ClassValue, clsx } from 'clsx'
-
-export function cn(...inputs: ClassValue[]) {
-  return inputs.filter(Boolean).join(' ')
+export function formatMoeda(valor: number): string {
+  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valor)
 }
 
-export function formatCurrency(value: number): string {
-  return new Intl.NumberFormat('pt-BR', {
-    style: 'currency',
-    currency: 'BRL',
-  }).format(value)
+export function formatData(data: string | Date): string {
+  return new Intl.DateTimeFormat('pt-BR').format(new Date(data))
 }
 
-export function formatDate(date: string | Date): string {
-  return new Intl.DateTimeFormat('pt-BR').format(new Date(date))
+export function formatDataHora(data: string | Date): string {
+  return new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(data))
 }
 
-export function formatDateTime(date: string | Date): string {
-  return new Intl.DateTimeFormat('pt-BR', {
-    dateStyle: 'short',
-    timeStyle: 'short',
-  }).format(new Date(date))
+export function estoqueBaixo(quantidade: number, minimo: number): boolean {
+  return quantidade <= minimo
 }
 
-export function isLowStock(quantity: number, minStock: number): boolean {
-  return quantity <= minStock
-}
-
-export function exportToCSV(data: Record<string, unknown>[], filename: string) {
+export function exportarCSV(dados: Record<string, unknown>[], nomeArquivo: string) {
   if (typeof window === 'undefined') return
-  
-  const headers = Object.keys(data[0] || {})
-  const rows = data.map(row =>
+  const headers = Object.keys(dados[0] || {})
+  const linhas = dados.map(row =>
     headers.map(h => {
       const val = row[h]
       return typeof val === 'string' && val.includes(',') ? `"${val}"` : val
     }).join(',')
   )
-  const csv = [headers.join(','), ...rows].join('\n')
+  const csv = [headers.join(','), ...linhas].join('\n')
   const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
-  a.download = `${filename}.csv`
+  a.download = `${nomeArquivo}.csv`
   a.click()
   URL.revokeObjectURL(url)
 }

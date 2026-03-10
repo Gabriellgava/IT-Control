@@ -2,8 +2,8 @@ import type { Metadata } from 'next'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'TI Assets — Controle de Ativos',
-  description: 'Sistema profissional de controle de ativos e estoque de TI',
+  title: 'Estoque TI',
+  description: 'Sistema de controle de ativos e estoque de TI',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

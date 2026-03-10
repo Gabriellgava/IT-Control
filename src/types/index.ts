@@ -13,7 +13,6 @@ export interface Ativo {
   observacoes?: string | null
   criadoEm: string
   atualizadoEm: string
-  movimentacoes?: Movimentacao[]
 }
 
 export interface Fornecedor {

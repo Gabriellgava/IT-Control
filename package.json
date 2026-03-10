@@ -1,15 +1,12 @@
 {
-  "name": "it-assets-control",
+  "name": "estoque-ti",
   "version": "1.0.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "prisma generate && next build",
     "start": "next start",
-    "lint": "next lint",
-    "db:push": "prisma db push",
-    "db:studio": "prisma studio",
-    "db:seed": "npx ts-node --compiler-options {\"module\":\"CommonJS\"} prisma/seed.ts"
+    "db:push": "prisma db push"
   },
   "dependencies": {
     "@prisma/client": "^5.7.0",
@@ -18,14 +15,12 @@
     "react-dom": "^18",
     "recharts": "^2.10.3",
     "lucide-react": "^0.303.0",
-    "date-fns": "^3.0.6",
-    "papaparse": "^5.4.1"
+    "date-fns": "^3.0.6"
   },
   "devDependencies": {
     "@types/node": "^20",
     "@types/react": "^18",
     "@types/react-dom": "^18",
-    "@types/papaparse": "^5.3.14",
     "autoprefixer": "^10.0.1",
     "postcss": "^8",
     "prisma": "^5.7.0",
