@@ -37,7 +37,10 @@ export const authOptions: NextAuthOptions = {
       }
       if (token.id) {
         const dbUser = await prisma.usuario.findUnique({ where: { id: token.id as string } })
-        if (dbUser) token.perfil = dbUser.perfil
+        if (dbUser) {
+          token.perfil = dbUser.perfil
+          token.ativo = dbUser.ativo
+        }
       }
       return token
     },
@@ -50,17 +53,35 @@ export const authOptions: NextAuthOptions = {
     },
     async signIn({ user, account }) {
       if (account?.provider === 'google') {
-        const existing = await prisma.usuario.findUnique({ where: { email: user.email! } })
-        if (!existing) {
-          const count = await prisma.usuario.count()
-          await prisma.usuario.update({
-            where: { email: user.email! },
-            data: { perfil: count === 0 ? 'admin' : 'usuario', ativo: count === 0 ? true : false },
-          })
+        try {
+          const existing = await prisma.usuario.findUnique({ where: { email: user.email! } })
+          if (existing) {
+            if (!existing.ativo) return false
+            if (!existing.perfil) {
+              const count = await prisma.usuario.count()
+              await prisma.usuario.update({
+                where: { id: existing.id },
+                data: { perfil: count === 1 ? 'admin' : 'usuario', ativo: true },
+              })
+            }
+          }
+        } catch (e) {
+          console.error('signIn error:', e)
         }
-        if (existing && !existing.ativo) return false
       }
       return true
+    },
+  },
+  events: {
+    async createUser({ user }) {
+      const count = await prisma.usuario.count()
+      await prisma.usuario.update({
+        where: { id: user.id },
+        data: {
+          perfil: count === 1 ? 'admin' : 'usuario',
+          ativo: count === 1 ? true : false,
+        },
+      })
     },
   },
   pages: { signIn: '/login', error: '/login' },
