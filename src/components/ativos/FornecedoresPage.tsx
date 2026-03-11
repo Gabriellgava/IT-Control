@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react'
 import { Plus, Edit2, Trash2, Globe, Mail, Phone } from 'lucide-react'
 import { Button, Card, Modal, Input, Table } from '@/components/ui'
+import { mascaraTelefone } from '@/lib/mascaras'
 import type { Fornecedor } from '@/types'
 
 export function FornecedoresPage() {
@@ -11,17 +12,27 @@ export function FornecedoresPage() {
   const [editando, setEditando] = useState<Fornecedor | null>(null)
   const [deletandoId, setDeletandoId] = useState<string | null>(null)
   const [salvando, setSalvando] = useState(false)
+  const [erros, setErros] = useState<Record<string, string>>({})
   const [form, setForm] = useState({ nome: '', contato: '', email: '', telefone: '', site: '' })
-  const s = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }))
+  const s = (k: string, v: string) => { setForm(f => ({ ...f, [k]: v })); setErros(e => ({ ...e, [k]: '' })) }
 
   const buscar = () => fetch('/api/fornecedores').then(r => r.json()).then(d => { setFornecedores(d); setLoading(false) })
   useEffect(() => { buscar() }, [])
 
-  const abrirNovo = () => { setEditando(null); setForm({ nome: '', contato: '', email: '', telefone: '', site: '' }); setModal(true) }
-  const abrirEditar = (f: Fornecedor) => { setEditando(f); setForm({ nome: f.nome, contato: f.contato ?? '', email: f.email ?? '', telefone: f.telefone ?? '', site: f.site ?? '' }); setModal(true) }
+  const abrirNovo = () => { setEditando(null); setForm({ nome: '', contato: '', email: '', telefone: '', site: '' }); setErros({}); setModal(true) }
+  const abrirEditar = (f: Fornecedor) => { setEditando(f); setForm({ nome: f.nome, contato: f.contato ?? '', email: f.email ?? '', telefone: f.telefone ?? '', site: f.site ?? '' }); setErros({}); setModal(true) }
+
+  const validar = () => {
+    const e: Record<string, string> = {}
+    if (!form.nome.trim()) e.nome = 'Nome é obrigatório'
+    if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) e.email = 'E-mail inválido'
+    if (form.telefone && form.telefone.replace(/\D/g, '').length < 10) e.telefone = 'Telefone inválido'
+    setErros(e)
+    return Object.keys(e).length === 0
+  }
 
   const salvar = async () => {
-    if (!form.nome) return
+    if (!validar()) return
     setSalvando(true)
     await fetch(editando ? `/api/fornecedores/${editando.id}` : '/api/fornecedores', {
       method: editando ? 'PUT' : 'POST',
@@ -77,10 +88,17 @@ export function FornecedoresPage() {
 
       <Modal open={modal} onClose={() => setModal(false)} title={editando ? 'Editar Fornecedor' : 'Novo Fornecedor'}>
         <div className="space-y-4">
-          <Input label="Nome *" value={form.nome} onChange={e => s('nome', e.target.value)} placeholder="Nome da empresa" />
+          <Input label="Nome *" value={form.nome} onChange={e => s('nome', e.target.value)} placeholder="Nome da empresa" error={erros.nome} />
           <Input label="Contato" value={form.contato} onChange={e => s('contato', e.target.value)} placeholder="Nome do responsável" />
-          <Input label="E-mail" type="email" value={form.email} onChange={e => s('email', e.target.value)} placeholder="contato@empresa.com" />
-          <Input label="Telefone" value={form.telefone} onChange={e => s('telefone', e.target.value)} placeholder="(11) 99999-9999" />
+          <Input label="E-mail" type="email" value={form.email} onChange={e => s('email', e.target.value)} placeholder="contato@empresa.com" error={erros.email} />
+          <Input
+            label="Telefone"
+            value={form.telefone}
+            onChange={e => s('telefone', mascaraTelefone(e.target.value))}
+            placeholder="(11) 99999-9999"
+            error={erros.telefone}
+            maxLength={15}
+          />
           <Input label="Site" value={form.site} onChange={e => s('site', e.target.value)} placeholder="https://empresa.com" />
           <div className="flex justify-end gap-3 pt-2">
             <Button variant="secondary" onClick={() => setModal(false)}>Cancelar</Button>
