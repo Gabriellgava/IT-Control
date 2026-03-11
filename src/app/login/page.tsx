@@ -24,8 +24,10 @@ export default function LoginPage() {
     if (!email || !senha) { setErroLogin('Preencha email e senha'); return }
     setLoading(true); setErroLogin('')
     const res = await signIn('credentials', { email, password: senha, redirect: false })
-    if (res?.error) { setErroLogin('Email ou senha incorretos'); setLoading(false) }
-    else router.push('/dashboard')
+    if (res?.error) {
+      setErroLogin(res.error === 'CredentialsSignin' ? 'Email ou senha incorretos, ou conta desativada.' : res.error)
+      setLoading(false)
+    } else router.push('/dashboard')
   }
 
   return (
@@ -40,9 +42,9 @@ export default function LoginPage() {
         </div>
 
         <div className="bg-gray-900 border border-gray-800 rounded-2xl p-8 shadow-2xl">
-          {(erro === 'AccessDenied') && (
+          {erro === 'AccessDenied' && (
             <div className="mb-4 p-3 bg-red-900/30 border border-red-800 rounded-lg text-sm text-red-400">
-              Acesso negado. Aguarde o administrador liberar seu acesso.
+              ⛔ Conta desativada ou sem acesso. Contate o administrador.
             </div>
           )}
 
