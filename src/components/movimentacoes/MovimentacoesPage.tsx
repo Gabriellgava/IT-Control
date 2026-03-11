@@ -79,7 +79,7 @@ export function MovimentacoesPage() {
                 {m.tipo === 'ENTRADA'
                   ? <Badge variant="success"><ArrowDownCircle className="w-3 h-3 mr-1" />Entrada</Badge>
                   : <Badge variant="warning"><ArrowUpCircle className="w-3 h-3 mr-1" />Saída</Badge>}
-                {m.cancelado && <Badge variant="error">Cancelada</Badge>}
+                {m.cancelado && <Badge variant="danger">Cancelada</Badge>}
               </div>
             </td>
             <td className="px-4 py-3">
