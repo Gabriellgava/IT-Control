@@ -57,13 +57,22 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
         })}
 
         {session?.user.perfil === 'admin' && (
-          <Link href="/admin/usuarios" onClick={onClose}
-            className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all
-              ${path.startsWith('/admin') ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white'}`}>
-            <Users className="w-4 h-4 flex-shrink-0" />
-            <span>Usuários</span>
-            <span className="ml-auto text-xs bg-blue-100 dark:bg-blue-900/40 text-blue-600 px-1.5 py-0.5 rounded-md font-semibold">Admin</span>
-          </Link>
+          <>
+            <Link href="/admin/usuarios" onClick={onClose}
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all
+                ${path === '/admin/usuarios' ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white'}`}>
+              <Users className="w-4 h-4 flex-shrink-0" />
+              <span>Usuários</span>
+              <span className="ml-auto text-xs bg-blue-100 dark:bg-blue-900/40 text-blue-600 px-1.5 py-0.5 rounded-md font-semibold">Admin</span>
+            </Link>
+            <Link href="/admin/setores" onClick={onClose}
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all
+                ${path === '/admin/setores' ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white'}`}>
+              <LayoutDashboard className="w-4 h-4 flex-shrink-0" />
+              <span>Setores</span>
+              <span className="ml-auto text-xs bg-blue-100 dark:bg-blue-900/40 text-blue-600 px-1.5 py-0.5 rounded-md font-semibold">Admin</span>
+            </Link>
+          </>
         )}
       </nav>
 
