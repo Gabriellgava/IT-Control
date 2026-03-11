@@ -4,7 +4,10 @@ import { subDays, format } from 'date-fns'
 
 export async function GET() {
   try {
-    const ativos = await prisma.ativo.findMany({ include: { fornecedor: true } })
+    const ativos = await prisma.ativo.findMany({
+      where: { deletado: false },
+      include: { fornecedor: true },
+    })
 
     const totalAtivos = ativos.length
     const totalItens = ativos.reduce((s, a) => s + a.quantidade, 0)
@@ -25,12 +28,13 @@ export async function GET() {
       take: 5,
     })
 
-    const topAtivos = await Promise.all(
+    const topAtivos = (await Promise.all(
       topAtivosRaw.map(async (r) => {
         const ativo = await prisma.ativo.findUnique({ where: { id: r.ativoId } })
-        return { nome: ativo?.nome ?? 'Desconhecido', totalSaida: r._sum.quantidade ?? 0 }
+        if (!ativo || ativo.deletado) return null
+        return { nome: ativo.nome, totalSaida: r._sum.quantidade ?? 0 }
       })
-    )
+    )).filter(Boolean) as { nome: string; totalSaida: number }[]
 
     const dist = ativos.reduce((acc, a) => {
       const key = a.fornecedor?.nome ?? 'Sem Fornecedor'

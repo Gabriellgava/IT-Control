@@ -10,6 +10,7 @@ export async function GET(request: NextRequest) {
 
     const ativos = await prisma.ativo.findMany({
       where: {
+        deletado: false,
         AND: [
           busca ? { OR: [{ nome: { contains: busca, mode: 'insensitive' } }, { codigo: { contains: busca, mode: 'insensitive' } }, { etiqueta: { contains: busca, mode: 'insensitive' } }] } : {},
           fornecedorId ? { fornecedorId } : {},

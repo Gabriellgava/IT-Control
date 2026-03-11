@@ -99,6 +99,7 @@ model Ativo {
   estoqueMinimo Int            @default(5) @map("estoque_minimo")
   dataCompra    DateTime?      @map("data_compra")
   observacoes   String?
+  deletado      Boolean        @default(false)
   criadoEm      DateTime       @default(now()) @map("criado_em")
   atualizadoEm  DateTime       @updatedAt @map("atualizado_em")
   movimentacoes Movimentacao[]

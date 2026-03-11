@@ -42,8 +42,11 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
 
 export async function DELETE(_: NextRequest, { params }: { params: { id: string } }) {
   try {
-    await prisma.movimentacao.deleteMany({ where: { ativoId: params.id } })
-    await prisma.ativo.delete({ where: { id: params.id } })
+    // Soft delete: marca como deletado, preserva histórico
+    await prisma.ativo.update({
+      where: { id: params.id },
+      data: { deletado: true, quantidade: 0 },
+    })
     return NextResponse.json({ sucesso: true })
   } catch (error) {
     console.error(error)
