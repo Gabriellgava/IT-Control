@@ -1,59 +1,12 @@
 import { NextAuthOptions } from 'next-auth'
 import GoogleProvider from 'next-auth/providers/google'
 import CredentialsProvider from 'next-auth/providers/credentials'
+import { PrismaAdapter } from '@auth/prisma-adapter'
 import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
 
 export const authOptions: NextAuthOptions = {
-  adapter: {
-    createUser: async (data: Record<string, unknown>) => {
-      const count = await prisma.usuario.count()
-      const user = await prisma.usuario.create({
-        data: {
-          nome: data.name as string ?? null,
-          email: data.email as string,
-          emailVerified: data.emailVerified as Date ?? null,
-          image: data.image as string ?? null,
-          perfil: count === 0 ? 'admin' : 'usuario',
-          ativo: count === 0,
-        },
-      })
-      return { id: user.id, name: user.nome, email: user.email!, emailVerified: user.emailVerified, image: user.image }
-    },
-    getUser: async (id: string) => {
-      const u = await prisma.usuario.findUnique({ where: { id } })
-      if (!u) return null
-      return { id: u.id, name: u.nome, email: u.email!, emailVerified: u.emailVerified, image: u.image }
-    },
-    getUserByEmail: async (email: string) => {
-      const u = await prisma.usuario.findUnique({ where: { email } })
-      if (!u) return null
-      return { id: u.id, name: u.nome, email: u.email!, emailVerified: u.emailVerified, image: u.image }
-    },
-    getUserByAccount: async ({ providerAccountId, provider }: { providerAccountId: string; provider: string }) => {
-      const account = await prisma.account.findUnique({
-        where: { provider_providerAccountId: { provider, providerAccountId } },
-        include: { user: true },
-      })
-      if (!account) return null
-      const u = account.user
-      return { id: u.id, name: u.nome, email: u.email!, emailVerified: u.emailVerified, image: u.image }
-    },
-    updateUser: async ({ id, name, ...data }: Record<string, unknown>) => {
-      const u = await prisma.usuario.update({ where: { id: id as string }, data: { nome: name as string, ...data } })
-      return { id: u.id, name: u.nome, email: u.email!, emailVerified: u.emailVerified, image: u.image }
-    },
-    linkAccount: (data: Record<string, unknown>) => prisma.account.create({ data: data as never }) as never,
-    createSession: (data: Record<string, unknown>) => prisma.session.create({ data: data as never }),
-    getSessionAndUser: async (sessionToken: string) => {
-      const s = await prisma.session.findUnique({ where: { sessionToken }, include: { user: true } })
-      if (!s) return null
-      const u = s.user
-      return { session: { sessionToken: s.sessionToken, userId: s.userId, expires: s.expires }, user: { id: u.id, name: u.nome, email: u.email!, emailVerified: u.emailVerified, image: u.image } }
-    },
-    updateSession: ({ sessionToken, ...data }: Record<string, unknown>) => prisma.session.update({ where: { sessionToken: sessionToken as string }, data }),
-    deleteSession: (sessionToken: string) => prisma.session.delete({ where: { sessionToken } }),
-  } as never,
+  adapter: PrismaAdapter(prisma) as never,
   providers: [
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID!,
@@ -77,27 +30,53 @@ export const authOptions: NextAuthOptions = {
   ],
   session: { strategy: 'jwt' },
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user, account }) {
+      // Na primeira vez que o user loga, salva os dados no token
       if (user) {
         token.id = user.id
         token.perfil = (user as { perfil?: string }).perfil
       }
+      // Para Google, busca o usuário pelo email para garantir o id correto do banco
+      if (account?.provider === 'google' && token.email) {
+        const dbUser = await prisma.usuario.findUnique({ where: { email: token.email as string } })
+        if (dbUser) {
+          token.id = dbUser.id
+          token.perfil = dbUser.perfil
+          token.name = dbUser.nome
+          token.picture = dbUser.image
+        }
+      }
+      // Sempre atualiza perfil do banco para refletir mudanças feitas pelo admin
       if (token.id) {
         const dbUser = await prisma.usuario.findUnique({ where: { id: token.id as string } })
         if (dbUser) {
           token.perfil = dbUser.perfil
-          if (!dbUser.ativo) return { ...token, error: 'inactive' }
+          token.name = dbUser.nome
         }
       }
       return token
     },
     async session({ session, token }) {
-      if (token.error === 'inactive') throw new Error('inactive')
       if (session.user) {
         session.user.id = token.id as string
         session.user.perfil = token.perfil as string
+        session.user.name = token.name as string
       }
       return session
+    },
+    async signIn({ user, account }) {
+      if (account?.provider === 'google') {
+        const existing = await prisma.usuario.findUnique({ where: { email: user.email! } })
+        if (!existing) {
+          const count = await prisma.usuario.count()
+          await prisma.usuario.update({
+            where: { email: user.email! },
+            data: { perfil: count === 0 ? 'admin' : 'usuario', ativo: count === 0 },
+          })
+        }
+        if (existing && !existing.ativo) return false
+      }
+      return true
     },
   },
   pages: { signIn: '/login', error: '/login' },
