@@ -53,6 +53,9 @@ export interface Movimentacao {
   usuario?: Usuario | null
   responsavel?: string | null
   observacoes?: string | null
+  cancelado: boolean
+  canceladoEm?: string | null
+  canceladoPor?: string | null
   criadoEm: string
 }
 

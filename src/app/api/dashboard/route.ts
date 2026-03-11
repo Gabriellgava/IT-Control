@@ -16,13 +16,14 @@ export async function GET() {
 
     const ultimasMovimentacoes = await prisma.movimentacao.findMany({
       take: 10,
+      where: { cancelado: false },
       orderBy: { criadoEm: 'desc' },
       include: { ativo: true, fornecedor: true, setor: true, usuario: true },
     })
 
     const topAtivosRaw = await prisma.movimentacao.groupBy({
       by: ['ativoId'],
-      where: { tipo: 'SAIDA' },
+      where: { tipo: 'SAIDA', cancelado: false },
       _sum: { quantidade: true },
       orderBy: { _sum: { quantidade: 'desc' } },
       take: 5,
@@ -46,14 +47,14 @@ export async function GET() {
     const graficoMovimentacoes = []
     for (let i = 6; i >= 0; i--) {
       const dia = subDays(new Date(), i)
-      const inicio = new Date(dia.setHours(0, 0, 0, 0))
-      const fim = new Date(dia.setHours(23, 59, 59, 999))
+      const inicio = new Date(dia); inicio.setHours(0, 0, 0, 0)
+      const fim = new Date(dia); fim.setHours(23, 59, 59, 999)
       const entradas = await prisma.movimentacao.aggregate({
-        where: { tipo: 'ENTRADA', data: { gte: inicio, lte: fim } },
+        where: { tipo: 'ENTRADA', cancelado: false, data: { gte: inicio, lte: fim } },
         _sum: { quantidade: true },
       })
       const saidas = await prisma.movimentacao.aggregate({
-        where: { tipo: 'SAIDA', data: { gte: inicio, lte: fim } },
+        where: { tipo: 'SAIDA', cancelado: false, data: { gte: inicio, lte: fim } },
         _sum: { quantidade: true },
       })
       graficoMovimentacoes.push({
@@ -61,7 +62,7 @@ export async function GET() {
         entradas: entradas._sum.quantidade ?? 0,
         saidas: saidas._sum.quantidade ?? 0,
       })
-    }
+        }
 
     return NextResponse.json({ totalAtivos, totalItens, valorTotal, estoqueBaixoCount, ultimasMovimentacoes, topAtivos, distribuicaoFornecedor, graficoMovimentacoes })
   } catch (error) {
