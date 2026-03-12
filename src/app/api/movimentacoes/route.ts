@@ -52,7 +52,13 @@ export async function POST(request: NextRequest) {
         ativoId,
         quantidade: qtd,
         valorUnitario: parseFloat(valorUnitario) || ativo.valorUnitario,
-        data: data ? new Date(data) : new Date(),
+        data: (() => {
+          if (!data) return new Date()
+          // Combina a data escolhida com a hora atual para preservar o horário real
+          const agora = new Date()
+          const [ano, mes, dia] = data.split('-').map(Number)
+          return new Date(ano, mes - 1, dia, agora.getHours(), agora.getMinutes(), agora.getSeconds())
+        })(),
         fornecedorId: fornecedorId || null,
         setorId: setorId || null,
         usuarioId: usuarioId || null,
