@@ -76,20 +76,25 @@ export const authOptions: NextAuthOptions = {
         const existing = await prisma.usuario.findUnique({ where: { email: user.email! } })
 
         if (!existing) {
-          // Novo usuário Google — define perfil e ativo após o adapter criar
           const count = await prisma.usuario.count()
           await prisma.usuario.update({
             where: { email: user.email! },
             data: {
+              nome: user.name,
               perfil: count === 0 ? 'admin' : 'usuario',
               ativo: count === 0,
             },
           })
-          // Se não é o primeiro usuário, bloqueia até admin ativar
           if (count !== 0) return false
         } else {
-          // Usuário existente — bloqueia se inativo
           if (!existing.ativo) return false
+          // Atualiza nome se ainda estiver null
+          if (!existing.nome && user.name) {
+            await prisma.usuario.update({
+              where: { email: user.email! },
+              data: { nome: user.name },
+            })
+          }
         }
       }
       return true
