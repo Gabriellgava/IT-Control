@@ -45,7 +45,7 @@ export async function DELETE(_: NextRequest, { params }: { params: { id: string 
     // Soft delete: marca como deletado, preserva histórico
     await prisma.ativo.update({
       where: { id: params.id },
-      data: { deletado: true, quantidade: 0 },
+      data: { deletado: true, quantidade: 0, estoqueMinimo: 0 },
     })
     return NextResponse.json({ sucesso: true })
   } catch (error) {
