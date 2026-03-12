@@ -1,34 +1,40 @@
 'use client'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, Package, PlusCircle, ArrowDownCircle, ArrowUpCircle, Truck, Monitor, Moon, Sun, List, Users, LogOut, Building2, History } from 'lucide-react'
+import { LayoutDashboard, Package, PlusCircle, ArrowDownCircle, ArrowUpCircle, Truck, Monitor, Moon, Sun, Users, LogOut, Building2, History, ChevronDown, List } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { useSession, signOut } from 'next-auth/react'
-
-const nav = [
-  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/ativos', label: 'Ativos', icon: Package },
-  { href: '/ativos/novo', label: 'Adicionar Ativo', icon: PlusCircle, sub: true },
-  { href: '/movimentacoes', label: 'Movimentações', icon: List },
-  { href: '/movimentacoes/entrada', label: 'Entrada de Estoque', icon: ArrowDownCircle, sub: true },
-  { href: '/movimentacoes/saida', label: 'Saída de Estoque', icon: ArrowUpCircle, sub: true },
-  { href: '/fornecedores', label: 'Fornecedores', icon: Truck },
-]
 
 export function Sidebar({ onClose }: { onClose?: () => void }) {
   const path = usePathname()
   const { data: session } = useSession()
   const [dark, setDark] = useState(false)
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({})
 
   useEffect(() => {
     if (localStorage.getItem('tema') === 'escuro') { document.documentElement.classList.add('dark'); setDark(true) }
   }, [])
+
+  // Auto-expande o grupo ativo baseado na rota atual
+  useEffect(() => {
+    if (path.startsWith('/ativos')) setExpanded(e => ({ ...e, ativos: true }))
+    if (path.startsWith('/movimentacoes')) setExpanded(e => ({ ...e, movimentacoes: true }))
+    if (path.startsWith('/admin')) setExpanded(e => ({ ...e, admin: true }))
+  }, [path])
+
+  const toggle = (key: string) => setExpanded(e => ({ ...e, [key]: !e[key] }))
 
   const toggleTema = () => {
     const next = !dark; setDark(next)
     if (next) { document.documentElement.classList.add('dark'); localStorage.setItem('tema', 'escuro') }
     else { document.documentElement.classList.remove('dark'); localStorage.setItem('tema', 'claro') }
   }
+
+  const itemCls = (active: boolean) => `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all w-full
+    ${active ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white'}`
+
+  const subCls = (active: boolean) => `flex items-center gap-3 pl-9 pr-3 py-2 rounded-lg text-xs font-medium transition-all w-full
+    ${active ? 'text-blue-700 dark:text-blue-400 bg-blue-50/50 dark:bg-blue-900/20' : 'text-gray-500 dark:text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white'}`
 
   return (
     <aside className="flex flex-col h-full bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 w-64">
@@ -43,43 +49,90 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
       </div>
 
       <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
-        {nav.map(({ href, label, icon: Icon, sub }) => {
-          const active = path === href || (href !== '/dashboard' && path.startsWith(href))
-          return (
-            <Link key={href} href={href} onClick={onClose}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all
-                ${sub ? 'ml-4 text-xs' : ''}
-                ${active ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white'}`}>
-              <Icon className={`flex-shrink-0 ${sub ? 'w-3.5 h-3.5' : 'w-4 h-4'}`} />
-              <span className="flex-1">{label}</span>
-            </Link>
-          )
-        })}
 
-        {session?.user.perfil === 'admin' && (
-          <>
-            <div className="pt-2 pb-1 px-3">
-              <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Administração</p>
+        {/* Dashboard */}
+        <Link href="/dashboard" onClick={onClose} className={itemCls(path === '/dashboard')}>
+          <LayoutDashboard className="w-4 h-4 flex-shrink-0" />
+          <span className="flex-1">Dashboard</span>
+        </Link>
+
+        {/* Ativos */}
+        <div>
+          <button onClick={() => toggle('ativos')} className={itemCls(path.startsWith('/ativos'))}>
+            <Package className="w-4 h-4 flex-shrink-0" />
+            <span className="flex-1 text-left">Ativos</span>
+            <ChevronDown className={`w-4 h-4 transition-transform ${expanded.ativos ? 'rotate-180' : ''}`} />
+          </button>
+          {expanded.ativos && (
+            <div className="mt-0.5 space-y-0.5">
+              <Link href="/ativos" onClick={onClose} className={subCls(path === '/ativos')}>
+                <List className="w-3.5 h-3.5 flex-shrink-0" />
+                Listar Ativos
+              </Link>
+              <Link href="/ativos/novo" onClick={onClose} className={subCls(path === '/ativos/novo')}>
+                <PlusCircle className="w-3.5 h-3.5 flex-shrink-0" />
+                Adicionar Ativo
+              </Link>
             </div>
-            <Link href="/admin/usuarios" onClick={onClose}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all
-                ${path === '/admin/usuarios' ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white'}`}>
+          )}
+        </div>
+
+        {/* Movimentações */}
+        <div>
+          <button onClick={() => toggle('movimentacoes')} className={itemCls(path.startsWith('/movimentacoes'))}>
+            <List className="w-4 h-4 flex-shrink-0" />
+            <span className="flex-1 text-left">Movimentações</span>
+            <ChevronDown className={`w-4 h-4 transition-transform ${expanded.movimentacoes ? 'rotate-180' : ''}`} />
+          </button>
+          {expanded.movimentacoes && (
+            <div className="mt-0.5 space-y-0.5">
+              <Link href="/movimentacoes" onClick={onClose} className={subCls(path === '/movimentacoes')}>
+                <List className="w-3.5 h-3.5 flex-shrink-0" />
+                Listar Movimentações
+              </Link>
+              <Link href="/movimentacoes/entrada" onClick={onClose} className={subCls(path === '/movimentacoes/entrada')}>
+                <ArrowDownCircle className="w-3.5 h-3.5 flex-shrink-0" />
+                Entrada de Estoque
+              </Link>
+              <Link href="/movimentacoes/saida" onClick={onClose} className={subCls(path === '/movimentacoes/saida')}>
+                <ArrowUpCircle className="w-3.5 h-3.5 flex-shrink-0" />
+                Saída de Estoque
+              </Link>
+            </div>
+          )}
+        </div>
+
+        {/* Fornecedores */}
+        <Link href="/fornecedores" onClick={onClose} className={itemCls(path === '/fornecedores')}>
+          <Truck className="w-4 h-4 flex-shrink-0" />
+          <span className="flex-1">Fornecedores</span>
+        </Link>
+
+        {/* Administração */}
+        {session?.user.perfil === 'admin' && (
+          <div>
+            <button onClick={() => toggle('admin')} className={itemCls(path.startsWith('/admin'))}>
               <Users className="w-4 h-4 flex-shrink-0" />
-              <span>Usuários</span>
-            </Link>
-            <Link href="/admin/historico" onClick={onClose}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all
-                ${path === '/admin/historico' ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white'}`}>
-              <History className="w-4 h-4 flex-shrink-0" />
-              <span>Histórico</span>
-            </Link>
-            <Link href="/admin/setores" onClick={onClose}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all
-                ${path === '/admin/setores' ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white'}`}>
-              <Building2 className="w-4 h-4 flex-shrink-0" />
-              <span>Setores</span>
-            </Link>
-          </>
+              <span className="flex-1 text-left">Administração</span>
+              <ChevronDown className={`w-4 h-4 transition-transform ${expanded.admin ? 'rotate-180' : ''}`} />
+            </button>
+            {expanded.admin && (
+              <div className="mt-0.5 space-y-0.5">
+                <Link href="/admin/usuarios" onClick={onClose} className={subCls(path === '/admin/usuarios')}>
+                  <Users className="w-3.5 h-3.5 flex-shrink-0" />
+                  Usuários
+                </Link>
+                <Link href="/admin/historico" onClick={onClose} className={subCls(path === '/admin/historico')}>
+                  <History className="w-3.5 h-3.5 flex-shrink-0" />
+                  Histórico
+                </Link>
+                <Link href="/admin/setores" onClick={onClose} className={subCls(path === '/admin/setores')}>
+                  <Building2 className="w-3.5 h-3.5 flex-shrink-0" />
+                  Setores
+                </Link>
+              </div>
+            )}
+          </div>
         )}
       </nav>
 
