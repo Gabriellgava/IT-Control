@@ -1,11 +1,13 @@
 'use client'
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useSession } from 'next-auth/react'
 import { Button, Input, Select, Textarea } from '@/components/ui'
 import type { Ativo, Fornecedor } from '@/types'
 
 export function AtivoForm({ ativo, fornecedores, onSuccess, onCancel }: { ativo?: Ativo; fornecedores: Fornecedor[]; onSuccess?: () => void; onCancel?: () => void }) {
   const router = useRouter()
+  const { data: session } = useSession()
   const [loading, setLoading] = useState(false)
   const [erro, setErro] = useState('')
   const [form, setForm] = useState({
@@ -24,7 +26,11 @@ export function AtivoForm({ ativo, fornecedores, onSuccess, onCancel }: { ativo?
       const res = await fetch(ativo ? `/api/ativos/${ativo.id}` : '/api/ativos', {
         method: ativo ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
+        body: JSON.stringify({
+          ...form,
+          usuarioId: session?.user.id,
+          responsavel: session?.user.name ?? session?.user.email,
+        }),
       })
       const data = await res.json()
       if (!res.ok) { setErro(data.error || 'Erro ao salvar'); setLoading(false); return }
