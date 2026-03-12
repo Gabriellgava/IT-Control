@@ -3,11 +3,11 @@ export function formatMoeda(valor: number): string {
 }
 
 export function formatData(data: string | Date): string {
-  return new Intl.DateTimeFormat('pt-BR').format(new Date(data))
+  return new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo' }).format(new Date(data))
 }
 
 export function formatDataHora(data: string | Date): string {
-  return new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(data))
+  return new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short', timeZone: 'America/Sao_Paulo' }).format(new Date(data))
 }
 
 export function estoqueBaixo(quantidade: number, minimo: number): boolean {
