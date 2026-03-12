@@ -9,10 +9,12 @@ export default function Page() {
   useEffect(() => { fetch('/api/fornecedores').then(r => r.json()).then(setFornecedores) }, [])
   return (
     <AppLayout>
-      <div className="max-w-2xl">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">Adicionar Ativo</h1>
-        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-6">
-          <AtivoForm fornecedores={fornecedores} />
+      <div className="flex justify-center">
+        <div className="w-full max-w-2xl">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">Adicionar Ativo</h1>
+          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-6">
+            <AtivoForm fornecedores={fornecedores} />
+          </div>
         </div>
       </div>
     </AppLayout>
