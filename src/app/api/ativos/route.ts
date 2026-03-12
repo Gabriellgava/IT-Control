@@ -30,18 +30,19 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
+    const { usuarioId, responsavel, ...ativoData } = body
     const ativo = await prisma.ativo.create({
       data: {
-        nome: body.nome,
-        codigo: body.codigo,
-        etiqueta: body.etiqueta || null,
-        fornecedorId: body.fornecedorId || null,
-        linkCompra: body.linkCompra || null,
-        valorUnitario: parseFloat(body.valorUnitario) || 0,
-        quantidade: parseInt(body.quantidade) || 0,
-        estoqueMinimo: parseInt(body.estoqueMinimo) || 5,
-        dataCompra: body.dataCompra ? new Date(body.dataCompra) : null,
-        observacoes: body.observacoes || null,
+        nome: ativoData.nome,
+        codigo: ativoData.codigo,
+        etiqueta: ativoData.etiqueta || null,
+        fornecedorId: ativoData.fornecedorId || null,
+        linkCompra: ativoData.linkCompra || null,
+        valorUnitario: parseFloat(ativoData.valorUnitario) || 0,
+        quantidade: parseInt(ativoData.quantidade) || 0,
+        estoqueMinimo: parseInt(ativoData.estoqueMinimo) || 5,
+        dataCompra: ativoData.dataCompra ? new Date(ativoData.dataCompra) : null,
+        observacoes: ativoData.observacoes || null,
       },
       include: { fornecedor: true },
     })
@@ -55,7 +56,8 @@ export async function POST(request: NextRequest) {
           valorUnitario: ativo.valorUnitario,
           data: ativo.dataCompra || new Date(),
           fornecedorId: ativo.fornecedorId,
-          responsavel: 'Sistema',
+          usuarioId: usuarioId || null,
+          responsavel: responsavel || 'Sistema',
           observacoes: 'Cadastro inicial',
         },
       })
