@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
           ativoId: ativo.id,
           quantidade: ativo.quantidade,
           valorUnitario: ativo.valorUnitario,
-          data: ativo.dataCompra || new Date(),
+          data: new Date(), // sempre usa a hora atual do cadastro
           fornecedorId: ativo.fornecedorId,
           usuarioId: usuarioId || null,
           responsavel: responsavel || 'Sistema',
