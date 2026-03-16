@@ -12,6 +12,7 @@ export async function GET(request: NextRequest) {
   const ativoId = searchParams.get('ativoId') || ''
   const usuarioId = searchParams.get('usuarioId') || ''
   const setorId = searchParams.get('setorId') || ''
+  const categoriaId = searchParams.get('categoriaId') || ''
   const pagina = parseInt(searchParams.get('pagina') || '1')
   const porPagina = 20
 
@@ -20,12 +21,13 @@ export async function GET(request: NextRequest) {
   if (ativoId) where.ativoId = ativoId
   if (usuarioId) where.usuarioId = usuarioId
   if (setorId) where.setorId = setorId
+  if (categoriaId) where.ativo = { categoriaId }
 
   const [total, movimentacoes] = await Promise.all([
     prisma.movimentacao.count({ where }),
     prisma.movimentacao.findMany({
       where,
-      include: { ativo: true, fornecedor: true, setor: true, usuario: true },
+      include: { ativo: { include: { categoria: true } }, fornecedor: true, setor: true, usuario: true },
       orderBy: { data: 'desc' },
       skip: (pagina - 1) * porPagina,
       take: porPagina,

@@ -1,3 +1,11 @@
+export interface Categoria {
+  id: string
+  nome: string
+  estoqueMinimo: number
+  criadoEm: string
+  _count?: { ativos: number }
+}
+
 export interface Ativo {
   id: string
   nome: string
@@ -5,12 +13,14 @@ export interface Ativo {
   etiqueta?: string | null
   fornecedorId?: string | null
   fornecedor?: Fornecedor | null
+  categoriaId?: string | null
+  categoria?: Categoria | null
   linkCompra?: string | null
   valorUnitario: number
   quantidade: number
-  estoqueMinimo: number
   dataCompra?: string | null
   observacoes?: string | null
+  deletado?: boolean
   criadoEm: string
   atualizadoEm: string
 }
@@ -67,5 +77,6 @@ export interface DashboardStats {
   ultimasMovimentacoes: Movimentacao[]
   topAtivos: { nome: string; totalSaida: number }[]
   distribuicaoFornecedor: { nome: string; quantidade: number }[]
+  distribuicaoCategoria: { nome: string; quantidade: number }[]
   graficoMovimentacoes: { data: string; entradas: number; saidas: number }[]
 }

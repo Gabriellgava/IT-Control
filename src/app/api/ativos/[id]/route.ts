@@ -5,7 +5,7 @@ export async function GET(_: NextRequest, { params }: { params: { id: string } }
   try {
     const ativo = await prisma.ativo.findUnique({
       where: { id: params.id },
-      include: { fornecedor: true, movimentacoes: { include: { fornecedor: true, setor: true, usuario: true }, orderBy: { data: 'desc' } } },
+      include: { fornecedor: true, categoria: true, movimentacoes: { include: { fornecedor: true, setor: true, usuario: true }, orderBy: { data: 'desc' } } },
     })
     if (!ativo) return NextResponse.json({ error: 'Ativo não encontrado' }, { status: 404 })
     return NextResponse.json(ativo)
@@ -25,13 +25,13 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
         codigo: body.codigo,
         etiqueta: body.etiqueta || null,
         fornecedorId: body.fornecedorId || null,
+        categoriaId: body.categoriaId || null,
         linkCompra: body.linkCompra || null,
         valorUnitario: parseFloat(body.valorUnitario) || 0,
-        estoqueMinimo: parseInt(body.estoqueMinimo) || 5,
         dataCompra: body.dataCompra ? new Date(body.dataCompra) : null,
         observacoes: body.observacoes || null,
       },
-      include: { fornecedor: true },
+      include: { fornecedor: true, categoria: true },
     })
     return NextResponse.json(ativo)
   } catch (error) {
@@ -42,10 +42,9 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
 
 export async function DELETE(_: NextRequest, { params }: { params: { id: string } }) {
   try {
-    // Soft delete: marca como deletado, preserva histórico
     await prisma.ativo.update({
       where: { id: params.id },
-      data: { deletado: true, quantidade: 0, estoqueMinimo: 0 },
+      data: { deletado: true, quantidade: 0 },
     })
     return NextResponse.json({ sucesso: true })
   } catch (error) {

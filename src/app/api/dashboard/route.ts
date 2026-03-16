@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server'
-
 export const dynamic = "force-dynamic"
 export const revalidate = 0
 import { prisma } from '@/lib/prisma'
@@ -9,19 +8,26 @@ export async function GET() {
   try {
     const ativos = await prisma.ativo.findMany({
       where: { deletado: false },
-      include: { fornecedor: true },
+      include: { fornecedor: true, categoria: true },
     })
 
     const totalAtivos = ativos.length
     const totalItens = ativos.reduce((s, a) => s + a.quantidade, 0)
     const valorTotal = ativos.reduce((s, a) => s + a.quantidade * a.valorUnitario, 0)
-    const estoqueBaixoCount = ativos.filter(a => a.quantidade <= a.estoqueMinimo).length
+
+    // Estoque baixo por categoria: soma qtd de todos ativos da categoria
+    const categorias = await prisma.categoria.findMany({
+      include: { ativos: { where: { deletado: false } } },
+    })
+    const estoqueBaixoCount = categorias.filter(c =>
+      c.estoqueMinimo > 0 && c.ativos.reduce((s, a) => s + a.quantidade, 0) <= c.estoqueMinimo
+    ).length
 
     const ultimasMovimentacoes = await prisma.movimentacao.findMany({
       take: 10,
       where: { cancelado: false },
       orderBy: { criadoEm: 'desc' },
-      include: { ativo: true, fornecedor: true, setor: true, usuario: true },
+      include: { ativo: { include: { categoria: true } }, fornecedor: true, setor: true, usuario: true },
     })
 
     const topAtivosRaw = await prisma.movimentacao.groupBy({
@@ -47,6 +53,14 @@ export async function GET() {
     }, {} as Record<string, number>)
     const distribuicaoFornecedor = Object.entries(dist).map(([nome, quantidade]) => ({ nome, quantidade }))
 
+    // Distribuição por categoria
+    const distCategoria = ativos.reduce((acc, a) => {
+      const key = a.categoria?.nome ?? 'Sem Categoria'
+      acc[key] = (acc[key] || 0) + a.quantidade
+      return acc
+    }, {} as Record<string, number>)
+    const distribuicaoCategoria = Object.entries(distCategoria).map(([nome, quantidade]) => ({ nome, quantidade }))
+
     const graficoMovimentacoes = []
     for (let i = 6; i >= 0; i--) {
       const dia = subDays(new Date(), i)
@@ -65,9 +79,9 @@ export async function GET() {
         entradas: entradas._sum.quantidade ?? 0,
         saidas: saidas._sum.quantidade ?? 0,
       })
-        }
+    }
 
-    return NextResponse.json({ totalAtivos, totalItens, valorTotal, estoqueBaixoCount, ultimasMovimentacoes, topAtivos, distribuicaoFornecedor, graficoMovimentacoes })
+    return NextResponse.json({ totalAtivos, totalItens, valorTotal, estoqueBaixoCount, ultimasMovimentacoes, topAtivos, distribuicaoFornecedor, distribuicaoCategoria, graficoMovimentacoes })
   } catch (error) {
     console.error(error)
     return NextResponse.json({ error: 'Erro ao buscar dados' }, { status: 500 })

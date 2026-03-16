@@ -115,7 +115,7 @@ export function MovimentacaoForm({ tipo }: { tipo: 'ENTRADA' | 'SAIDA' }) {
           {erros.ativoId && <p className="text-xs text-red-500">{erros.ativoId}</p>}
         </div>
 
-        {ativoSel && tipo === 'SAIDA' && ativoSel.quantidade <= ativoSel.estoqueMinimo && (
+        {ativoSel && tipo === 'SAIDA' && ativoSel.quantidade <= 0 && (
           <div className="p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg text-xs text-amber-700 dark:text-amber-400">
             ⚠️ Atenção: este produto está com estoque baixo ({ativoSel.quantidade} unidades)
           </div>
