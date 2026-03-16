@@ -86,6 +86,16 @@ model Usuario {
   @@map("usuarios")
 }
 
+model Categoria {
+  id            String   @id @default(cuid())
+  nome          String   @unique
+  estoqueMinimo Int      @default(0) @map("estoque_minimo")
+  criadoEm      DateTime @default(now()) @map("criado_em")
+  ativos        Ativo[]
+
+  @@map("categorias")
+}
+
 model Ativo {
   id            String         @id @default(cuid())
   nome          String
@@ -93,10 +103,11 @@ model Ativo {
   etiqueta      String?        @unique
   fornecedorId  String?        @map("fornecedor_id")
   fornecedor    Fornecedor?    @relation(fields: [fornecedorId], references: [id])
+  categoriaId   String?        @map("categoria_id")
+  categoria     Categoria?     @relation(fields: [categoriaId], references: [id])
   linkCompra    String?        @map("link_compra")
   valorUnitario Float          @default(0) @map("valor_unitario")
   quantidade    Int            @default(0)
-  estoqueMinimo Int            @default(5) @map("estoque_minimo")
   dataCompra    DateTime?      @map("data_compra")
   observacoes   String?
   deletado      Boolean        @default(false)

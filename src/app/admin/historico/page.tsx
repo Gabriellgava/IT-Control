@@ -10,7 +10,7 @@ import { formatMoeda, formatDataHora, exportarCSV } from '@/lib/utils'
 interface Mov {
   id: string; tipo: string; quantidade: number; valorUnitario: number; data: string
   responsavel: string | null; observacoes: string | null
-  ativo: { id: string; nome: string; codigo: string } | null
+  ativo: { id: string; nome: string; codigo: string; categoria?: { nome: string } | null } | null
   fornecedor: { nome: string } | null
   setor: { nome: string } | null
   usuario: { id: string; nome: string | null; email: string | null } | null
@@ -18,6 +18,7 @@ interface Mov {
 interface Ativo { id: string; nome: string; codigo: string }
 interface Usuario { id: string; nome: string | null; email: string | null }
 interface Setor { id: string; nome: string }
+interface Categoria { id: string; nome: string }
 
 export default function HistoricoPage() {
   const { data: session } = useSession()
@@ -26,11 +27,12 @@ export default function HistoricoPage() {
   const [ativos, setAtivos] = useState<Ativo[]>([])
   const [usuarios, setUsuarios] = useState<Usuario[]>([])
   const [setores, setSetores] = useState<Setor[]>([])
+  const [categorias, setCategorias] = useState<Categoria[]>([])
   const [loading, setLoading] = useState(true)
   const [total, setTotal] = useState(0)
   const [paginas, setPaginas] = useState(1)
   const [pagina, setPagina] = useState(1)
-  const [filtros, setFiltros] = useState({ tipo: '', ativoId: '', usuarioId: '', setorId: '' })
+  const [filtros, setFiltros] = useState({ tipo: '', ativoId: '', usuarioId: '', setorId: '', categoriaId: '' })
   const f = (k: string, v: string) => { setFiltros(p => ({ ...p, [k]: v })); setPagina(1) }
 
   useEffect(() => {
@@ -41,6 +43,7 @@ export default function HistoricoPage() {
     fetch('/api/ativos').then(r => r.json()).then(setAtivos)
     fetch('/api/admin/usuarios').then(r => r.json()).then(setUsuarios)
     fetch('/api/setores').then(r => r.json()).then(setSetores)
+    fetch('/api/categorias').then(r => r.json()).then(setCategorias)
   }, [])
 
   const buscar = useCallback(async () => {
@@ -50,6 +53,7 @@ export default function HistoricoPage() {
     if (filtros.ativoId) p.set('ativoId', filtros.ativoId)
     if (filtros.usuarioId) p.set('usuarioId', filtros.usuarioId)
     if (filtros.setorId) p.set('setorId', filtros.setorId)
+    if (filtros.categoriaId) p.set('categoriaId', filtros.categoriaId)
     p.set('pagina', pagina.toString())
     const res = await fetch(`/api/admin/historico?${p}`)
     const data = await res.json()
@@ -65,17 +69,17 @@ export default function HistoricoPage() {
     Tipo: m.tipo,
     Produto: m.ativo?.nome ?? '(deletado)',
     Código: m.ativo?.codigo ?? '—',
+    Categoria: m.ativo?.categoria?.nome ?? '—',
     Quantidade: m.quantidade,
     'Valor Unit.': m.valorUnitario,
     Setor: m.setor?.nome ?? '—',
     Fornecedor: m.fornecedor?.nome ?? '—',
     Usuário: m.usuario?.nome ?? m.usuario?.email ?? '—',
     Responsável: m.responsavel ?? '—',
-    Observações: m.observacoes ?? '—',
     Data: formatDataHora(m.data),
   })), 'historico-movimentacoes')
 
-  const limparFiltros = () => { setFiltros({ tipo: '', ativoId: '', usuarioId: '', setorId: '' }); setPagina(1) }
+  const limparFiltros = () => { setFiltros({ tipo: '', ativoId: '', usuarioId: '', setorId: '', categoriaId: '' }); setPagina(1) }
   const temFiltro = Object.values(filtros).some(v => v !== '')
 
   return (
@@ -92,11 +96,15 @@ export default function HistoricoPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
           <Select value={filtros.tipo} onChange={e => f('tipo', e.target.value)}>
             <option value="">Todos os tipos</option>
             <option value="ENTRADA">Entradas</option>
             <option value="SAIDA">Saídas</option>
+          </Select>
+          <Select value={filtros.categoriaId} onChange={e => f('categoriaId', e.target.value)}>
+            <option value="">Todas as categorias</option>
+            {categorias.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
           </Select>
           <Select value={filtros.ativoId} onChange={e => f('ativoId', e.target.value)}>
             <option value="">Todos os produtos</option>
@@ -119,7 +127,7 @@ export default function HistoricoPage() {
         {loading ? (
           <div className="flex items-center justify-center h-48"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" /></div>
         ) : (
-          <Table headers={['Tipo', 'Produto', 'Qtd', 'Valor Unit.', 'Setor / Fornecedor', 'Usuário', 'Responsável', 'Data']} empty={movs.length === 0}>
+          <Table headers={['Tipo', 'Produto', 'Categoria', 'Qtd', 'Valor Unit.', 'Setor / Fornecedor', 'Usuário', 'Data']} empty={movs.length === 0}>
             {movs.map(m => (
               <tr key={m.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
                 <td className="px-4 py-3">
@@ -133,6 +141,11 @@ export default function HistoricoPage() {
                     : <p className="text-sm text-gray-400 italic">(produto deletado)</p>}
                 </td>
                 <td className="px-4 py-3">
+                  {m.ativo?.categoria
+                    ? <Badge variant="info">{m.ativo.categoria.nome}</Badge>
+                    : <span className="text-xs text-gray-400">—</span>}
+                </td>
+                <td className="px-4 py-3">
                   <span className={`text-sm font-bold ${m.tipo === 'ENTRADA' ? 'text-green-600' : 'text-amber-600'}`}>
                     {m.tipo === 'ENTRADA' ? '+' : '-'}{m.quantidade}
                   </span>
@@ -140,7 +153,6 @@ export default function HistoricoPage() {
                 <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">{formatMoeda(m.valorUnitario)}</td>
                 <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">{m.tipo === 'ENTRADA' ? (m.fornecedor?.nome ?? '—') : (m.setor?.nome ?? '—')}</td>
                 <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">{m.usuario?.nome ?? m.usuario?.email ?? '—'}</td>
-                <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">{m.responsavel ?? '—'}</td>
                 <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">{formatDataHora(m.data)}</td>
               </tr>
             ))}
