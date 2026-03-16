@@ -27,7 +27,6 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
         fornecedorId: body.fornecedorId || null,
         linkCompra: body.linkCompra || null,
         valorUnitario: parseFloat(body.valorUnitario) || 0,
-        estoqueMinimo: parseInt(body.estoqueMinimo) || 5,
         dataCompra: body.dataCompra ? new Date(body.dataCompra) : null,
         observacoes: body.observacoes || null,
       },
@@ -45,7 +44,6 @@ export async function DELETE(_: NextRequest, { params }: { params: { id: string 
     // Soft delete: marca como deletado, preserva histórico
     await prisma.ativo.update({
       where: { id: params.id },
-      data: { deletado: true, quantidade: 0, estoqueMinimo: 0 },
     })
     return NextResponse.json({ sucesso: true })
   } catch (error) {
