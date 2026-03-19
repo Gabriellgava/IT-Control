@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 export const dynamic = "force-dynamic"
 export const revalidate = 0
 import { prisma } from '@/lib/prisma'
-import { subDays, format } from 'date-fns'
+import { subDays, format, startOfMonth } from 'date-fns'
 
 export async function GET() {
   try {
@@ -15,13 +15,21 @@ export async function GET() {
     const totalItens = ativos.reduce((s, a) => s + a.quantidade, 0)
     const valorTotal = ativos.reduce((s, a) => s + a.quantidade * a.valorUnitario, 0)
 
-    // Estoque baixo por categoria: soma qtd de todos ativos da categoria
+    // Estoque baixo por categoria
     const categorias = await prisma.categoria.findMany({
       include: { ativos: { where: { deletado: false } } },
     })
     const estoqueBaixoCount = categorias.filter(c =>
       c.estoqueMinimo > 0 && c.ativos.reduce((s, a) => s + a.quantidade, 0) <= c.estoqueMinimo
     ).length
+
+    // Descartes do mês atual
+    const inicioMes = startOfMonth(new Date())
+    const descartesDoMes = await prisma.movimentacao.aggregate({
+      where: { tipo: 'SAIDA', subtipo: 'DESCARTE', cancelado: false, data: { gte: inicioMes } },
+      _sum: { quantidade: true },
+      _count: { id: true },
+    })
 
     const ultimasMovimentacoes = await prisma.movimentacao.findMany({
       take: 10,
@@ -32,7 +40,7 @@ export async function GET() {
 
     const topAtivosRaw = await prisma.movimentacao.groupBy({
       by: ['ativoId'],
-      where: { tipo: 'SAIDA', cancelado: false },
+      where: { tipo: 'SAIDA', subtipo: 'USUARIO', cancelado: false },
       _sum: { quantidade: true },
       orderBy: { _sum: { quantidade: 'desc' } },
       take: 5,
@@ -53,7 +61,6 @@ export async function GET() {
     }, {} as Record<string, number>)
     const distribuicaoFornecedor = Object.entries(dist).map(([nome, quantidade]) => ({ nome, quantidade }))
 
-    // Distribuição por categoria
     const distCategoria = ativos.reduce((acc, a) => {
       const key = a.categoria?.nome ?? 'Sem Categoria'
       acc[key] = (acc[key] || 0) + a.quantidade
@@ -71,17 +78,26 @@ export async function GET() {
         _sum: { quantidade: true },
       })
       const saidas = await prisma.movimentacao.aggregate({
-        where: { tipo: 'SAIDA', cancelado: false, data: { gte: inicio, lte: fim } },
+        where: { tipo: 'SAIDA', subtipo: 'USUARIO', cancelado: false, data: { gte: inicio, lte: fim } },
+        _sum: { quantidade: true },
+      })
+      const descartes = await prisma.movimentacao.aggregate({
+        where: { tipo: 'SAIDA', subtipo: 'DESCARTE', cancelado: false, data: { gte: inicio, lte: fim } },
         _sum: { quantidade: true },
       })
       graficoMovimentacoes.push({
         data: format(inicio, 'dd/MM'),
         entradas: entradas._sum.quantidade ?? 0,
         saidas: saidas._sum.quantidade ?? 0,
+        descartes: descartes._sum.quantidade ?? 0,
       })
     }
 
-    return NextResponse.json({ totalAtivos, totalItens, valorTotal, estoqueBaixoCount, ultimasMovimentacoes, topAtivos, distribuicaoFornecedor, distribuicaoCategoria, graficoMovimentacoes })
+    return NextResponse.json({
+      totalAtivos, totalItens, valorTotal, estoqueBaixoCount,
+      descartesDoMes: { quantidade: descartesDoMes._sum.quantidade ?? 0, count: descartesDoMes._count.id ?? 0 },
+      ultimasMovimentacoes, topAtivos, distribuicaoFornecedor, distribuicaoCategoria, graficoMovimentacoes
+    })
   } catch (error) {
     console.error(error)
     return NextResponse.json({ error: 'Erro ao buscar dados' }, { status: 500 })

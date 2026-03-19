@@ -1,104 +1,136 @@
-# 🖥️ TI Assets — Sistema de Controle de Ativos de TI
+# 🖥️ IT Control — Sistema de Controle de Ativos de TI
 
-Sistema profissional de controle de ativos e estoque de TI, com dashboard, histórico de movimentações, alertas de estoque baixo e exportação de dados.
+Sistema profissional fullstack de controle de ativos e estoque de TI, com dashboard em tempo real, histórico completo de movimentações, alertas de estoque por categoria e controle de descartes.
+
+🔗 **[Acessar sistema](https://it-control-fast.vercel.app)**
+
+---
 
 ## ✨ Funcionalidades
 
-- **Dashboard profissional** com gráficos de movimentações, distribuição por fornecedor e indicadores
-- **Cadastro completo de ativos** (nome, código, etiqueta, fornecedor, valor, estoque, links de compra)
-- **Controle de entradas** com registro de fornecedor, data e valor
-- **Controle de saídas** com registro de setor destino, usuário responsável e data
-- **Histórico completo** de todas as movimentações
-- **Alertas automáticos** de estoque baixo (item fica vermelho quando abaixo do mínimo)
-- **Gerenciamento de fornecedores**
-- **Exportação para CSV** de ativos e movimentações
-- **Busca e filtros** por nome, código, etiqueta e fornecedor
-- **Paginação** na listagem de ativos
-- **Modo escuro/claro**
-- **Interface responsiva** (desktop, tablet, celular)
+### 📊 Dashboard
+- Cards com total de produtos, itens em estoque, valor total, categorias em estoque baixo e descartes do mês
+- Gráfico de movimentações dos últimos 7 dias (entradas, saídas e descartes)
+- Gráfico de distribuição por fornecedor
+- Top produtos com maior saída
+- Feed das últimas movimentações
 
-## 🚀 Como rodar
+### 📦 Ativos
+- Cadastro completo (nome, código, etiqueta, categoria, fornecedor, valor, data de compra, link de compra)
+- Busca por nome, código ou etiqueta
+- Filtros por categoria, fornecedor e estoque baixo
+- Soft delete — histórico preservado após exclusão
+- Exportação em CSV
 
-### Pré-requisitos
-- Node.js 18+
-- npm ou yarn
+### 🔄 Movimentações
+- **Entrada de estoque** — com fornecedor, data e valor unitário
+- **Saída para usuário** — com setor destino e funcionário que recebe
+- **Descarte** — registra motivo, zera estoque do item automaticamente
+- Cancelamento de movimentações (admin) com estorno automático de estoque
 
-### Instalação
+### 🏷️ Categorias
+- Estoque mínimo definido por categoria (ex: Teclados mínimo 4 unidades)
+- Alerta disparado quando a soma de todos os ativos da categoria fica abaixo do mínimo
+- CRUD completo pelo admin
 
-```bash
-# 1. Instalar dependências
-npm install
+### 🏢 Fornecedores
+- Cadastro com contato, e-mail, telefone e site
+- Máscara automática de telefone
 
-# 2. Configurar banco de dados (SQLite local)
-npx prisma db push
+### 🔐 Autenticação
+- Login com Google OAuth
+- Login com e-mail e senha
+- Controle de acesso por perfil (admin / usuário)
+- Usuários inativos bloqueados automaticamente
 
-# 3. (Opcional) Popular com dados de exemplo
-npm run db:seed
+### ⚙️ Administração
+- Gerenciamento de usuários (ativar/desativar, alterar perfil)
+- Gerenciamento de setores
+- Gerenciamento de categorias
+- Histórico completo com filtros por tipo, subtipo, categoria, produto, usuário e setor
+- Exportação do histórico em CSV
 
-# 4. Iniciar servidor de desenvolvimento
-npm run dev
-```
+### 🎨 Interface
+- Modo escuro / claro
+- Totalmente responsivo (desktop, tablet, celular)
+- Sidebar colapsável com submenus
 
-Acesse: http://localhost:3000
+---
 
-## 🗄️ Banco de dados
+## 🛠️ Tecnologias
 
-O projeto usa SQLite por padrão (arquivo `prisma/dev.db`). Para usar PostgreSQL, altere o `.env`:
+| Tecnologia | Versão | Uso |
+|---|---|---|
+| Next.js | 14 | Framework fullstack (App Router) |
+| React | 18 | Interface |
+| TypeScript | 5 | Tipagem estática |
+| TailwindCSS | 3 | Estilização |
+| Prisma ORM | 5 | Banco de dados |
+| PostgreSQL | — | Banco (Neon.tech) |
+| NextAuth.js | 4 | Autenticação |
+| Recharts | 2 | Gráficos |
+| Lucide React | — | Ícones |
 
-```env
-DATABASE_URL="postgresql://usuario:senha@localhost:5432/ti_assets"
-```
+---
 
-E no `prisma/schema.prisma`, mude `provider = "sqlite"` para `provider = "postgresql"`.
+## 🗄️ Banco de Dados
 
-## 🌐 Deploy na Vercel
+| Tabela | Descrição |
+|---|---|
+| `usuarios` | Usuários do sistema |
+| `accounts` | Contas OAuth (NextAuth) |
+| `sessions` | Sessões ativas (NextAuth) |
+| `ativos` | Equipamentos de TI |
+| `categorias` | Categorias com estoque mínimo |
+| `fornecedores` | Fornecedores |
+| `setores` | Setores da empresa |
+| `movimentacoes` | Histórico de entradas, saídas e descartes |
 
+---
 
-## 📁 Estrutura do projeto
+## 📁 Estrutura
 
 ```
 src/
 ├── app/
-│   ├── api/               # API Routes (backend)
-│   │   ├── assets/        # CRUD de ativos
-│   │   ├── movements/     # Movimentações
-│   │   ├── suppliers/     # Fornecedores
-│   │   ├── sectors/       # Setores
-│   │   ├── users/         # Usuários
-│   │   └── dashboard/     # Stats do dashboard
-│   ├── dashboard/         # Página do dashboard
-│   ├── assets/            # Páginas de ativos
-│   ├── movements/         # Páginas de movimentações
-│   └── suppliers/         # Página de fornecedores
+│   ├── api/                  # Backend (API Routes)
+│   │   ├── ativos/
+│   │   ├── movimentacoes/
+│   │   ├── categorias/
+│   │   ├── fornecedores/
+│   │   ├── setores/
+│   │   ├── dashboard/
+│   │   └── admin/
+│   ├── dashboard/
+│   ├── ativos/
+│   ├── movimentacoes/
+│   ├── fornecedores/
+│   ├── admin/
+│   └── login/
 ├── components/
-│   ├── layout/            # Sidebar e AppLayout
-│   ├── ui/                # Componentes reutilizáveis
-│   ├── dashboard/         # Componentes do dashboard
-│   ├── assets/            # Formulário e lista de ativos
-│   └── movements/         # Formulário e lista de movimentações
+│   ├── layout/               # Sidebar, AppLayout
+│   ├── ui/                   # Componentes reutilizáveis
+│   ├── dashboard/
+│   ├── ativos/
+│   └── movimentacoes/
 ├── lib/
-│   ├── prisma.ts          # Instância do Prisma
-│   └── utils.ts           # Funções utilitárias
+│   ├── prisma.ts
+│   ├── auth.ts
+│   ├── utils.ts
+│   └── mascaras.ts
 └── types/
-    └── index.ts           # Types TypeScript
+    └── index.ts
 prisma/
-├── schema.prisma          # Schema do banco
+└── schema.prisma
 ```
 
-## 🛠️ Tecnologias
+---
 
-- **Next.js 14** — Framework React com App Router
-- **TypeScript** — Tipagem estática
-- **TailwindCSS** — Estilização
-- **Prisma** — ORM
-- **PostgreSQL** — Banco de dados
-- **Recharts** — Gráficos interativos
-- **Lucide React** — Ícones
+## 🚀 Deploy
 
-## 📋 Tabelas do banco
+Hospedado na **Vercel** com deploy automático a partir da branch `main`.  
+Banco de dados **PostgreSQL** na **Neon.tech**.
 
-- `Ativos` — Produtos/ativos de TI
-- `Fornecedores` — Fornecedores
-- `Movimentacoes` — Histórico de entradas e saídas
-- `setor` — Setores da empresa
-- `usuario` — Usuários do sistema
+---
+
+*Desenvolvido por [Gabriell Gava](https://github.com/Gabriellgava)*
