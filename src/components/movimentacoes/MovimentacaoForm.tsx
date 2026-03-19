@@ -227,7 +227,7 @@ export function MovimentacaoForm({ tipo }: { tipo: 'ENTRADA' | 'SAIDA' }) {
           label={subtipo === 'DESCARTE' ? 'Motivo do descarte *' : 'Observações'}
           value={form.observacoes}
           onChange={e => s('observacoes', e.target.value)}
-          error={erros.observacoes}
+          
           placeholder={subtipo === 'DESCARTE' ? 'Ex: Equipamento danificado, queimado, sem conserto...' : 'Informações adicionais...'}
           rows={3}
         />
