@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { Package, AlertTriangle, TrendingUp, DollarSign, ArrowDownCircle, ArrowUpCircle } from 'lucide-react'
+import { Package, AlertTriangle, TrendingUp, DollarSign, ArrowDownCircle, ArrowUpCircle, Trash2 } from 'lucide-react'
 import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import { StatCard, Card } from '@/components/ui'
 import { formatMoeda, formatDataHora } from '@/lib/utils'
@@ -26,11 +26,12 @@ export function DashboardPage() {
         <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Visão geral do estoque e ativos de TI</p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
         <StatCard label="Total de Produtos" value={stats.totalAtivos} icon={<Package className="w-5 h-5" />} color="blue" sub="ativos cadastrados" />
         <StatCard label="Itens em Estoque" value={stats.totalItens} icon={<TrendingUp className="w-5 h-5" />} color="green" sub="unidades disponíveis" />
         <StatCard label="Valor do Estoque" value={formatMoeda(stats.valorTotal)} icon={<DollarSign className="w-5 h-5" />} color="purple" sub="valor total" />
-        <StatCard label="Estoque Baixo" value={stats.estoqueBaixoCount} icon={<AlertTriangle className="w-5 h-5" />} color={stats.estoqueBaixoCount > 0 ? 'red' : 'green'} sub={stats.estoqueBaixoCount > 0 ? 'requerem reposição' : 'tudo ok'} />
+        <StatCard label="Estoque Baixo" value={stats.estoqueBaixoCount} icon={<AlertTriangle className="w-5 h-5" />} color={stats.estoqueBaixoCount > 0 ? 'red' : 'green'} sub={stats.estoqueBaixoCount > 0 ? 'categorias abaixo do mínimo' : 'tudo ok'} />
+        <StatCard label="Descartes no Mês" value={stats.descartesDoMes.count} icon={<Trash2 className="w-5 h-5" />} color="amber" sub={`${stats.descartesDoMes.quantidade} unidades descartadas`} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -45,6 +46,7 @@ export function DashboardPage() {
               <Legend iconSize={10} wrapperStyle={{ fontSize: 12 }} />
               <Bar dataKey="entradas" name="Entradas" fill="#3b82f6" radius={[4, 4, 0, 0]} />
               <Bar dataKey="saidas" name="Saídas" fill="#f59e0b" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="descartes" name="Descartes" fill="#ef4444" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </Card>
@@ -90,14 +92,26 @@ export function DashboardPage() {
             {stats.ultimasMovimentacoes.length === 0 ? <p className="text-sm text-gray-400">Nenhuma movimentação</p> :
               stats.ultimasMovimentacoes.slice(0, 6).map(m => (
                 <div key={m.id} className="flex items-center gap-3 py-1.5 border-b border-gray-50 dark:border-gray-800 last:border-0">
-                  <div className={`p-1.5 rounded-lg flex-shrink-0 ${m.tipo === 'ENTRADA' ? 'bg-green-50 dark:bg-green-900/20 text-green-500' : 'bg-amber-50 dark:bg-amber-900/20 text-amber-500'}`}>
-                    {m.tipo === 'ENTRADA' ? <ArrowDownCircle className="w-3.5 h-3.5" /> : <ArrowUpCircle className="w-3.5 h-3.5" />}
+                  <div className={`p-1.5 rounded-lg flex-shrink-0 ${
+                    m.tipo === 'ENTRADA' ? 'bg-green-50 dark:bg-green-900/20 text-green-500'
+                    : m.subtipo === 'DESCARTE' ? 'bg-red-50 dark:bg-red-900/20 text-red-500'
+                    : 'bg-amber-50 dark:bg-amber-900/20 text-amber-500'
+                  }`}>
+                    {m.tipo === 'ENTRADA' ? <ArrowDownCircle className="w-3.5 h-3.5" />
+                      : m.subtipo === 'DESCARTE' ? <Trash2 className="w-3.5 h-3.5" />
+                      : <ArrowUpCircle className="w-3.5 h-3.5" />}
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-xs font-medium text-gray-900 dark:text-white truncate">{m.ativo?.nome}</p>
-                    <p className="text-xs text-gray-400">{m.tipo === 'ENTRADA' ? 'Entrada' : `Saída → ${m.setor?.nome ?? ''}`} · {formatDataHora(m.data)}</p>
+                    <p className="text-xs text-gray-400">
+                      {m.tipo === 'ENTRADA' ? 'Entrada'
+                        : m.subtipo === 'DESCARTE' ? 'Descarte'
+                        : `Saída → ${m.setor?.nome ?? ''}`} · {formatDataHora(m.data)}
+                    </p>
                   </div>
-                  <span className={`text-xs font-bold ${m.tipo === 'ENTRADA' ? 'text-green-600' : 'text-amber-600'}`}>{m.tipo === 'ENTRADA' ? '+' : '-'}{m.quantidade}</span>
+                  <span className={`text-xs font-bold ${m.tipo === 'ENTRADA' ? 'text-green-600' : m.subtipo === 'DESCARTE' ? 'text-red-600' : 'text-amber-600'}`}>
+                    {m.tipo === 'ENTRADA' ? '+' : '-'}{m.quantidade}
+                  </span>
                 </div>
               ))}
           </div>

@@ -50,6 +50,7 @@ export interface Usuario {
 export interface Movimentacao {
   id: string
   tipo: 'ENTRADA' | 'SAIDA'
+  subtipo?: 'USUARIO' | 'DESCARTE' | null
   ativoId: string
   ativo?: Ativo
   quantidade: number
@@ -74,9 +75,10 @@ export interface DashboardStats {
   totalItens: number
   valorTotal: number
   estoqueBaixoCount: number
+  descartesDoMes: { quantidade: number; count: number }
   ultimasMovimentacoes: Movimentacao[]
   topAtivos: { nome: string; totalSaida: number }[]
   distribuicaoFornecedor: { nome: string; quantidade: number }[]
   distribuicaoCategoria: { nome: string; quantidade: number }[]
-  graficoMovimentacoes: { data: string; entradas: number; saidas: number }[]
+  graficoMovimentacoes: { data: string; entradas: number; saidas: number; descartes: number }[]
 }

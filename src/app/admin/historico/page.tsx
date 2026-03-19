@@ -4,11 +4,11 @@ import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { Badge, Table, Select, Button } from '@/components/ui'
-import { ArrowDownCircle, ArrowUpCircle, Download, RefreshCw } from 'lucide-react'
+import { ArrowDownCircle, ArrowUpCircle, Download, RefreshCw, Trash2 } from 'lucide-react'
 import { formatMoeda, formatDataHora, exportarCSV } from '@/lib/utils'
 
 interface Mov {
-  id: string; tipo: string; quantidade: number; valorUnitario: number; data: string
+  id: string; tipo: string; subtipo?: string | null; quantidade: number; valorUnitario: number; data: string
   responsavel: string | null; observacoes: string | null
   ativo: { id: string; nome: string; codigo: string; categoria?: { nome: string } | null } | null
   fornecedor: { nome: string } | null
@@ -32,7 +32,7 @@ export default function HistoricoPage() {
   const [total, setTotal] = useState(0)
   const [paginas, setPaginas] = useState(1)
   const [pagina, setPagina] = useState(1)
-  const [filtros, setFiltros] = useState({ tipo: '', ativoId: '', usuarioId: '', setorId: '', categoriaId: '' })
+  const [filtros, setFiltros] = useState({ tipo: '', subtipo: '', ativoId: '', usuarioId: '', setorId: '', categoriaId: '' })
   const f = (k: string, v: string) => { setFiltros(p => ({ ...p, [k]: v })); setPagina(1) }
 
   useEffect(() => {
@@ -50,6 +50,7 @@ export default function HistoricoPage() {
     setLoading(true)
     const p = new URLSearchParams()
     if (filtros.tipo) p.set('tipo', filtros.tipo)
+    if (filtros.subtipo) p.set('subtipo', filtros.subtipo)
     if (filtros.ativoId) p.set('ativoId', filtros.ativoId)
     if (filtros.usuarioId) p.set('usuarioId', filtros.usuarioId)
     if (filtros.setorId) p.set('setorId', filtros.setorId)
@@ -67,6 +68,7 @@ export default function HistoricoPage() {
 
   const exportar = () => exportarCSV(movs.map(m => ({
     Tipo: m.tipo,
+    Subtipo: m.subtipo ?? '—',
     Produto: m.ativo?.nome ?? '(deletado)',
     Código: m.ativo?.codigo ?? '—',
     Categoria: m.ativo?.categoria?.nome ?? '—',
@@ -76,10 +78,11 @@ export default function HistoricoPage() {
     Fornecedor: m.fornecedor?.nome ?? '—',
     Usuário: m.usuario?.nome ?? m.usuario?.email ?? '—',
     Responsável: m.responsavel ?? '—',
+    Observações: m.observacoes ?? '—',
     Data: formatDataHora(m.data),
   })), 'historico-movimentacoes')
 
-  const limparFiltros = () => { setFiltros({ tipo: '', ativoId: '', usuarioId: '', setorId: '', categoriaId: '' }); setPagina(1) }
+  const limparFiltros = () => { setFiltros({ tipo: '', subtipo: '', ativoId: '', usuarioId: '', setorId: '', categoriaId: '' }); setPagina(1) }
   const temFiltro = Object.values(filtros).some(v => v !== '')
 
   return (
@@ -96,11 +99,16 @@ export default function HistoricoPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+        <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
           <Select value={filtros.tipo} onChange={e => f('tipo', e.target.value)}>
             <option value="">Todos os tipos</option>
             <option value="ENTRADA">Entradas</option>
             <option value="SAIDA">Saídas</option>
+          </Select>
+          <Select value={filtros.subtipo} onChange={e => f('subtipo', e.target.value)}>
+            <option value="">Todos os subtipos</option>
+            <option value="USUARIO">Saída p/ Usuário</option>
+            <option value="DESCARTE">Descarte</option>
           </Select>
           <Select value={filtros.categoriaId} onChange={e => f('categoriaId', e.target.value)}>
             <option value="">Todas as categorias</option>
@@ -127,13 +135,15 @@ export default function HistoricoPage() {
         {loading ? (
           <div className="flex items-center justify-center h-48"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" /></div>
         ) : (
-          <Table headers={['Tipo', 'Produto', 'Categoria', 'Qtd', 'Valor Unit.', 'Setor / Fornecedor', 'Usuário', 'Data']} empty={movs.length === 0}>
+          <Table headers={['Tipo', 'Produto', 'Categoria', 'Qtd', 'Valor Unit.', 'Destino', 'Usuário', 'Data']} empty={movs.length === 0}>
             {movs.map(m => (
               <tr key={m.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
                 <td className="px-4 py-3">
                   {m.tipo === 'ENTRADA'
                     ? <Badge variant="success"><ArrowDownCircle className="w-3 h-3 mr-1" />Entrada</Badge>
-                    : <Badge variant="warning"><ArrowUpCircle className="w-3 h-3 mr-1" />Saída</Badge>}
+                    : m.subtipo === 'DESCARTE'
+                      ? <Badge variant="danger"><Trash2 className="w-3 h-3 mr-1" />Descarte</Badge>
+                      : <Badge variant="warning"><ArrowUpCircle className="w-3 h-3 mr-1" />Saída</Badge>}
                 </td>
                 <td className="px-4 py-3">
                   {m.ativo
@@ -146,12 +156,16 @@ export default function HistoricoPage() {
                     : <span className="text-xs text-gray-400">—</span>}
                 </td>
                 <td className="px-4 py-3">
-                  <span className={`text-sm font-bold ${m.tipo === 'ENTRADA' ? 'text-green-600' : 'text-amber-600'}`}>
+                  <span className={`text-sm font-bold ${m.tipo === 'ENTRADA' ? 'text-green-600' : m.subtipo === 'DESCARTE' ? 'text-red-600' : 'text-amber-600'}`}>
                     {m.tipo === 'ENTRADA' ? '+' : '-'}{m.quantidade}
                   </span>
                 </td>
                 <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">{formatMoeda(m.valorUnitario)}</td>
-                <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">{m.tipo === 'ENTRADA' ? (m.fornecedor?.nome ?? '—') : (m.setor?.nome ?? '—')}</td>
+                <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
+                  {m.tipo === 'ENTRADA' ? (m.fornecedor?.nome ?? '—')
+                    : m.subtipo === 'DESCARTE' ? <span className="text-red-500 text-xs font-medium">Descartado</span>
+                    : (m.setor?.nome ?? '—')}
+                </td>
                 <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">{m.usuario?.nome ?? m.usuario?.email ?? '—'}</td>
                 <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">{formatDataHora(m.data)}</td>
               </tr>

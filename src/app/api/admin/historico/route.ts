@@ -9,6 +9,7 @@ export async function GET(request: NextRequest) {
 
   const { searchParams } = new URL(request.url)
   const tipo = searchParams.get('tipo') || ''
+  const subtipo = searchParams.get('subtipo') || ''
   const ativoId = searchParams.get('ativoId') || ''
   const usuarioId = searchParams.get('usuarioId') || ''
   const setorId = searchParams.get('setorId') || ''
@@ -18,6 +19,7 @@ export async function GET(request: NextRequest) {
 
   const where: Record<string, unknown> = {}
   if (tipo) where.tipo = tipo
+  if (subtipo) where.subtipo = subtipo
   if (ativoId) where.ativoId = ativoId
   if (usuarioId) where.usuarioId = usuarioId
   if (setorId) where.setorId = setorId

@@ -121,6 +121,7 @@ model Ativo {
 model Movimentacao {
   id            String      @id @default(cuid())
   tipo          String
+  subtipo       String?     @default("USUARIO") @map("subtipo")
   ativoId       String      @map("ativo_id")
   ativo         Ativo       @relation(fields: [ativoId], references: [id])
   quantidade    Int
