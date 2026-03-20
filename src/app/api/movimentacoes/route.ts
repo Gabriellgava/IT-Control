@@ -49,6 +49,8 @@ export async function POST(request: NextRequest) {
       data: {
         quantidade: novaQuantidade,
         valorUnitario: tipo === 'ENTRADA' ? parseFloat(valorUnitario) || ativo.valorUnitario : ativo.valorUnitario,
+        // Descarte → soft delete automático: some da lista mas histórico preservado
+        ...(subtipo === 'DESCARTE' && { deletado: true }),
       },
     })
 
