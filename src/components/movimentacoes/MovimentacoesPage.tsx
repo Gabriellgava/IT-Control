@@ -2,18 +2,18 @@
 import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
 import { useSession } from 'next-auth/react'
-import { ArrowDownCircle, ArrowUpCircle, Download, XCircle } from 'lucide-react'
+import { ArrowDownCircle, ArrowUpCircle, Download, XCircle, Trash2 } from 'lucide-react'
 import { Button, Badge, Table, Select, Modal } from '@/components/ui'
 import { formatMoeda, formatDataHora, exportarCSV } from '@/lib/utils'
-import type { Movimentacao, Ativo } from '@/types'
+import type { Movimentacao, Produto } from '@/types'
 
 export function MovimentacoesPage() {
   const { data: session } = useSession()
   const [movs, setMovs] = useState<Movimentacao[]>([])
-  const [ativos, setAtivos] = useState<Ativo[]>([])
+  const [produtos, setProdutos] = useState<Produto[]>([])
   const [loading, setLoading] = useState(true)
   const [filtroTipo, setFiltroTipo] = useState('')
-  const [filtroProduto, setFiltroAtivo] = useState('')
+  const [filtroProduto, setFiltroProduto] = useState('')
   const [cancelandoId, setCancelandoId] = useState<string | null>(null)
   const [cancelando, setCancelando] = useState(false)
   const isAdmin = session?.user.perfil === 'admin'
@@ -27,7 +27,10 @@ export function MovimentacoesPage() {
     setMovs(await res.json()); setLoading(false)
   }, [filtroTipo, filtroProduto])
 
-  useEffect(() => { buscar(); fetch('/api/ativos').then(r => r.json()).then(setAtivos) }, [buscar])
+  useEffect(() => {
+    buscar()
+    fetch('/api/produtos').then(r => r.json()).then(setProdutos)
+  }, [buscar])
 
   const cancelar = async () => {
     if (!cancelandoId) return
@@ -37,10 +40,16 @@ export function MovimentacoesPage() {
   }
 
   const exportar = () => exportarCSV(movs.filter(m => !m.cancelado).map(m => ({
-    Tipo: m.tipo, Produto: m.ativo?.nome ?? '', Código: m.ativo?.codigo ?? '',
-    Quantidade: m.quantidade, 'Valor Unitário': m.valorUnitario,
-    Fornecedor: m.fornecedor?.nome ?? '', Setor: m.setor?.nome ?? '',
-    Responsável: m.responsavel ?? '', Data: formatDataHora(m.data), Observações: m.observacoes ?? '',
+    Tipo: m.tipo,
+    Subtipo: m.subtipo ?? '—',
+    Produto: m.unidade?.produto?.nome ?? '—',
+    Etiqueta: m.unidade?.etiqueta ?? '—',
+    'Valor Unitário': m.valorUnitario,
+    Fornecedor: m.fornecedor?.nome ?? '—',
+    Setor: m.setor?.nome ?? '—',
+    Responsável: m.responsavel ?? '—',
+    Data: formatDataHora(m.data),
+    Observações: m.observacoes ?? '',
   })), 'movimentacoes-ti')
 
   if (loading) return <div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" /></div>
@@ -65,32 +74,35 @@ export function MovimentacoesPage() {
           <option value="ENTRADA">Entradas</option>
           <option value="SAIDA">Saídas</option>
         </Select>
-        <Select value={filtroProduto} onChange={e => setFiltroAtivo(e.target.value)} className="w-60">
+        <Select value={filtroProduto} onChange={e => setFiltroProduto(e.target.value)} className="w-60">
           <option value="">Todos os produtos</option>
-          {ativos.map(a => <option key={a.id} value={a.id}>{a.nome}</option>)}
+          {produtos.map(p => <option key={p.id} value={p.id}>{p.nome}</option>)}
         </Select>
       </div>
 
-      <Table headers={['Tipo', 'Produto', 'Qtd', 'Valor Unit.', 'Fornecedor / Setor', 'Responsável', 'Data', ...(isAdmin ? [''] : [])]} empty={movs.length === 0}>
+      <Table headers={['Tipo', 'Produto / Etiqueta', 'Valor Unit.', 'Destino', 'Responsável', 'Data', ...(isAdmin ? [''] : [])]} empty={movs.length === 0}>
         {movs.map(m => (
           <tr key={m.id} className={`hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors ${m.cancelado ? 'opacity-40' : ''}`}>
             <td className="px-4 py-3">
               <div className="flex flex-col gap-1">
                 {m.tipo === 'ENTRADA'
                   ? <Badge variant="success"><ArrowDownCircle className="w-3 h-3 mr-1" />Entrada</Badge>
-                  : <Badge variant="warning"><ArrowUpCircle className="w-3 h-3 mr-1" />Saída</Badge>}
-                {m.cancelado && <Badge variant="danger">Cancelada</Badge>}
+                  : m.subtipo === 'DESCARTE'
+                    ? <Badge variant="danger"><Trash2 className="w-3 h-3 mr-1" />Descarte</Badge>
+                    : <Badge variant="warning"><ArrowUpCircle className="w-3 h-3 mr-1" />Saída</Badge>}
+                {m.cancelado && <Badge variant="default">Cancelada</Badge>}
               </div>
             </td>
             <td className="px-4 py-3">
-              <p className="text-sm font-medium text-gray-900 dark:text-white">{m.ativo?.nome ?? '(deletado)'}</p>
-              <p className="text-xs text-gray-400 font-mono">{m.ativo?.codigo}</p>
-            </td>
-            <td className="px-4 py-3">
-              <span className={`text-sm font-bold ${m.tipo === 'ENTRADA' ? 'text-green-600' : 'text-amber-600'}`}>{m.tipo === 'ENTRADA' ? '+' : '-'}{m.quantidade}</span>
+              <p className="text-sm font-medium text-gray-900 dark:text-white">{m.unidade?.produto?.nome ?? '—'}</p>
+              <p className="text-xs text-gray-400 font-mono">{m.unidade?.etiqueta ?? '—'}</p>
             </td>
             <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">{formatMoeda(m.valorUnitario)}</td>
-            <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">{m.tipo === 'ENTRADA' ? (m.fornecedor?.nome ?? '—') : (m.setor?.nome ?? '—')}</td>
+            <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
+              {m.tipo === 'ENTRADA' ? (m.fornecedor?.nome ?? '—')
+                : m.subtipo === 'DESCARTE' ? <span className="text-red-500 text-xs font-medium">Descartado</span>
+                : (m.setor?.nome ?? '—')}
+            </td>
             <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">{m.responsavel ?? m.usuario?.nome ?? '—'}</td>
             <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">{formatDataHora(m.data)}</td>
             {isAdmin && (
@@ -111,7 +123,7 @@ export function MovimentacoesPage() {
       <Modal open={!!cancelandoId} onClose={() => setCancelandoId(null)} title="Cancelar movimentação">
         <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">Deseja cancelar esta movimentação?</p>
         <p className="text-xs text-amber-600 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg p-3 mb-6">
-          ⚠️ A quantidade será estornada no estoque automaticamente.
+          ⚠️ A unidade será reativada no estoque automaticamente.
         </p>
         <div className="flex gap-3 justify-end">
           <Button variant="secondary" onClick={() => setCancelandoId(null)}>Voltar</Button>
