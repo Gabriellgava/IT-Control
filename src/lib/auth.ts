@@ -33,12 +33,36 @@ export const authOptions: NextAuthOptions = {
   session: { strategy: 'jwt' },
   callbacks: {
   async jwt({ token, user, account }) {
-    // ... seu código
+    // Quando faz login
+    if (user) {
+      token.id = user.id
+    }
+
+    // Para login com Google, garantir dados do banco
+    if (account?.provider === 'google' && token.email) {
+      const dbUser = await prisma.usuario.findUnique({
+        where: { email: token.email as string },
+      })
+
+      if (dbUser) {
+        token.id = dbUser.id
+        token.name = dbUser.nome
+        token.picture = dbUser.image
+        token.perfil = dbUser.perfil
+        token.ativo = dbUser.ativo
+      }
+    }
+
     return token
   },
 
   async session({ session, token }) {
-    // ... seu código
+    if (session.user) {
+      session.user.id = token.id as string
+      session.user.name = token.name as string
+      session.user.perfil = token.perfil as string
+    }
+
     return session
   },
 
