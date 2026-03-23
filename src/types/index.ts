@@ -3,26 +3,7 @@ export interface Categoria {
   nome: string
   estoqueMinimo: number
   criadoEm: string
-  _count?: { ativos: number }
-}
-
-export interface Ativo {
-  id: string
-  nome: string
-  codigo: string
-  etiqueta?: string | null
-  fornecedorId?: string | null
-  fornecedor?: Fornecedor | null
-  categoriaId?: string | null
-  categoria?: Categoria | null
-  linkCompra?: string | null
-  valorUnitario: number
-  quantidade: number
-  dataCompra?: string | null
-  observacoes?: string | null
-  deletado?: boolean
-  criadoEm: string
-  atualizadoEm: string
+  _count?: { produtos: number }
 }
 
 export interface Fornecedor {
@@ -47,13 +28,40 @@ export interface Usuario {
   perfil: string
 }
 
+export interface Produto {
+  id: string
+  nome: string
+  codigo: string
+  categoriaId?: string | null
+  categoria?: Categoria | null
+  fornecedorId?: string | null
+  fornecedor?: Fornecedor | null
+  valorUnitario: number
+  linkCompra?: string | null
+  observacoes?: string | null
+  criadoEm: string
+  atualizadoEm: string
+  unidades?: Unidade[]
+  _count?: { unidades: number }
+}
+
+export interface Unidade {
+  id: string
+  produtoId: string
+  produto?: Produto
+  etiqueta: string
+  dataCompra?: string | null
+  status: 'ATIVA' | 'DESCARTADA'
+  criadoEm: string
+  movimentacoes?: Movimentacao[]
+}
+
 export interface Movimentacao {
   id: string
   tipo: 'ENTRADA' | 'SAIDA'
   subtipo?: 'USUARIO' | 'DESCARTE' | null
-  ativoId: string
-  ativo?: Ativo
-  quantidade: number
+  unidadeId: string
+  unidade?: Unidade & { produto?: Produto }
   valorUnitario: number
   data: string
   fornecedorId?: string | null
@@ -71,14 +79,13 @@ export interface Movimentacao {
 }
 
 export interface DashboardStats {
-  totalAtivos: number
-  totalItens: number
+  totalProdutos: number
+  totalUnidades: number
   valorTotal: number
   estoqueBaixoCount: number
-  descartesDoMes: { quantidade: number; count: number }
+  descartesDoMes: { count: number }
   ultimasMovimentacoes: Movimentacao[]
-  topAtivos: { nome: string; totalSaida: number }[]
-  distribuicaoFornecedor: { nome: string; quantidade: number }[]
+  topProdutos: { nome: string; totalSaida: number }[]
   distribuicaoCategoria: { nome: string; quantidade: number }[]
   graficoMovimentacoes: { data: string; entradas: number; saidas: number; descartes: number }[]
 }

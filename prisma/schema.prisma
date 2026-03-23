@@ -45,30 +45,6 @@ model VerificationToken {
   @@map("verification_tokens")
 }
 
-model Fornecedor {
-  id            String         @id @default(cuid())
-  nome          String
-  contato       String?
-  email         String?
-  telefone      String?
-  site          String?
-  criadoEm      DateTime       @default(now()) @map("criado_em")
-  atualizadoEm  DateTime       @updatedAt @map("atualizado_em")
-  ativos        Ativo[]
-  movimentacoes Movimentacao[]
-
-  @@map("fornecedores")
-}
-
-model Setor {
-  id            String         @id @default(cuid())
-  nome          String         @unique
-  criadoEm      DateTime       @default(now()) @map("criado_em")
-  movimentacoes Movimentacao[]
-
-  @@map("setores")
-}
-
 model Usuario {
   id            String         @id @default(cuid())
   nome          String?
@@ -87,44 +63,76 @@ model Usuario {
 }
 
 model Categoria {
-  id            String   @id @default(cuid())
-  nome          String   @unique
-  estoqueMinimo Int      @default(0) @map("estoque_minimo")
-  criadoEm      DateTime @default(now()) @map("criado_em")
-  ativos        Ativo[]
+  id            String    @id @default(cuid())
+  nome          String    @unique
+  estoqueMinimo Int       @default(0) @map("estoque_minimo")
+  criadoEm      DateTime  @default(now()) @map("criado_em")
+  produtos      Produto[]
 
   @@map("categorias")
 }
 
-model Ativo {
+model Fornecedor {
   id            String         @id @default(cuid())
   nome          String
-  codigo        String         @unique
-  etiqueta      String?        @unique
-  fornecedorId  String?        @map("fornecedor_id")
-  fornecedor    Fornecedor?    @relation(fields: [fornecedorId], references: [id])
-  categoriaId   String?        @map("categoria_id")
-  categoria     Categoria?     @relation(fields: [categoriaId], references: [id])
-  linkCompra    String?        @map("link_compra")
-  valorUnitario Float          @default(0) @map("valor_unitario")
-  quantidade    Int            @default(0)
-  dataCompra    DateTime?      @map("data_compra")
-  observacoes   String?
-  deletado      Boolean        @default(false)
+  contato       String?
+  email         String?
+  telefone      String?
+  site          String?
   criadoEm      DateTime       @default(now()) @map("criado_em")
   atualizadoEm  DateTime       @updatedAt @map("atualizado_em")
+  produtos      Produto[]
   movimentacoes Movimentacao[]
 
-  @@map("ativos")
+  @@map("fornecedores")
+}
+
+model Setor {
+  id            String         @id @default(cuid())
+  nome          String         @unique
+  criadoEm      DateTime       @default(now()) @map("criado_em")
+  movimentacoes Movimentacao[]
+
+  @@map("setores")
+}
+
+model Produto {
+  id            String     @id @default(cuid())
+  nome          String
+  codigo        String     @unique
+  categoriaId   String?    @map("categoria_id")
+  categoria     Categoria? @relation(fields: [categoriaId], references: [id])
+  fornecedorId  String?    @map("fornecedor_id")
+  fornecedor    Fornecedor? @relation(fields: [fornecedorId], references: [id])
+  valorUnitario Float      @default(0) @map("valor_unitario")
+  linkCompra    String?    @map("link_compra")
+  observacoes   String?
+  criadoEm      DateTime   @default(now()) @map("criado_em")
+  atualizadoEm  DateTime   @updatedAt @map("atualizado_em")
+  unidades      Unidade[]
+
+  @@map("produtos")
+}
+
+model Unidade {
+  id            String         @id @default(cuid())
+  produtoId     String         @map("produto_id")
+  produto       Produto        @relation(fields: [produtoId], references: [id])
+  etiqueta      String         @unique
+  dataCompra    DateTime?      @map("data_compra")
+  status        String         @default("ATIVA")
+  criadoEm      DateTime       @default(now()) @map("criado_em")
+  movimentacoes Movimentacao[]
+
+  @@map("unidades")
 }
 
 model Movimentacao {
   id            String      @id @default(cuid())
   tipo          String
-  subtipo       String?     @default("USUARIO") @map("subtipo")
-  ativoId       String      @map("ativo_id")
-  ativo         Ativo       @relation(fields: [ativoId], references: [id])
-  quantidade    Int
+  subtipo       String?
+  unidadeId     String      @map("unidade_id")
+  unidade       Unidade     @relation(fields: [unidadeId], references: [id])
   valorUnitario Float       @default(0) @map("valor_unitario")
   data          DateTime    @default(now())
   fornecedorId  String?     @map("fornecedor_id")

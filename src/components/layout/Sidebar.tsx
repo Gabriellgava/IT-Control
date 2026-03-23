@@ -16,7 +16,7 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
   }, [])
 
   useEffect(() => {
-    if (path.startsWith('/ativos')) setExpanded(e => ({ ...e, ativos: true }))
+    if (path.startsWith('/produtos')) setExpanded(e => ({ ...e, produtos: true }))
     if (path.startsWith('/movimentacoes')) setExpanded(e => ({ ...e, movimentacoes: true }))
     if (path.startsWith('/admin')) setExpanded(e => ({ ...e, admin: true }))
   }, [path])
@@ -48,29 +48,34 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
       </div>
 
       <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
+
         <Link href="/dashboard" onClick={onClose} className={itemCls(path === '/dashboard')}>
           <LayoutDashboard className="w-4 h-4 flex-shrink-0" />
           <span className="flex-1">Dashboard</span>
         </Link>
 
+        {/* Produtos */}
         <div>
-          <button onClick={() => toggle('ativos')} className={itemCls(path.startsWith('/ativos'))}>
+          <button onClick={() => toggle('produtos')} className={itemCls(path.startsWith('/produtos'))}>
             <Package className="w-4 h-4 flex-shrink-0" />
-            <span className="flex-1 text-left">Ativos</span>
-            <ChevronDown className={`w-4 h-4 transition-transform ${expanded.ativos ? 'rotate-180' : ''}`} />
+            <span className="flex-1 text-left">Produtos</span>
+            <ChevronDown className={`w-4 h-4 transition-transform ${expanded.produtos ? 'rotate-180' : ''}`} />
           </button>
-          {expanded.ativos && (
+          {expanded.produtos && (
             <div className="mt-0.5 space-y-0.5">
-              <Link href="/ativos" onClick={onClose} className={subCls(path === '/ativos')}>
-                <List className="w-3.5 h-3.5 flex-shrink-0" />Listar Ativos
+              <Link href="/produtos" onClick={onClose} className={subCls(path === '/produtos')}>
+                <List className="w-3.5 h-3.5 flex-shrink-0" />
+                Listar Produtos
               </Link>
-              <Link href="/ativos/novo" onClick={onClose} className={subCls(path === '/ativos/novo')}>
-                <PlusCircle className="w-3.5 h-3.5 flex-shrink-0" />Adicionar Ativo
+              <Link href="/produtos/novo" onClick={onClose} className={subCls(path === '/produtos/novo')}>
+                <PlusCircle className="w-3.5 h-3.5 flex-shrink-0" />
+                Novo Produto
               </Link>
             </div>
           )}
         </div>
 
+        {/* Movimentações */}
         <div>
           <button onClick={() => toggle('movimentacoes')} className={itemCls(path.startsWith('/movimentacoes'))}>
             <List className="w-4 h-4 flex-shrink-0" />
@@ -80,23 +85,28 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
           {expanded.movimentacoes && (
             <div className="mt-0.5 space-y-0.5">
               <Link href="/movimentacoes" onClick={onClose} className={subCls(path === '/movimentacoes')}>
-                <List className="w-3.5 h-3.5 flex-shrink-0" />Listar Movimentações
+                <List className="w-3.5 h-3.5 flex-shrink-0" />
+                Listar Movimentações
               </Link>
               <Link href="/movimentacoes/entrada" onClick={onClose} className={subCls(path === '/movimentacoes/entrada')}>
-                <ArrowDownCircle className="w-3.5 h-3.5 flex-shrink-0" />Entrada de Estoque
+                <ArrowDownCircle className="w-3.5 h-3.5 flex-shrink-0" />
+                Entrada de Estoque
               </Link>
               <Link href="/movimentacoes/saida" onClick={onClose} className={subCls(path === '/movimentacoes/saida')}>
-                <ArrowUpCircle className="w-3.5 h-3.5 flex-shrink-0" />Saída de Estoque
+                <ArrowUpCircle className="w-3.5 h-3.5 flex-shrink-0" />
+                Saída de Estoque
               </Link>
             </div>
           )}
         </div>
 
+        {/* Fornecedores */}
         <Link href="/fornecedores" onClick={onClose} className={itemCls(path === '/fornecedores')}>
           <Truck className="w-4 h-4 flex-shrink-0" />
           <span className="flex-1">Fornecedores</span>
         </Link>
 
+        {/* Administração */}
         {session?.user.perfil === 'admin' && (
           <div>
             <button onClick={() => toggle('admin')} className={itemCls(path.startsWith('/admin'))}>
@@ -107,16 +117,20 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
             {expanded.admin && (
               <div className="mt-0.5 space-y-0.5">
                 <Link href="/admin/usuarios" onClick={onClose} className={subCls(path === '/admin/usuarios')}>
-                  <Users className="w-3.5 h-3.5 flex-shrink-0" />Usuários
+                  <Users className="w-3.5 h-3.5 flex-shrink-0" />
+                  Usuários
                 </Link>
                 <Link href="/admin/historico" onClick={onClose} className={subCls(path === '/admin/historico')}>
-                  <History className="w-3.5 h-3.5 flex-shrink-0" />Histórico
+                  <History className="w-3.5 h-3.5 flex-shrink-0" />
+                  Histórico
                 </Link>
                 <Link href="/admin/setores" onClick={onClose} className={subCls(path === '/admin/setores')}>
-                  <Building2 className="w-3.5 h-3.5 flex-shrink-0" />Setores
+                  <Building2 className="w-3.5 h-3.5 flex-shrink-0" />
+                  Setores
                 </Link>
                 <Link href="/admin/categorias" onClick={onClose} className={subCls(path === '/admin/categorias')}>
-                  <Tag className="w-3.5 h-3.5 flex-shrink-0" />Categorias
+                  <Tag className="w-3.5 h-3.5 flex-shrink-0" />
+                  Categorias
                 </Link>
               </div>
             )}
