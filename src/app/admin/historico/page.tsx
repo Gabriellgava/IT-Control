@@ -8,14 +8,14 @@ import { ArrowDownCircle, ArrowUpCircle, Download, RefreshCw, Trash2 } from 'luc
 import { formatMoeda, formatDataHora, exportarCSV } from '@/lib/utils'
 
 interface Mov {
-  id: string; tipo: string; subtipo?: string | null; quantidade: number; valorUnitario: number; data: string
+  id: string; tipo: string; subtipo?: string | null; valorUnitario: number; data: string
   responsavel: string | null; observacoes: string | null
-  ativo: { id: string; nome: string; codigo: string; categoria?: { nome: string } | null } | null
+  unidade: { id: string; etiqueta: string; produto?: { nome: string; codigo: string; categoria?: { nome: string } | null } | null } | null
   fornecedor: { nome: string } | null
   setor: { nome: string } | null
   usuario: { id: string; nome: string | null; email: string | null } | null
 }
-interface Ativo { id: string; nome: string; codigo: string }
+interface Produto { id: string; nome: string; codigo: string }
 interface Usuario { id: string; nome: string | null; email: string | null }
 interface Setor { id: string; nome: string }
 interface Categoria { id: string; nome: string }
@@ -24,7 +24,7 @@ export default function HistoricoPage() {
   const { data: session } = useSession()
   const router = useRouter()
   const [movs, setMovs] = useState<Mov[]>([])
-  const [ativos, setAtivos] = useState<Ativo[]>([])
+  const [produtos, setProdutos] = useState<Produto[]>([])
   const [usuarios, setUsuarios] = useState<Usuario[]>([])
   const [setores, setSetores] = useState<Setor[]>([])
   const [categorias, setCategorias] = useState<Categoria[]>([])
@@ -32,7 +32,7 @@ export default function HistoricoPage() {
   const [total, setTotal] = useState(0)
   const [paginas, setPaginas] = useState(1)
   const [pagina, setPagina] = useState(1)
-  const [filtros, setFiltros] = useState({ tipo: '', subtipo: '', ativoId: '', usuarioId: '', setorId: '', categoriaId: '' })
+  const [filtros, setFiltros] = useState({ tipo: '', subtipo: '', produtoId: '', usuarioId: '', setorId: '', categoriaId: '' })
   const f = (k: string, v: string) => { setFiltros(p => ({ ...p, [k]: v })); setPagina(1) }
 
   useEffect(() => {
@@ -40,7 +40,7 @@ export default function HistoricoPage() {
   }, [session, router])
 
   useEffect(() => {
-    fetch('/api/ativos').then(r => r.json()).then(setAtivos)
+    fetch('/api/produtos').then(r => r.json()).then(setProdutos)
     fetch('/api/admin/usuarios').then(r => r.json()).then(setUsuarios)
     fetch('/api/setores').then(r => r.json()).then(setSetores)
     fetch('/api/categorias').then(r => r.json()).then(setCategorias)
@@ -51,7 +51,7 @@ export default function HistoricoPage() {
     const p = new URLSearchParams()
     if (filtros.tipo) p.set('tipo', filtros.tipo)
     if (filtros.subtipo) p.set('subtipo', filtros.subtipo)
-    if (filtros.ativoId) p.set('ativoId', filtros.ativoId)
+    if (filtros.produtoId) p.set('produtoId', filtros.produtoId)
     if (filtros.usuarioId) p.set('usuarioId', filtros.usuarioId)
     if (filtros.setorId) p.set('setorId', filtros.setorId)
     if (filtros.categoriaId) p.set('categoriaId', filtros.categoriaId)
@@ -69,10 +69,9 @@ export default function HistoricoPage() {
   const exportar = () => exportarCSV(movs.map(m => ({
     Tipo: m.tipo,
     Subtipo: m.subtipo ?? '—',
-    Produto: m.ativo?.nome ?? '(deletado)',
-    Código: m.ativo?.codigo ?? '—',
-    Categoria: m.ativo?.categoria?.nome ?? '—',
-    Quantidade: m.quantidade,
+    Produto: m.unidade?.produto?.nome ?? '(deletado)',
+    Etiqueta: m.unidade?.etiqueta ?? '—',
+    Categoria: m.unidade?.produto?.categoria?.nome ?? '—',
     'Valor Unit.': m.valorUnitario,
     Setor: m.setor?.nome ?? '—',
     Fornecedor: m.fornecedor?.nome ?? '—',
@@ -82,7 +81,7 @@ export default function HistoricoPage() {
     Data: formatDataHora(m.data),
   })), 'historico-movimentacoes')
 
-  const limparFiltros = () => { setFiltros({ tipo: '', subtipo: '', ativoId: '', usuarioId: '', setorId: '', categoriaId: '' }); setPagina(1) }
+  const limparFiltros = () => { setFiltros({ tipo: '', subtipo: '', produtoId: '', usuarioId: '', setorId: '', categoriaId: '' }); setPagina(1) }
   const temFiltro = Object.values(filtros).some(v => v !== '')
 
   return (
@@ -114,9 +113,9 @@ export default function HistoricoPage() {
             <option value="">Todas as categorias</option>
             {categorias.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
           </Select>
-          <Select value={filtros.ativoId} onChange={e => f('ativoId', e.target.value)}>
+          <Select value={filtros.produtoId} onChange={e => f('produtoId', e.target.value)}>
             <option value="">Todos os produtos</option>
-            {ativos.map(a => <option key={a.id} value={a.id}>{a.nome} ({a.codigo})</option>)}
+            {produtos.map(p => <option key={p.id} value={p.id}>{p.nome} ({p.codigo})</option>)}
           </Select>
           <Select value={filtros.usuarioId} onChange={e => f('usuarioId', e.target.value)}>
             <option value="">Todos os usuários</option>
@@ -135,7 +134,7 @@ export default function HistoricoPage() {
         {loading ? (
           <div className="flex items-center justify-center h-48"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" /></div>
         ) : (
-          <Table headers={['Tipo', 'Produto', 'Categoria', 'Qtd', 'Valor Unit.', 'Destino', 'Usuário', 'Data']} empty={movs.length === 0}>
+          <Table headers={['Tipo', 'Produto / Etiqueta', 'Categoria', 'Valor Unit.', 'Destino', 'Usuário', 'Data']} empty={movs.length === 0}>
             {movs.map(m => (
               <tr key={m.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
                 <td className="px-4 py-3">
@@ -146,19 +145,14 @@ export default function HistoricoPage() {
                       : <Badge variant="warning"><ArrowUpCircle className="w-3 h-3 mr-1" />Saída</Badge>}
                 </td>
                 <td className="px-4 py-3">
-                  {m.ativo
-                    ? <><p className="text-sm font-medium text-gray-900 dark:text-white">{m.ativo.nome}</p><p className="text-xs text-gray-400 font-mono">{m.ativo.codigo}</p></>
+                  {m.unidade
+                    ? <><p className="text-sm font-medium text-gray-900 dark:text-white">{m.unidade.produto?.nome ?? '—'}</p><p className="text-xs text-gray-400 font-mono">{m.unidade.etiqueta}</p></>
                     : <p className="text-sm text-gray-400 italic">(produto deletado)</p>}
                 </td>
                 <td className="px-4 py-3">
-                  {m.ativo?.categoria
-                    ? <Badge variant="info">{m.ativo.categoria.nome}</Badge>
+                  {m.unidade?.produto?.categoria
+                    ? <Badge variant="info">{m.unidade.produto.categoria.nome}</Badge>
                     : <span className="text-xs text-gray-400">—</span>}
-                </td>
-                <td className="px-4 py-3">
-                  <span className={`text-sm font-bold ${m.tipo === 'ENTRADA' ? 'text-green-600' : m.subtipo === 'DESCARTE' ? 'text-red-600' : 'text-amber-600'}`}>
-                    {m.tipo === 'ENTRADA' ? '+' : '-'}{m.quantidade}
-                  </span>
                 </td>
                 <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">{formatMoeda(m.valorUnitario)}</td>
                 <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">

@@ -33,10 +33,9 @@ export async function DELETE(_: NextRequest, { params }: { params: { id: string 
     return NextResponse.json({ error: 'Sem permissão' }, { status: 403 })
 
   try {
-    // Verifica se há ativos vinculados
-    const count = await prisma.ativo.count({ where: { categoriaId: params.id, deletado: false } })
+    const count = await prisma.produto.count({ where: { categoriaId: params.id } })
     if (count > 0)
-      return NextResponse.json({ error: `Categoria possui ${count} ativo(s) vinculado(s). Remova-os primeiro.` }, { status: 400 })
+      return NextResponse.json({ error: `Categoria possui ${count} produto(s) vinculado(s). Remova-os primeiro.` }, { status: 400 })
 
     await prisma.categoria.delete({ where: { id: params.id } })
     return NextResponse.json({ sucesso: true })
