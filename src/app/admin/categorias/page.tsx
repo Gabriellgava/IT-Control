@@ -63,7 +63,7 @@ export default function Page() {
               <td className="px-4 py-3">
                 <Badge variant={c.estoqueMinimo > 0 ? 'warning' : 'default'}>{c.estoqueMinimo} unidades</Badge>
               </td>
-              <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">{c._count?.ativos ?? 0} ativo(s)</td>
+              <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">{c._count?.produtos ?? 0} produto(s)</td>
               <td className="px-4 py-3">
                 <div className="flex gap-1">
                   <button onClick={() => abrirEditar(c)} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-400 hover:text-blue-600 transition-colors"><Edit2 className="w-4 h-4" /></button>
