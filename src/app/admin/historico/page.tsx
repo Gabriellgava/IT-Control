@@ -32,7 +32,7 @@ export default function HistoricoPage() {
   const [total, setTotal] = useState(0)
   const [paginas, setPaginas] = useState(1)
   const [pagina, setPagina] = useState(1)
-  const [filtros, setFiltros] = useState({ tipo: '', subtipo: '', ativoId: '', usuarioId: '', setorId: '', categoriaId: '' })
+  const [filtros, setFiltros] = useState({ tipo: '', subtipo: '', produtoId: '', usuarioId: '', setorId: '', categoriaId: '' })
   const f = (k: string, v: string) => { setFiltros(p => ({ ...p, [k]: v })); setPagina(1) }
 
   useEffect(() => {
@@ -51,7 +51,7 @@ export default function HistoricoPage() {
     const p = new URLSearchParams()
     if (filtros.tipo) p.set('tipo', filtros.tipo)
     if (filtros.subtipo) p.set('subtipo', filtros.subtipo)
-    if (filtros.ativoId) p.set('ativoId', filtros.ativoId)
+    if (filtros.produtoId) p.set('produtoId', filtros.produtoId)
     if (filtros.usuarioId) p.set('usuarioId', filtros.usuarioId)
     if (filtros.setorId) p.set('setorId', filtros.setorId)
     if (filtros.categoriaId) p.set('categoriaId', filtros.categoriaId)
@@ -82,7 +82,7 @@ export default function HistoricoPage() {
     Data: formatDataHora(m.data),
   })), 'historico-movimentacoes')
 
-  const limparFiltros = () => { setFiltros({ tipo: '', subtipo: '', ativoId: '', usuarioId: '', setorId: '', categoriaId: '' }); setPagina(1) }
+  const limparFiltros = () => { setFiltros({ tipo: '', subtipo: '', produtoId: '', usuarioId: '', setorId: '', categoriaId: '' }); setPagina(1) }
   const temFiltro = Object.values(filtros).some(v => v !== '')
 
   return (
@@ -114,7 +114,7 @@ export default function HistoricoPage() {
             <option value="">Todas as categorias</option>
             {categorias.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
           </Select>
-          <Select value={filtros.ativoId} onChange={e => f('ativoId', e.target.value)}>
+          <Select value={filtros.produtoId} onChange={e => f('produtoId', e.target.value)}>
             <option value="">Todos os produtos</option>
             {ativos.map(a => <option key={a.id} value={a.id}>{a.nome} ({a.codigo})</option>)}
           </Select>

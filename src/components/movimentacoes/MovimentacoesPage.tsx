@@ -13,7 +13,7 @@ export function MovimentacoesPage() {
   const [ativos, setAtivos] = useState<Ativo[]>([])
   const [loading, setLoading] = useState(true)
   const [filtroTipo, setFiltroTipo] = useState('')
-  const [filtroAtivo, setFiltroAtivo] = useState('')
+  const [filtroProduto, setFiltroAtivo] = useState('')
   const [cancelandoId, setCancelandoId] = useState<string | null>(null)
   const [cancelando, setCancelando] = useState(false)
   const isAdmin = session?.user.perfil === 'admin'
@@ -22,10 +22,10 @@ export function MovimentacoesPage() {
     setLoading(true)
     const p = new URLSearchParams()
     if (filtroTipo) p.set('tipo', filtroTipo)
-    if (filtroAtivo) p.set('ativoId', filtroAtivo)
+    if (filtroProduto) p.set('produtoId', filtroProduto)
     const res = await fetch(`/api/movimentacoes?${p}`)
     setMovs(await res.json()); setLoading(false)
-  }, [filtroTipo, filtroAtivo])
+  }, [filtroTipo, filtroProduto])
 
   useEffect(() => { buscar(); fetch('/api/ativos').then(r => r.json()).then(setAtivos) }, [buscar])
 
@@ -65,7 +65,7 @@ export function MovimentacoesPage() {
           <option value="ENTRADA">Entradas</option>
           <option value="SAIDA">Saídas</option>
         </Select>
-        <Select value={filtroAtivo} onChange={e => setFiltroAtivo(e.target.value)} className="w-60">
+        <Select value={filtroProduto} onChange={e => setFiltroAtivo(e.target.value)} className="w-60">
           <option value="">Todos os produtos</option>
           {ativos.map(a => <option key={a.id} value={a.id}>{a.nome}</option>)}
         </Select>
