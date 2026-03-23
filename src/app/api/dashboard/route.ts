@@ -6,97 +6,90 @@ import { subDays, format, startOfMonth } from 'date-fns'
 
 export async function GET() {
   try {
-    const ativos = await prisma.ativo.findMany({
-      where: { deletado: false },
-      include: { fornecedor: true, categoria: true },
-    })
+    const totalProdutos = await prisma.produto.count()
+    const totalUnidades = await prisma.unidade.count({ where: { status: 'ATIVA' } })
 
-    const totalAtivos = ativos.length
-    const totalItens = ativos.reduce((s, a) => s + a.quantidade, 0)
-    const valorTotal = ativos.reduce((s, a) => s + a.quantidade * a.valorUnitario, 0)
+    // Valor total = soma das unidades ativas × valor do produto
+    const unidadesAtivas = await prisma.unidade.findMany({
+      where: { status: 'ATIVA' },
+      include: { produto: true },
+    })
+    const valorTotal = unidadesAtivas.reduce((s, u) => s + u.produto.valorUnitario, 0)
 
     // Estoque baixo por categoria
     const categorias = await prisma.categoria.findMany({
-      include: { ativos: { where: { deletado: false } } },
+      include: { produtos: { include: { _count: { select: { unidades: { where: { status: 'ATIVA' } } } } } } },
     })
-    const estoqueBaixoCount = categorias.filter(c =>
-      c.estoqueMinimo > 0 && c.ativos.reduce((s, a) => s + a.quantidade, 0) <= c.estoqueMinimo
-    ).length
+    const estoqueBaixoCount = categorias.filter(c => {
+      const total = c.produtos.reduce((s, p) => s + p._count.unidades, 0)
+      return c.estoqueMinimo > 0 && total <= c.estoqueMinimo
+    }).length
 
-    // Descartes do mês atual
+    // Descartes do mês
     const inicioMes = startOfMonth(new Date())
-    const descartesDoMes = await prisma.movimentacao.aggregate({
+    const descartesDoMes = await prisma.movimentacao.count({
       where: { tipo: 'SAIDA', subtipo: 'DESCARTE', cancelado: false, data: { gte: inicioMes } },
-      _sum: { quantidade: true },
-      _count: { id: true },
     })
 
+    // Últimas movimentações
     const ultimasMovimentacoes = await prisma.movimentacao.findMany({
       take: 10,
       where: { cancelado: false },
       orderBy: { criadoEm: 'desc' },
-      include: { ativo: { include: { categoria: true } }, fornecedor: true, setor: true, usuario: true },
+      include: {
+        unidade: { include: { produto: { include: { categoria: true } } } },
+        fornecedor: true, setor: true, usuario: true,
+      },
     })
 
-    const topAtivosRaw = await prisma.movimentacao.groupBy({
-      by: ['ativoId'],
+    // Top produtos com mais saídas
+    const topRaw = await prisma.movimentacao.groupBy({
+      by: ['unidadeId'],
       where: { tipo: 'SAIDA', subtipo: 'USUARIO', cancelado: false },
-      _sum: { quantidade: true },
-      orderBy: { _sum: { quantidade: 'desc' } },
-      take: 5,
+      _count: { id: true },
+      orderBy: { _count: { id: 'desc' } },
+      take: 10,
     })
+    const topMap: Record<string, number> = {}
+    for (const r of topRaw) {
+      const u = await prisma.unidade.findUnique({ where: { id: r.unidadeId }, include: { produto: true } })
+      if (!u) continue
+      topMap[u.produto.nome] = (topMap[u.produto.nome] || 0) + r._count.id
+    }
+    const topProdutos = Object.entries(topMap)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([nome, totalSaida]) => ({ nome, totalSaida }))
 
-    const topAtivos = (await Promise.all(
-      topAtivosRaw.map(async (r) => {
-        const ativo = await prisma.ativo.findUnique({ where: { id: r.ativoId } })
-        if (!ativo || ativo.deletado) return null
-        return { nome: ativo.nome, totalSaida: r._sum.quantidade ?? 0 }
-      })
-    )).filter(Boolean) as { nome: string; totalSaida: number }[]
-
-    const dist = ativos.reduce((acc, a) => {
-      const key = a.fornecedor?.nome ?? 'Sem Fornecedor'
-      acc[key] = (acc[key] || 0) + 1
-      return acc
-    }, {} as Record<string, number>)
-    const distribuicaoFornecedor = Object.entries(dist).map(([nome, quantidade]) => ({ nome, quantidade }))
-
-    const distCategoria = ativos.reduce((acc, a) => {
-      const key = a.categoria?.nome ?? 'Sem Categoria'
-      acc[key] = (acc[key] || 0) + a.quantidade
-      return acc
-    }, {} as Record<string, number>)
+    // Distribuição por categoria
+    const produtos = await prisma.produto.findMany({
+      include: { categoria: true, _count: { select: { unidades: { where: { status: 'ATIVA' } } } } },
+    })
+    const distCategoria: Record<string, number> = {}
+    for (const p of produtos) {
+      const key = p.categoria?.nome ?? 'Sem Categoria'
+      distCategoria[key] = (distCategoria[key] || 0) + p._count.unidades
+    }
     const distribuicaoCategoria = Object.entries(distCategoria).map(([nome, quantidade]) => ({ nome, quantidade }))
 
+    // Gráfico 7 dias
     const graficoMovimentacoes = []
     for (let i = 6; i >= 0; i--) {
       const dia = subDays(new Date(), i)
       const inicio = new Date(dia); inicio.setHours(0, 0, 0, 0)
       const fim = new Date(dia); fim.setHours(23, 59, 59, 999)
-      const entradas = await prisma.movimentacao.aggregate({
-        where: { tipo: 'ENTRADA', cancelado: false, data: { gte: inicio, lte: fim } },
-        _sum: { quantidade: true },
-      })
-      const saidas = await prisma.movimentacao.aggregate({
-        where: { tipo: 'SAIDA', subtipo: 'USUARIO', cancelado: false, data: { gte: inicio, lte: fim } },
-        _sum: { quantidade: true },
-      })
-      const descartes = await prisma.movimentacao.aggregate({
-        where: { tipo: 'SAIDA', subtipo: 'DESCARTE', cancelado: false, data: { gte: inicio, lte: fim } },
-        _sum: { quantidade: true },
-      })
-      graficoMovimentacoes.push({
-        data: format(inicio, 'dd/MM'),
-        entradas: entradas._sum.quantidade ?? 0,
-        saidas: saidas._sum.quantidade ?? 0,
-        descartes: descartes._sum.quantidade ?? 0,
-      })
+      const [entradas, saidas, descartes] = await Promise.all([
+        prisma.movimentacao.count({ where: { tipo: 'ENTRADA', cancelado: false, data: { gte: inicio, lte: fim } } }),
+        prisma.movimentacao.count({ where: { tipo: 'SAIDA', subtipo: 'USUARIO', cancelado: false, data: { gte: inicio, lte: fim } } }),
+        prisma.movimentacao.count({ where: { tipo: 'SAIDA', subtipo: 'DESCARTE', cancelado: false, data: { gte: inicio, lte: fim } } }),
+      ])
+      graficoMovimentacoes.push({ data: format(inicio, 'dd/MM'), entradas, saidas, descartes })
     }
 
     return NextResponse.json({
-      totalAtivos, totalItens, valorTotal, estoqueBaixoCount,
-      descartesDoMes: { quantidade: descartesDoMes._sum.quantidade ?? 0, count: descartesDoMes._count.id ?? 0 },
-      ultimasMovimentacoes, topAtivos, distribuicaoFornecedor, distribuicaoCategoria, graficoMovimentacoes
+      totalProdutos, totalUnidades, valorTotal, estoqueBaixoCount,
+      descartesDoMes: { count: descartesDoMes },
+      ultimasMovimentacoes, topProdutos, distribuicaoCategoria, graficoMovimentacoes,
     })
   } catch (error) {
     console.error(error)

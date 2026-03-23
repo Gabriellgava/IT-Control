@@ -5,40 +5,49 @@ import { prisma } from '@/lib/prisma'
 
 export async function DELETE(_: NextRequest, { params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions)
-  if (!session || session.user.perfil !== 'admin') {
+  if (!session || session.user.perfil !== 'admin')
     return NextResponse.json({ error: 'Sem permissão' }, { status: 403 })
-  }
 
   try {
-    const mov = await prisma.movimentacao.findUnique({ where: { id: params.id } })
-    if (!mov) return NextResponse.json({ error: 'Movimentação não encontrada' }, { status: 404 })
-    if (mov.cancelado) return NextResponse.json({ error: 'Movimentação já cancelada' }, { status: 400 })
+    const mov = await prisma.movimentacao.findUnique({
+      where: { id: params.id },
+      include: { unidade: true },
+    })
 
-    // Estorna a quantidade no ativo se ainda existir
-    const ativo = await prisma.ativo.findUnique({ where: { id: mov.ativoId } })
-    if (ativo && !ativo.deletado) {
-      const novaQtd = mov.tipo === 'ENTRADA'
-        ? ativo.quantidade - mov.quantidade
-        : ativo.quantidade + mov.quantidade
-      await prisma.ativo.update({
-        where: { id: ativo.id },
-        data: { quantidade: Math.max(0, novaQtd) },
+    if (!mov) return NextResponse.json({ error: 'Movimentação não encontrada' }, { status: 404 })
+    if (mov.cancelado) return NextResponse.json({ error: 'Já cancelada' }, { status: 400 })
+
+    // Estorna: ENTRADA → remove unidade (ou marca DESCARTADA se já tem saída)
+    // SAIDA USUARIO → reativa unidade | SAIDA DESCARTE → reativa unidade
+    if (mov.tipo === 'ENTRADA') {
+      const temSaida = await prisma.movimentacao.count({
+        where: { unidadeId: mov.unidadeId, tipo: 'SAIDA', cancelado: false },
+      })
+      if (temSaida > 0)
+        return NextResponse.json({ error: 'Não é possível cancelar: unidade já possui saída registrada' }, { status: 400 })
+
+      await prisma.unidade.delete({ where: { id: mov.unidadeId } })
+    }
+
+    if (mov.tipo === 'SAIDA') {
+      await prisma.unidade.update({
+        where: { id: mov.unidadeId },
+        data: { status: 'ATIVA' },
       })
     }
 
-    // Marca como cancelado
     await prisma.movimentacao.update({
       where: { id: params.id },
       data: {
         cancelado: true,
         canceladoEm: new Date(),
-        canceladoPor: session.user.name ?? session.user.email,
+        canceladoPor: session.user.name ?? session.user.email ?? 'Admin',
       },
     })
 
     return NextResponse.json({ sucesso: true })
   } catch (error) {
     console.error(error)
-    return NextResponse.json({ error: 'Erro ao cancelar movimentação' }, { status: 500 })
+    return NextResponse.json({ error: 'Erro ao cancelar' }, { status: 500 })
   }
 }

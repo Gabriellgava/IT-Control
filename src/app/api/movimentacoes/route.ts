@@ -6,7 +6,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const tipo = searchParams.get('tipo') || ''
     const subtipo = searchParams.get('subtipo') || ''
-    const ativoId = searchParams.get('ativoId') || ''
+    const produtoId = searchParams.get('produtoId') || ''
     const limite = parseInt(searchParams.get('limite') || '100')
 
     const movimentacoes = await prisma.movimentacao.findMany({
@@ -15,10 +15,15 @@ export async function GET(request: NextRequest) {
         AND: [
           tipo ? { tipo } : {},
           subtipo ? { subtipo } : {},
-          ativoId ? { ativoId } : {},
+          produtoId ? { unidade: { produtoId } } : {},
         ],
       },
-      include: { ativo: { include: { categoria: true } }, fornecedor: true, setor: true, usuario: true },
+      include: {
+        unidade: { include: { produto: { include: { categoria: true } } } },
+        fornecedor: true,
+        setor: true,
+        usuario: true,
+      },
       orderBy: { data: 'desc' },
       take: limite,
     })
@@ -33,50 +38,102 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { tipo, subtipo, ativoId, quantidade, valorUnitario, data, fornecedorId, setorId, usuarioId, responsavel, observacoes } = body
+    const { tipo, subtipo, produtoId, etiqueta, dataCompra, valorUnitario, fornecedorId, setorId, usuarioId, responsavel, observacoes } = body
 
-    const ativo = await prisma.ativo.findUnique({ where: { id: ativoId } })
-    if (!ativo) return NextResponse.json({ error: 'Ativo não encontrado' }, { status: 404 })
+    // ENTRADA: cria nova unidade física
+    if (tipo === 'ENTRADA') {
+      if (!produtoId) return NextResponse.json({ error: 'Produto é obrigatório' }, { status: 400 })
+      if (!etiqueta?.trim()) return NextResponse.json({ error: 'Etiqueta é obrigatória' }, { status: 400 })
 
-    const qtd = parseInt(quantidade)
-    if (tipo === 'SAIDA' && ativo.quantidade < qtd) {
-      return NextResponse.json({ error: 'Quantidade insuficiente em estoque' }, { status: 400 })
+      const produto = await prisma.produto.findUnique({ where: { id: produtoId } })
+      if (!produto) return NextResponse.json({ error: 'Produto não encontrado' }, { status: 404 })
+
+      // Verifica se etiqueta já existe
+      const etiquetaExiste = await prisma.unidade.findUnique({ where: { etiqueta: etiqueta.trim() } })
+      if (etiquetaExiste) return NextResponse.json({ error: 'Etiqueta já cadastrada' }, { status: 400 })
+
+      const unidade = await prisma.unidade.create({
+        data: {
+          produtoId,
+          etiqueta: etiqueta.trim(),
+          dataCompra: dataCompra ? new Date(dataCompra) : null,
+          status: 'ATIVA',
+        },
+      })
+
+      const movimentacao = await prisma.movimentacao.create({
+        data: {
+          tipo: 'ENTRADA',
+          subtipo: null,
+          unidadeId: unidade.id,
+          valorUnitario: parseFloat(valorUnitario) || produto.valorUnitario,
+          data: dataCompra ? new Date(dataCompra) : new Date(),
+          fornecedorId: fornecedorId || produto.fornecedorId || null,
+          usuarioId: usuarioId || null,
+          responsavel: responsavel || null,
+          observacoes: observacoes || null,
+        },
+        include: {
+          unidade: { include: { produto: { include: { categoria: true } } } },
+          fornecedor: true,
+          setor: true,
+          usuario: true,
+        },
+      })
+
+      return NextResponse.json(movimentacao, { status: 201 })
     }
 
-    const novaQuantidade = tipo === 'ENTRADA' ? ativo.quantidade + qtd : ativo.quantidade - qtd
-    await prisma.ativo.update({
-      where: { id: ativoId },
-      data: {
-        quantidade: novaQuantidade,
-        valorUnitario: tipo === 'ENTRADA' ? parseFloat(valorUnitario) || ativo.valorUnitario : ativo.valorUnitario,
-        // Descarte → soft delete automático: some da lista mas histórico preservado
-        ...(subtipo === 'DESCARTE' && { deletado: true }),
-      },
-    })
+    // SAIDA (usuário ou descarte): opera sobre unidade existente por etiqueta
+    if (tipo === 'SAIDA') {
+      if (!etiqueta?.trim()) return NextResponse.json({ error: 'Etiqueta é obrigatória' }, { status: 400 })
 
-    const movimentacao = await prisma.movimentacao.create({
-      data: {
-        tipo,
-        subtipo: tipo === 'SAIDA' ? (subtipo || 'USUARIO') : null,
-        ativoId,
-        quantidade: qtd,
-        valorUnitario: parseFloat(valorUnitario) || ativo.valorUnitario,
-        data: (() => {
-          if (!data) return new Date()
-          const agora = new Date()
-          const [ano, mes, dia] = data.split('-').map(Number)
-          return new Date(ano, mes - 1, dia, agora.getHours(), agora.getMinutes(), agora.getSeconds())
-        })(),
-        fornecedorId: fornecedorId || null,
-        setorId: setorId || null,
-        usuarioId: usuarioId || null,
-        responsavel: responsavel || null,
-        observacoes: observacoes || null,
-      },
-      include: { ativo: true, fornecedor: true, setor: true, usuario: true },
-    })
+      const unidade = await prisma.unidade.findUnique({
+        where: { etiqueta: etiqueta.trim() },
+        include: { produto: true },
+      })
 
-    return NextResponse.json(movimentacao, { status: 201 })
+      if (!unidade) return NextResponse.json({ error: 'Etiqueta não encontrada' }, { status: 404 })
+      if (unidade.status !== 'ATIVA') return NextResponse.json({ error: 'Esta unidade já foi descartada' }, { status: 400 })
+
+      // Atualiza status se for descarte
+      if (subtipo === 'DESCARTE') {
+        await prisma.unidade.update({
+          where: { id: unidade.id },
+          data: { status: 'DESCARTADA' },
+        })
+      }
+
+      const movimentacao = await prisma.movimentacao.create({
+        data: {
+          tipo: 'SAIDA',
+          subtipo: subtipo || 'USUARIO',
+          unidadeId: unidade.id,
+          valorUnitario: unidade.produto.valorUnitario,
+          data: (() => {
+            const agora = new Date()
+            if (!body.data) return agora
+            const [ano, mes, dia] = body.data.split('-').map(Number)
+            return new Date(ano, mes - 1, dia, agora.getHours(), agora.getMinutes(), agora.getSeconds())
+          })(),
+          fornecedorId: null,
+          setorId: setorId || null,
+          usuarioId: usuarioId || null,
+          responsavel: responsavel || null,
+          observacoes: observacoes || null,
+        },
+        include: {
+          unidade: { include: { produto: { include: { categoria: true } } } },
+          fornecedor: true,
+          setor: true,
+          usuario: true,
+        },
+      })
+
+      return NextResponse.json(movimentacao, { status: 201 })
+    }
+
+    return NextResponse.json({ error: 'Tipo inválido' }, { status: 400 })
   } catch (error) {
     console.error(error)
     return NextResponse.json({ error: 'Erro ao registrar movimentação' }, { status: 500 })
