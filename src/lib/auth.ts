@@ -42,35 +42,14 @@ export const authOptions: NextAuthOptions = {
     return session
   },
 
-  async signIn({ user, account }) {
+async signIn({ user, account }) {
     if (account?.provider === 'google') {
       const existing = await prisma.usuario.findUnique({
         where: { email: user.email! },
       })
 
-      if (!existing) {
-        const count = await prisma.usuario.count()
-
-        await prisma.usuario.create({
-          data: {
-            email: user.email!,
-            nome: user.name,
-            perfil: count === 0 ? 'admin' : 'usuario',
-            ativo: count === 0,
-            image: user.image,
-          },
-        })
-
-        if (count !== 0) return false
-      } else {
-        if (!existing.ativo) return false
-
-        if (!existing.nome && user.name) {
-          await prisma.usuario.update({
-            where: { email: user.email! },
-            data: { nome: user.name },
-          })
-        }
+      if (existing && !existing.ativo) {
+        return false
       }
     }
 
