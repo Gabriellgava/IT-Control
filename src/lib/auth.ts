@@ -32,74 +32,56 @@ export const authOptions: NextAuthOptions = {
   ],
   session: { strategy: 'jwt' },
   callbacks: {
-    async jwt({ token, user, account }) {
-      if (user) {
-        token.id = user.id
-        token.perfil = (user as { perfil?: string }).perfil
-      }
-      // Para Google, busca o id correto do banco
-      if (account?.provider === 'google' && token.email) {
-        const dbUser = await prisma.usuario.findUnique({ where: { email: token.email as string } })
-        if (dbUser) {
-          token.id = dbUser.id
-          token.perfil = dbUser.perfil
-          token.name = dbUser.nome
-          token.picture = dbUser.image
-          token.ativo = dbUser.ativo
-        }
-      }
-      // Sempre sincroniza perfil e status ativo do banco
-      if (token.id) {
-        const dbUser = await prisma.usuario.findUnique({ where: { id: token.id as string } })
-        if (dbUser) {
-          token.perfil = dbUser.perfil
-          token.name = dbUser.nome
-          token.ativo = dbUser.ativo
-        }
-      }
-      return token
-    },
-    async session({ session, token }) {
-      if (session.user) {
-        session.user.id = token.id as string
-        session.user.perfil = token.perfil as string
-        session.user.name = token.name as string
-        // Se usuário foi desativado, limpa a sessão
-        if (token.ativo === false) {
-          return { ...session, user: undefined } as never
-        }
-      }
-      return session
-    },
-    async signIn({ user, account }) {
-      if (account?.provider === 'google') {
-        const existing = await prisma.usuario.findUnique({ where: { email: user.email! } })
+  async jwt({ token, user, account }) {
+    // ... seu código
+    return token
+  },
 
-        if (!existing) {
-          const count = await prisma.usuario.count()
+  async session({ session, token }) {
+    // ... seu código
+    return session
+  },
+
+  async signIn({ user, account }) {
+    if (account?.provider === 'google') {
+      const existing = await prisma.usuario.findUnique({
+        where: { email: user.email! },
+      })
+
+      if (!existing) {
+        const count = await prisma.usuario.count()
+
+        await prisma.usuario.create({
+          data: {
+            email: user.email!,
+            nome: user.name,
+            perfil: count === 0 ? 'admin' : 'usuario',
+            ativo: count === 0,
+            image: user.image,
+          },
+        })
+
+        if (count !== 0) return false
+      } else {
+        if (!existing.ativo) return false
+
+        if (!existing.nome && user.name) {
           await prisma.usuario.update({
             where: { email: user.email! },
-            data: {
-              nome: user.name,
-              perfil: count === 0 ? 'admin' : 'usuario',
-              ativo: count === 0,
-            },
+            data: { nome: user.name },
           })
-          if (count !== 0) return false
-        } else {
-          if (!existing.ativo) return false
-          // Atualiza nome se ainda estiver null
-          if (!existing.nome && user.name) {
-            await prisma.usuario.update({
-              where: { email: user.email! },
-              data: { nome: user.name },
-            })
-          }
         }
       }
-      return true
-    },
+    }
+
+    return true
   },
-  pages: { signIn: '/login', error: '/login' },
-  secret: process.env.NEXTAUTH_SECRET,
+},
+
+pages: {
+  signIn: '/login',
+  error: '/login',
+},
+
+secret: process.env.NEXTAUTH_SECRET,
 }
