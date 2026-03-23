@@ -7,7 +7,7 @@ export async function GET() {
   try {
     const categorias = await prisma.categoria.findMany({
       orderBy: { nome: 'asc' },
-      include: { _count: { select: { ativos: { where: { deletado: false } } } } },
+      include: { _count: { select: { produtos: true } } },
     })
     return NextResponse.json(categorias)
   } catch (error) {
