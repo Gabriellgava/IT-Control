@@ -150,3 +150,19 @@ model Movimentacao {
 
   @@map("movimentacoes")
 }
+// ADICIONAR AO FINAL DO schema.prisma
+
+model Inventario {
+  id           String   @id @default(cuid())
+  setor        String
+  responsavel  String
+  tipo         String
+  marca        String
+  modelo       String
+  etiqueta     String   @unique
+  observacoes  String?
+  criadoEm    DateTime @default(now()) @map("criado_em")
+  atualizadoEm DateTime @updatedAt @map("atualizado_em")
+
+  @@map("inventario")
+}

@@ -7,5 +7,6 @@ export const config = {
     '/movimentacoes/:path*',
     '/fornecedores/:path*',
     '/admin/:path*',
+    '/inventario/:path*',
   ],
 }
