@@ -37,6 +37,7 @@ export default function InventarioPage() {
   const [busca, setBusca] = useState('')
   const [filtroSetor, setFiltroSetor] = useState('')
   const [filtroTipo, setFiltroTipo] = useState('')
+  const [filtroResponsavel, setFiltroResponsavel] = useState('')
   const [modalForm, setModalForm] = useState(false)
   const [modalImport, setModalImport] = useState(false)
   const [editando, setEditando] = useState<Item | null>(null)
@@ -52,6 +53,7 @@ export default function InventarioPage() {
   // Setores e tipos únicos para filtros
   const setoresUnicos = [...new Set(itens.map(i => i.setor))].sort()
   const tiposUnicos = [...new Set(itens.map(i => i.tipo))].sort()
+  const responsaveisUnicos = [...new Set(itens.map(i => i.responsavel))].sort()
 
   const buscarItens = useCallback(async () => {
     setLoading(true)
@@ -59,10 +61,11 @@ export default function InventarioPage() {
     if (busca) p.set('search', busca)
     if (filtroSetor) p.set('setor', filtroSetor)
     if (filtroTipo) p.set('tipo', filtroTipo)
+    if (filtroResponsavel) p.set('responsavel', filtroResponsavel)
     const res = await fetch(`/api/inventario?${p}`)
     setItens(await res.json())
     setLoading(false)
-  }, [busca, filtroSetor, filtroTipo])
+  }, [busca, filtroSetor, filtroTipo, filtroResponsavel])
 
   useEffect(() => { buscarItens() }, [buscarItens])
 
@@ -178,6 +181,11 @@ export default function InventarioPage() {
             className="border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
             <option value="">Todos os tipos</option>
             {tiposUnicos.map(t => <option key={t} value={t}>{t}</option>)}
+          </select>
+          <select value={filtroResponsavel} onChange={e => setFiltroResponsavel(e.target.value)}
+            className="border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <option value="">Todos os responsáveis</option>
+            {responsaveisUnicos.map(r => <option key={r} value={r}>{r}</option>)}
           </select>
         </div>
 

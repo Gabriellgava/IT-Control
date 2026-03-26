@@ -27,6 +27,7 @@ export async function DELETE(_: NextRequest, { params }: { params: { id: string 
         return NextResponse.json({ error: 'Não é possível cancelar: unidade já possui saída registrada' }, { status: 400 })
 
       await prisma.unidade.delete({ where: { id: mov.unidadeId } })
+      await prisma.inventario.deleteMany({ where: { etiqueta: mov.unidade.etiqueta } })
     }
 
     if (mov.tipo === 'SAIDA') {
@@ -34,6 +35,51 @@ export async function DELETE(_: NextRequest, { params }: { params: { id: string 
         where: { id: mov.unidadeId },
         data: { status: 'ATIVA' },
       })
+
+      if (mov.subtipo === 'USUARIO') {
+        await prisma.inventario.deleteMany({ where: { etiqueta: mov.unidade.etiqueta } })
+      }
+
+      if (mov.subtipo === 'DESCARTE') {
+        const ultimaSaidaUsuario = await prisma.movimentacao.findFirst({
+          where: {
+            unidadeId: mov.unidadeId,
+            tipo: 'SAIDA',
+            subtipo: 'USUARIO',
+            cancelado: false,
+            id: { not: mov.id },
+            data: { lte: mov.data },
+          },
+          include: {
+            unidade: { include: { produto: { include: { categoria: true } } } },
+            setor: true,
+          },
+          orderBy: { data: 'desc' },
+        })
+
+        if (ultimaSaidaUsuario?.setor) {
+          await prisma.inventario.upsert({
+            where: { etiqueta: mov.unidade.etiqueta },
+            update: {
+              setor: ultimaSaidaUsuario.setor.nome,
+              responsavel: ultimaSaidaUsuario.responsavel || 'Não informado',
+              tipo: ultimaSaidaUsuario.unidade.produto.categoria?.nome || ultimaSaidaUsuario.unidade.produto.nome,
+              marca: ultimaSaidaUsuario.unidade.produto.nome,
+              modelo: ultimaSaidaUsuario.unidade.produto.codigo,
+              observacoes: ultimaSaidaUsuario.observacoes || null,
+            },
+            create: {
+              setor: ultimaSaidaUsuario.setor.nome,
+              responsavel: ultimaSaidaUsuario.responsavel || 'Não informado',
+              tipo: ultimaSaidaUsuario.unidade.produto.categoria?.nome || ultimaSaidaUsuario.unidade.produto.nome,
+              marca: ultimaSaidaUsuario.unidade.produto.nome,
+              modelo: ultimaSaidaUsuario.unidade.produto.codigo,
+              etiqueta: mov.unidade.etiqueta,
+              observacoes: ultimaSaidaUsuario.observacoes || null,
+            },
+          })
+        }
+      }
     }
 
     await prisma.movimentacao.update({

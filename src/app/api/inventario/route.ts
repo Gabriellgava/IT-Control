@@ -9,6 +9,7 @@ export async function GET(request: NextRequest) {
     const busca = searchParams.get('search') || ''
     const setor = searchParams.get('setor') || ''
     const tipo = searchParams.get('tipo') || ''
+    const responsavel = searchParams.get('responsavel') || ''
 
     const itens = await prisma.inventario.findMany({
       where: {
@@ -23,6 +24,7 @@ export async function GET(request: NextRequest) {
           } : {},
           setor ? { setor: { contains: setor, mode: 'insensitive' } } : {},
           tipo ? { tipo: { contains: tipo, mode: 'insensitive' } } : {},
+          responsavel ? { responsavel: { contains: responsavel, mode: 'insensitive' } } : {},
         ],
       },
       orderBy: [{ setor: 'asc' }, { responsavel: 'asc' }],
