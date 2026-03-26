@@ -18,6 +18,43 @@ export function Card({ children, className = '' }: { children: ReactNode; classN
   return <div className={`bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl shadow-sm ${className}`}>{children}</div>
 }
 
+export function PageHeader({
+  title,
+  description,
+  actions,
+}: {
+  title: string
+  description?: ReactNode
+  actions?: ReactNode
+}) {
+  return (
+    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{title}</h1>
+        {description && <p className="text-sm text-gray-500 mt-1">{description}</p>}
+      </div>
+      {actions && <div className="flex gap-2 flex-wrap">{actions}</div>}
+    </div>
+  )
+}
+
+export function LoadingState({ message = 'Carregando...' }: { message?: string }) {
+  return (
+    <div className="flex flex-col items-center justify-center h-64 gap-3">
+      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
+      <p className="text-sm text-gray-400">{message}</p>
+    </div>
+  )
+}
+
+export function ErrorState({ message }: { message: string }) {
+  return (
+    <Card className="p-6 border-red-200 dark:border-red-800">
+      <p className="text-sm text-red-600 dark:text-red-400">{message}</p>
+    </Card>
+  )
+}
+
 interface InputProps extends InputHTMLAttributes<HTMLInputElement> { label?: string; error?: string; icon?: ReactNode }
 export function Input({ label, error, icon, className = '', ...props }: InputProps) {
   return (
