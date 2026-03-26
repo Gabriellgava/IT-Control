@@ -3,7 +3,7 @@ import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
 import { useSession } from 'next-auth/react'
 import { ArrowDownCircle, ArrowUpCircle, Download, XCircle, Trash2 } from 'lucide-react'
-import { Button, Badge, Table, Select, Modal } from '@/components/ui'
+import { Button, Badge, Table, Select, Modal, LoadingState, ErrorState, PageHeader } from '@/components/ui'
 import { formatMoeda, formatDataHora, exportarCSV } from '@/lib/utils'
 import type { Movimentacao, Produto } from '@/types'
 
@@ -12,6 +12,7 @@ export function MovimentacoesPage() {
   const [movs, setMovs] = useState<Movimentacao[]>([])
   const [produtos, setProdutos] = useState<Produto[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
   const [filtroTipo, setFiltroTipo] = useState('')
   const [filtroProduto, setFiltroProduto] = useState('')
   const [cancelandoId, setCancelandoId] = useState<string | null>(null)
@@ -20,23 +21,44 @@ export function MovimentacoesPage() {
 
   const buscar = useCallback(async () => {
     setLoading(true)
+    setError('')
     const p = new URLSearchParams()
     if (filtroTipo) p.set('tipo', filtroTipo)
     if (filtroProduto) p.set('produtoId', filtroProduto)
-    const res = await fetch(`/api/movimentacoes?${p}`)
-    setMovs(await res.json()); setLoading(false)
+    try {
+      const res = await fetch(`/api/movimentacoes?${p}`)
+      if (!res.ok) throw new Error('Não foi possível carregar movimentações.')
+      setMovs(await res.json())
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Erro inesperado ao carregar movimentações.')
+    } finally {
+      setLoading(false)
+    }
   }, [filtroTipo, filtroProduto])
 
   useEffect(() => {
     buscar()
-    fetch('/api/produtos').then(r => r.json()).then(setProdutos)
+    fetch('/api/produtos')
+      .then(r => r.ok ? r.json() : [])
+      .then(setProdutos)
+      .catch(() => setProdutos([]))
   }, [buscar])
 
   const cancelar = async () => {
     if (!cancelandoId) return
     setCancelando(true)
-    await fetch(`/api/movimentacoes/${cancelandoId}`, { method: 'DELETE' })
-    setCancelando(false); setCancelandoId(null); buscar()
+    setError('')
+    try {
+      const res = await fetch(`/api/movimentacoes/${cancelandoId}`, { method: 'DELETE' })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Não foi possível cancelar a movimentação.')
+      setCancelandoId(null)
+      await buscar()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Erro inesperado ao cancelar movimentação.')
+    } finally {
+      setCancelando(false)
+    }
   }
 
   const exportar = () => exportarCSV(movs.filter(m => !m.cancelado).map(m => ({
@@ -52,21 +74,23 @@ export function MovimentacoesPage() {
     Observações: m.observacoes ?? '',
   })), 'movimentacoes-ti')
 
-  if (loading) return <div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" /></div>
+  if (loading) return <LoadingState message="Carregando movimentações..." />
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Movimentações</h1>
-          <p className="text-sm text-gray-500 mt-1">{movs.filter(m => !m.cancelado).length} registro{movs.filter(m => !m.cancelado).length !== 1 ? 's' : ''}</p>
-        </div>
-        <div className="flex gap-2 flex-wrap">
-          <Button variant="secondary" size="sm" icon={<Download className="w-4 h-4" />} onClick={exportar}>CSV</Button>
-          <Link href="/movimentacoes/entrada"><Button size="sm" icon={<ArrowDownCircle className="w-4 h-4" />} variant="secondary">Entrada</Button></Link>
-          <Link href="/movimentacoes/saida"><Button size="sm" icon={<ArrowUpCircle className="w-4 h-4" />}>Saída</Button></Link>
-        </div>
-      </div>
+      <PageHeader
+        title="Movimentações"
+        description={`${movs.filter(m => !m.cancelado).length} registro${movs.filter(m => !m.cancelado).length !== 1 ? 's' : ''}`}
+        actions={
+          <>
+            <Button variant="secondary" size="sm" icon={<Download className="w-4 h-4" />} onClick={exportar}>CSV</Button>
+            <Link href="/movimentacoes/entrada"><Button size="sm" icon={<ArrowDownCircle className="w-4 h-4" />} variant="secondary">Entrada</Button></Link>
+            <Link href="/movimentacoes/saida"><Button size="sm" icon={<ArrowUpCircle className="w-4 h-4" />}>Saída</Button></Link>
+          </>
+        }
+      />
+
+      {error && <ErrorState message={error} />}
 
       <div className="flex gap-3 flex-wrap">
         <Select value={filtroTipo} onChange={e => setFiltroTipo(e.target.value)} className="w-44">
