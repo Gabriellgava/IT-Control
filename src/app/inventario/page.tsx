@@ -19,6 +19,7 @@ interface Item {
 
 const CAMPOS_OBRIGATORIOS = ['setor', 'responsavel', 'tipo', 'marca', 'modelo', 'etiqueta'] as const
 const FORM_VAZIO = { setor: '', responsavel: '', tipo: '', marca: '', modelo: '', etiqueta: '', observacoes: '' }
+const ORDEM_COLUNAS_SEM_CABECALHO = ['setor', 'responsavel', 'tipo', 'marca', 'modelo', 'etiqueta', 'observacoes'] as const
 
 // Mapeamentos de colunas aceitos (PT e EN)
 const MAPA_COLUNAS: Record<string, string> = {
@@ -29,6 +30,41 @@ const MAPA_COLUNAS: Record<string, string> = {
   modelo: 'modelo', model: 'modelo',
   etiqueta: 'etiqueta', tag: 'etiqueta', 'etiqueta interna': 'etiqueta', 'internal tag': 'etiqueta', patrimonio: 'etiqueta', patrimônio: 'etiqueta',
   observacoes: 'observacoes', observações: 'observacoes', notes: 'observacoes', obs: 'observacoes',
+}
+
+const normalizarCabecalho = (v: string) =>
+  v
+    .trim()
+    .toLowerCase()
+    .replace(/['"]/g, '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+
+const parseCsvLine = (linha: string) => {
+  const cols: string[] = []
+  let atual = ''
+  let emAspas = false
+
+  for (let i = 0; i < linha.length; i++) {
+    const ch = linha[i]
+    if (ch === '"') {
+      if (emAspas && linha[i + 1] === '"') {
+        atual += '"'
+        i++
+      } else {
+        emAspas = !emAspas
+      }
+      continue
+    }
+    if (ch === ',' && !emAspas) {
+      cols.push(atual.trim())
+      atual = ''
+      continue
+    }
+    atual += ch
+  }
+  cols.push(atual.trim())
+  return cols.map(c => c.replace(/^["']|["']$/g, '').trim())
 }
 
 export default function InventarioPage() {
@@ -114,19 +150,31 @@ export default function InventarioPage() {
 
     const reader = new FileReader()
     reader.onload = (ev) => {
-      const texto = ev.target?.result as string
-      const linhas = texto.split(/\r?\n/).filter(l => l.trim())
+      const textoRaw = ev.target?.result as string
+      const texto = textoRaw.replace(/\\n/g, '\n')
+      const linhas = texto.split(/\r?\n/).map(l => l.trim()).filter(l => l)
       if (linhas.length < 2) { setImportStatus({ tipo: 'erro', msg: 'Arquivo vazio ou sem dados' }); return }
 
-      const cabecalho = linhas[0].split(',').map(c => c.trim().toLowerCase().replace(/['"]/g, ''))
-      const mapeado = cabecalho.map(c => MAPA_COLUNAS[c] ?? c)
+      const primeiraLinha = parseCsvLine(linhas[0]).map(normalizarCabecalho)
+      const temCabecalho = primeiraLinha.some(c => MAPA_COLUNAS[c])
+      const colunas = temCabecalho
+        ? primeiraLinha.map(c => MAPA_COLUNAS[c] ?? c)
+        : [...ORDEM_COLUNAS_SEM_CABECALHO]
+      const linhasDados = temCabecalho ? linhas.slice(1) : linhas
 
-      const dados = linhas.slice(1).map(linha => {
-        const cols = linha.split(',').map(c => c.trim().replace(/^["']|["']$/g, ''))
-        const obj: Record<string, string> = {}
-        mapeado.forEach((campo, i) => { obj[campo] = cols[i] ?? '' })
-        return obj
-      }).filter(obj => Object.values(obj).some(v => v))
+      const dados = linhasDados
+        .map(linha => parseCsvLine(linha))
+        .map(cols => {
+          const obj: Record<string, string> = {}
+          colunas.forEach((campo, i) => { obj[campo] = (cols[i] ?? '').trim() })
+          return obj
+        })
+        .filter(obj => Object.values(obj).some(v => v))
+
+      if (dados.length === 0) {
+        setImportStatus({ tipo: 'erro', msg: 'Nenhum dado válido encontrado no arquivo.' })
+        return
+      }
 
       setPreviewImport(dados)
     }
@@ -143,7 +191,12 @@ export default function InventarioPage() {
     })
     const data = await res.json()
     if (!res.ok) { setImportStatus({ tipo: 'erro', msg: data.error }); setImportando(false); return }
-    setImportStatus({ tipo: 'ok', msg: data.mensagem })
+    if (data.importados === 0) {
+      setImportStatus({ tipo: 'erro', msg: data.erros?.join(' | ') || 'Nenhum item foi importado.' })
+      setImportando(false)
+      return
+    }
+    setImportStatus({ tipo: data.erros?.length ? 'erro' : 'ok', msg: data.mensagem })
     setPreviewImport([])
     if (fileRef.current) fileRef.current.value = ''
     buscarItens(); setImportando(false)

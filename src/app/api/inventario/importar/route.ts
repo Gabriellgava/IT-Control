@@ -23,43 +23,57 @@ export async function POST(request: NextRequest) {
       const item = itens[i]
       const linha = i + 2 // linha 1 = cabeçalho
 
-      if (!item.setor || !item.responsavel || !item.tipo || !item.marca || !item.modelo || !item.etiqueta) {
+      const setor = item.setor?.trim()
+      const responsavel = item.responsavel?.trim()
+      const tipo = item.tipo?.trim()
+      const marca = item.marca?.trim()
+      const modelo = item.modelo?.trim()
+      const etiqueta = item.etiqueta?.trim()
+      const observacoes = item.observacoes?.trim() || null
+
+      if (!setor || !responsavel || !tipo || !marca || !modelo || !etiqueta) {
         erros.push(`Linha ${linha}: campos obrigatórios faltando`)
         continue
       }
 
       try {
         await prisma.inventario.upsert({
-          where: { etiqueta: item.etiqueta.trim() },
+          where: { etiqueta },
           update: {
-            setor: item.setor.trim(),
-            responsavel: item.responsavel.trim(),
-            tipo: item.tipo.trim(),
-            marca: item.marca.trim(),
-            modelo: item.modelo.trim(),
-            observacoes: item.observacoes?.trim() || null,
+            setor,
+            responsavel,
+            tipo,
+            marca,
+            modelo,
+            observacoes,
           },
           create: {
-            setor: item.setor.trim(),
-            responsavel: item.responsavel.trim(),
-            tipo: item.tipo.trim(),
-            marca: item.marca.trim(),
-            modelo: item.modelo.trim(),
-            etiqueta: item.etiqueta.trim(),
-            observacoes: item.observacoes?.trim() || null,
+            setor,
+            responsavel,
+            tipo,
+            marca,
+            modelo,
+            etiqueta,
+            observacoes,
           },
         })
-        importados.push(item.etiqueta)
+        importados.push(etiqueta)
       } catch {
-        erros.push(`Linha ${linha}: erro ao importar etiqueta "${item.etiqueta}"`)
+        erros.push(`Linha ${linha}: erro ao importar etiqueta "${etiqueta}"`)
       }
     }
 
-    return NextResponse.json({
+    const payload = {
       importados: importados.length,
       erros,
       mensagem: `${importados.length} item(s) importado(s) com sucesso${erros.length > 0 ? `, ${erros.length} erro(s)` : ''}`,
-    })
+    }
+
+    if (importados.length === 0) {
+      return NextResponse.json({ ...payload, error: 'Nenhum item foi importado. Verifique o formato da planilha.' }, { status: 400 })
+    }
+
+    return NextResponse.json(payload)
   } catch (error) {
     console.error(error)
     return NextResponse.json({ error: 'Erro ao processar importação' }, { status: 500 })
