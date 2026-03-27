@@ -75,11 +75,14 @@ export function MovimentacaoForm({ tipo }: { tipo: 'ENTRADA' | 'SAIDA' }) {
         data: form.data,
         fornecedorId: form.fornecedorId || null,
         setorId: form.setorId || null,
+        funcionarioRecebe: form.funcionarioRecebe.trim() || null,
         valorUnitario: form.valorUnitario,
         usuarioId: session?.user.id,
-        responsavel: session?.user.name ?? session?.user.email,
+        responsavel: tipo === 'SAIDA' && subtipo === 'USUARIO'
+          ? form.funcionarioRecebe.trim()
+          : (session?.user.name ?? session?.user.email),
         observacoes: tipo === 'SAIDA' && subtipo === 'USUARIO' && form.funcionarioRecebe
-          ? `Recebido por: ${form.funcionarioRecebe}${form.observacoes ? ' | ' + form.observacoes : ''}`
+          ? `Registrado por: ${session?.user.name ?? session?.user.email}${form.observacoes ? ' | ' + form.observacoes : ''}`
           : form.observacoes,
       }),
     })

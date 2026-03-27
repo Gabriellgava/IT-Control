@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { Plus, Edit2, Trash2, Globe, Mail, Phone } from 'lucide-react'
-import { Button, Card, Modal, Input, Table } from '@/components/ui'
+import { Button, Card, Modal, Input, PageHeader, LoadingState, ErrorState } from '@/components/ui'
 import { mascaraTelefone } from '@/lib/mascaras'
 import type { Fornecedor } from '@/types'
 
@@ -12,11 +12,24 @@ export function FornecedoresPage() {
   const [editando, setEditando] = useState<Fornecedor | null>(null)
   const [deletandoId, setDeletandoId] = useState<string | null>(null)
   const [salvando, setSalvando] = useState(false)
+  const [error, setError] = useState('')
   const [erros, setErros] = useState<Record<string, string>>({})
   const [form, setForm] = useState({ nome: '', contato: '', email: '', telefone: '', site: '' })
   const s = (k: string, v: string) => { setForm(f => ({ ...f, [k]: v })); setErros(e => ({ ...e, [k]: '' })) }
 
-  const buscar = () => fetch('/api/fornecedores').then(r => r.json()).then(d => { setFornecedores(d); setLoading(false) })
+  const buscar = async () => {
+    setError('')
+    try {
+      const res = await fetch('/api/fornecedores')
+      if (!res.ok) throw new Error('Não foi possível carregar fornecedores.')
+      const data = await res.json()
+      setFornecedores(data)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Erro inesperado ao carregar fornecedores.')
+    } finally {
+      setLoading(false)
+    }
+  }
   useEffect(() => { buscar() }, [])
 
   const abrirNovo = () => { setEditando(null); setForm({ nome: '', contato: '', email: '', telefone: '', site: '' }); setErros({}); setModal(true) }
@@ -34,31 +47,49 @@ export function FornecedoresPage() {
   const salvar = async () => {
     if (!validar()) return
     setSalvando(true)
-    await fetch(editando ? `/api/fornecedores/${editando.id}` : '/api/fornecedores', {
-      method: editando ? 'PUT' : 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(form),
-    })
-    setSalvando(false); setModal(false); buscar()
+    setError('')
+    try {
+      const res = await fetch(editando ? `/api/fornecedores/${editando.id}` : '/api/fornecedores', {
+        method: editando ? 'PUT' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Não foi possível salvar o fornecedor.')
+      setModal(false)
+      await buscar()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Erro inesperado ao salvar fornecedor.')
+    } finally {
+      setSalvando(false)
+    }
   }
 
   const deletar = async () => {
     if (!deletandoId) return
-    await fetch(`/api/fornecedores/${deletandoId}`, { method: 'DELETE' })
-    setDeletandoId(null); buscar()
+    setError('')
+    try {
+      const res = await fetch(`/api/fornecedores/${deletandoId}`, { method: 'DELETE' })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Não foi possível excluir o fornecedor.')
+      setDeletandoId(null)
+      await buscar()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Erro inesperado ao excluir fornecedor.')
+    }
   }
 
-  if (loading) return <div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" /></div>
+  if (loading) return <LoadingState message="Carregando fornecedores..." />
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Fornecedores</h1>
-          <p className="text-sm text-gray-500 mt-1">{fornecedores.length} cadastrado{fornecedores.length !== 1 ? 's' : ''}</p>
-        </div>
-        <Button icon={<Plus className="w-4 h-4" />} onClick={abrirNovo}>Novo Fornecedor</Button>
-      </div>
+      <PageHeader
+        title="Fornecedores"
+        description={`${fornecedores.length} cadastrado${fornecedores.length !== 1 ? 's' : ''}`}
+        actions={<Button icon={<Plus className="w-4 h-4" />} onClick={abrirNovo}>Novo Fornecedor</Button>}
+      />
+
+      {error && <ErrorState message={error} />}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {fornecedores.length === 0 ? (

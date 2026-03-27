@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { tipo, subtipo, produtoId, etiqueta, dataCompra, valorUnitario, fornecedorId, setorId, usuarioId, responsavel, observacoes } = body
+    const { tipo, subtipo, produtoId, etiqueta, dataCompra, valorUnitario, fornecedorId, setorId, usuarioId, responsavel, observacoes, funcionarioRecebe } = body
 
     // ENTRADA: cria nova unidade física
     if (tipo === 'ENTRADA') {
@@ -60,6 +60,8 @@ export async function POST(request: NextRequest) {
           status: 'ATIVA',
         },
       })
+
+      await prisma.inventario.deleteMany({ where: { etiqueta: etiqueta.trim() } })
 
       const movimentacao = await prisma.movimentacao.create({
         data: {
@@ -90,7 +92,7 @@ export async function POST(request: NextRequest) {
 
       const unidade = await prisma.unidade.findUnique({
         where: { etiqueta: etiqueta.trim() },
-        include: { produto: true },
+        include: { produto: { include: { categoria: true } } },
       })
 
       if (!unidade) return NextResponse.json({ error: 'Etiqueta não encontrada' }, { status: 404 })
@@ -101,6 +103,36 @@ export async function POST(request: NextRequest) {
         await prisma.unidade.update({
           where: { id: unidade.id },
           data: { status: 'DESCARTADA' },
+        })
+        await prisma.inventario.deleteMany({ where: { etiqueta: etiqueta.trim() } })
+      }
+
+      if ((subtipo || 'USUARIO') === 'USUARIO') {
+        if (!setorId) return NextResponse.json({ error: 'Setor é obrigatório para saída de usuário' }, { status: 400 })
+        if (!funcionarioRecebe?.trim()) return NextResponse.json({ error: 'Funcionário é obrigatório para saída de usuário' }, { status: 400 })
+
+        const setor = await prisma.setor.findUnique({ where: { id: setorId } })
+        if (!setor) return NextResponse.json({ error: 'Setor não encontrado' }, { status: 404 })
+
+        await prisma.inventario.upsert({
+          where: { etiqueta: etiqueta.trim() },
+          update: {
+            setor: setor.nome,
+            responsavel: funcionarioRecebe.trim(),
+            tipo: unidade.produto.categoria?.nome || unidade.produto.nome,
+            marca: unidade.produto.nome,
+            modelo: unidade.produto.codigo,
+            observacoes: observacoes || null,
+          },
+          create: {
+            setor: setor.nome,
+            responsavel: funcionarioRecebe.trim(),
+            tipo: unidade.produto.categoria?.nome || unidade.produto.nome,
+            marca: unidade.produto.nome,
+            modelo: unidade.produto.codigo,
+            etiqueta: etiqueta.trim(),
+            observacoes: observacoes || null,
+          },
         })
       }
 

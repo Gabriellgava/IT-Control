@@ -2,7 +2,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
 import { Search, Plus, Edit2, Trash2, Download, Package, Tag, ChevronDown, ChevronRight } from 'lucide-react'
-import { Button, Badge, Input, Select, Modal, Table } from '@/components/ui'
+import { Button, Badge, Input, Select, Modal, Table, PageHeader, LoadingState, ErrorState } from '@/components/ui'
 import { formatMoeda, formatData, exportarCSV } from '@/lib/utils'
 import type { Produto, Categoria, Fornecedor } from '@/types'
 import { ProdutoForm } from './ProdutoForm'
@@ -19,22 +19,30 @@ export function ProdutosPage() {
   const [editando, setEditando] = useState<Produto | null>(null)
   const [deletandoId, setDeletandoId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
 
   const buscarProdutos = useCallback(async () => {
     setLoading(true)
+    setError('')
     const p = new URLSearchParams()
     if (busca) p.set('search', busca)
     if (filtroCategoria) p.set('categoriaId', filtroCategoria)
     if (filtroFornecedor) p.set('fornecedorId', filtroFornecedor)
-    const res = await fetch(`/api/produtos?${p}`)
-    setProdutos(await res.json())
-    setLoading(false)
+    try {
+      const res = await fetch(`/api/produtos?${p}`)
+      if (!res.ok) throw new Error('Não foi possível carregar produtos.')
+      setProdutos(await res.json())
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Erro inesperado ao carregar produtos.')
+    } finally {
+      setLoading(false)
+    }
   }, [busca, filtroCategoria, filtroFornecedor])
 
   useEffect(() => {
     buscarProdutos()
-    fetch('/api/categorias').then(r => r.json()).then(setCategorias)
-    fetch('/api/fornecedores').then(r => r.json()).then(setFornecedores)
+    fetch('/api/categorias').then(r => r.ok ? r.json() : []).then(setCategorias).catch(() => setCategorias([]))
+    fetch('/api/fornecedores').then(r => r.ok ? r.json() : []).then(setFornecedores).catch(() => setFornecedores([]))
   }, [buscarProdutos])
 
   const toggleExpandir = (id: string) => {
@@ -47,10 +55,15 @@ export function ProdutosPage() {
 
   const deletar = async () => {
     if (!deletandoId) return
+    setError('')
     const res = await fetch(`/api/produtos/${deletandoId}`, { method: 'DELETE' })
     const data = await res.json()
-    if (!res.ok) { alert(data.error); return }
-    setDeletandoId(null); buscarProdutos()
+    if (!res.ok) {
+      setError(data.error || 'Não foi possível excluir o produto.')
+      return
+    }
+    setDeletandoId(null)
+    buscarProdutos()
   }
 
   const exportar = () => exportarCSV(produtos.map(p => ({
@@ -63,16 +76,18 @@ export function ProdutosPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Produtos</h1>
-          <p className="text-sm text-gray-500 mt-1">{produtos.length} modelo{produtos.length !== 1 ? 's' : ''} cadastrado{produtos.length !== 1 ? 's' : ''}</p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="secondary" size="sm" icon={<Download className="w-4 h-4" />} onClick={exportar}>CSV</Button>
-          <Link href="/produtos/novo"><Button size="sm" icon={<Plus className="w-4 h-4" />}>Novo Produto</Button></Link>
-        </div>
-      </div>
+      <PageHeader
+        title="Produtos"
+        description={`${produtos.length} modelo${produtos.length !== 1 ? 's' : ''} cadastrado${produtos.length !== 1 ? 's' : ''}`}
+        actions={
+          <>
+            <Button variant="secondary" size="sm" icon={<Download className="w-4 h-4" />} onClick={exportar}>CSV</Button>
+            <Link href="/produtos/novo"><Button size="sm" icon={<Plus className="w-4 h-4" />}>Novo Produto</Button></Link>
+          </>
+        }
+      />
+
+      {error && <ErrorState message={error} />}
 
       {/* Filtros */}
       <div className="flex flex-col sm:flex-row gap-3">
@@ -102,7 +117,7 @@ export function ProdutosPage() {
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center h-48"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" /></div>
+        <LoadingState message="Carregando produtos..." />
       ) : modo === 'agrupado' ? (
         /* MODO AGRUPADO */
         <div className="space-y-2">
