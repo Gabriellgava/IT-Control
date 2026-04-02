@@ -1,6 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
+function parseDateWithCurrentTime(data?: string): Date {
+  const agora = new Date()
+  if (!data) return agora
+
+  const [ano, mes, dia] = data.split('-').map(Number)
+  if (!ano || !mes || !dia) return agora
+
+  return new Date(
+    ano,
+    mes - 1,
+    dia,
+    agora.getHours(),
+    agora.getMinutes(),
+    agora.getSeconds(),
+    agora.getMilliseconds(),
+  )
+}
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
@@ -56,7 +74,7 @@ export async function POST(request: NextRequest) {
         data: {
           produtoId,
           etiqueta: etiqueta.trim(),
-          dataCompra: dataCompra ? new Date(dataCompra) : null,
+          dataCompra: parseDateWithCurrentTime(dataCompra),
           status: 'ATIVA',
         },
       })
@@ -69,7 +87,7 @@ export async function POST(request: NextRequest) {
           subtipo: null,
           unidadeId: unidade.id,
           valorUnitario: parseFloat(valorUnitario) || produto.valorUnitario,
-          data: dataCompra ? new Date(dataCompra) : new Date(),
+          data: parseDateWithCurrentTime(dataCompra),
           fornecedorId: fornecedorId || produto.fornecedorId || null,
           usuarioId: usuarioId || null,
           responsavel: responsavel || null,
@@ -142,12 +160,7 @@ export async function POST(request: NextRequest) {
           subtipo: subtipo || 'USUARIO',
           unidadeId: unidade.id,
           valorUnitario: unidade.produto.valorUnitario,
-          data: (() => {
-            const agora = new Date()
-            if (!body.data) return agora
-            const [ano, mes, dia] = body.data.split('-').map(Number)
-            return new Date(ano, mes - 1, dia, agora.getHours(), agora.getMinutes(), agora.getSeconds())
-          })(),
+          data: parseDateWithCurrentTime(body.data),
           fornecedorId: null,
           setorId: setorId || null,
           usuarioId: usuarioId || null,

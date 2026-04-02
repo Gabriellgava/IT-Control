@@ -22,6 +22,17 @@ export async function GET(request: NextRequest) {
       include: {
         categoria: true,
         fornecedor: true,
+        unidades: {
+          orderBy: { criadoEm: 'desc' },
+          select: {
+            id: true,
+            etiqueta: true,
+            dataCompra: true,
+            status: true,
+            criadoEm: true,
+            produtoId: true,
+          },
+        },
         _count: { select: { unidades: { where: { status: 'ATIVA' } } } },
       },
       orderBy: { nome: 'asc' },
