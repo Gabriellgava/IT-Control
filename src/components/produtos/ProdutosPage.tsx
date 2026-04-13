@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
-import { Search, Plus, Edit2, Trash2, Download, Package, Tag, ChevronDown, ChevronRight } from 'lucide-react'
+import { Search, Plus, Edit2, Trash2, Download, Package, Tag, ChevronDown, ChevronRight, Eye } from 'lucide-react'
 import { Button, Badge, Input, Select, Modal, Table, PageHeader, LoadingState, ErrorState } from '@/components/ui'
 import { formatMoeda, formatData, exportarCSV } from '@/lib/utils'
 import type { Produto, Categoria, Fornecedor } from '@/types'
@@ -17,6 +17,7 @@ export function ProdutosPage() {
   const [modo, setModo] = useState<'agrupado' | 'individual'>('agrupado')
   const [expandidos, setExpandidos] = useState<Set<string>>(new Set())
   const [editando, setEditando] = useState<Produto | null>(null)
+  const [consultando, setConsultando] = useState<Produto | null>(null)
   const [deletandoId, setDeletandoId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -92,7 +93,7 @@ export function ProdutosPage() {
       {/* Filtros */}
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="flex-1">
-          <Input placeholder="Buscar por nome ou código..." value={busca} onChange={e => setBusca(e.target.value)} icon={<Search className="w-4 h-4" />} />
+          <Input placeholder="Buscar por nome, código ou etiqueta..." value={busca} onChange={e => setBusca(e.target.value)} icon={<Search className="w-4 h-4" />} />
         </div>
         <Select value={filtroCategoria} onChange={e => setFiltroCategoria(e.target.value)}>
           <option value="">Todas as categorias</option>
@@ -143,6 +144,7 @@ export function ProdutosPage() {
                   <p className="text-xs text-gray-400">{formatMoeda(p.valorUnitario)} cada</p>
                 </div>
                 <div className="flex gap-1">
+                  <button onClick={() => setConsultando(p)} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-400 hover:text-indigo-600 transition-colors"><Eye className="w-4 h-4" /></button>
                   <button onClick={() => setEditando(p)} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-400 hover:text-blue-600 transition-colors"><Edit2 className="w-4 h-4" /></button>
                   <button onClick={() => setDeletandoId(p.id)} className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-600 transition-colors"><Trash2 className="w-4 h-4" /></button>
                 </div>
@@ -195,6 +197,61 @@ export function ProdutosPage() {
             onSuccess={() => { setEditando(null); buscarProdutos() }}
             onCancel={() => setEditando(null)}
           />
+        )}
+      </Modal>
+
+      {/* Modal consulta */}
+      <Modal open={!!consultando} onClose={() => setConsultando(null)} title="Detalhes do Produto">
+        {consultando && (
+          <div className="space-y-4 text-sm">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <p className="text-xs text-gray-500">Nome</p>
+                <p className="font-medium text-gray-900 dark:text-white">{consultando.nome}</p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500">Código</p>
+                <p className="font-mono text-gray-900 dark:text-white">{consultando.codigo}</p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500">Categoria</p>
+                <p className="text-gray-900 dark:text-white">{consultando.categoria?.nome ?? '—'}</p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500">Fornecedor</p>
+                <p className="text-gray-900 dark:text-white">{consultando.fornecedor?.nome ?? '—'}</p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500">Valor unitário</p>
+                <p className="text-gray-900 dark:text-white">{formatMoeda(consultando.valorUnitario)}</p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500">Unidades ativas</p>
+                <p className="text-gray-900 dark:text-white">{consultando._count?.unidades ?? 0}</p>
+              </div>
+            </div>
+
+            <div>
+              <p className="text-xs text-gray-500">Link de compra</p>
+              {consultando.linkCompra ? (
+                <a
+                  href={consultando.linkCompra}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-blue-600 hover:underline break-all"
+                >
+                  {consultando.linkCompra}
+                </a>
+              ) : (
+                <p className="text-gray-900 dark:text-white">—</p>
+              )}
+            </div>
+
+            <div>
+              <p className="text-xs text-gray-500">Observações</p>
+              <p className="text-gray-900 dark:text-white whitespace-pre-wrap">{consultando.observacoes || '—'}</p>
+            </div>
+          </div>
         )}
       </Modal>
 
