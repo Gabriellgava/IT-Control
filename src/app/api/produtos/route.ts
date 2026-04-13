@@ -14,6 +14,7 @@ export async function GET(request: NextRequest) {
           busca ? { OR: [
             { nome: { contains: busca, mode: 'insensitive' } },
             { codigo: { contains: busca, mode: 'insensitive' } },
+            { unidades: { some: { etiqueta: { contains: busca, mode: 'insensitive' } } } },
           ]} : {},
           categoriaId ? { categoriaId } : {},
           fornecedorId ? { fornecedorId } : {},

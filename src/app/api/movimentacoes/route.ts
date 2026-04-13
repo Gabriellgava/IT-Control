@@ -132,20 +132,31 @@ export async function POST(request: NextRequest) {
         const setor = await prisma.setor.findUnique({ where: { id: setorId } })
         if (!setor) return NextResponse.json({ error: 'Setor não encontrado' }, { status: 404 })
 
+        const tipoInventario = unidade.produto.categoria?.nome || unidade.produto.nome
+        const responsavelInventario = funcionarioRecebe.trim()
+
+        await prisma.inventario.deleteMany({
+          where: {
+            responsavel: responsavelInventario,
+            tipo: tipoInventario,
+            NOT: { etiqueta: etiqueta.trim() },
+          },
+        })
+
         await prisma.inventario.upsert({
           where: { etiqueta: etiqueta.trim() },
           update: {
             setor: setor.nome,
-            responsavel: funcionarioRecebe.trim(),
-            tipo: unidade.produto.categoria?.nome || unidade.produto.nome,
+            responsavel: responsavelInventario,
+            tipo: tipoInventario,
             marca: unidade.produto.nome,
             modelo: unidade.produto.codigo,
             observacoes: observacoes || null,
           },
           create: {
             setor: setor.nome,
-            responsavel: funcionarioRecebe.trim(),
-            tipo: unidade.produto.categoria?.nome || unidade.produto.nome,
+            responsavel: responsavelInventario,
+            tipo: tipoInventario,
             marca: unidade.produto.nome,
             modelo: unidade.produto.codigo,
             etiqueta: etiqueta.trim(),
