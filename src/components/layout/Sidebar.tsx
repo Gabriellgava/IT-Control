@@ -1,7 +1,7 @@
 'use client'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, Package, PlusCircle, ArrowDownCircle, ArrowUpCircle, Truck, Monitor, Moon, Sun, Users, LogOut, Building2, History, ChevronDown, List, Tag, FileSignature } from 'lucide-react'
+import { LayoutDashboard, Package, PlusCircle, ArrowDownCircle, ArrowUpCircle, Truck, Monitor, Moon, Sun, Users, LogOut, Building2, History, ChevronDown, List, Tag, FileSignature, KeyRound } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { useSession, signOut } from 'next-auth/react'
 import { ClipboardList } from 'lucide-react'
@@ -116,6 +116,11 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
         <Link href="/termos" onClick={onClose} className={itemCls(path === '/termos')}>
           <FileSignature className="w-4 h-4 flex-shrink-0" />
           <span className="flex-1">Termos</span>
+        </Link>
+
+        <Link href="/licencas-assinaturas" onClick={onClose} className={itemCls(path === '/licencas-assinaturas')}>
+          <KeyRound className="w-4 h-4 flex-shrink-0" />
+          <span className="flex-1">Licenças e Assinaturas</span>
         </Link>
 
         {/* Administração */}
