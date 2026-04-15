@@ -2,7 +2,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { Button, Input, Modal, Table, Badge } from '@/components/ui'
-import { Search, Plus, Edit2, Trash2, Download, Upload, X, AlertCircle, CheckCircle } from 'lucide-react'
+import { Search, Plus, Edit2, Trash2, Download, Upload, AlertCircle, CheckCircle } from 'lucide-react'
 import { exportarCSV, formatData } from '@/lib/utils'
 
 interface Item {
