@@ -1,9 +1,10 @@
 'use client'
 
+import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { Badge, Button, Input } from '@/components/ui'
-import { FileText, Plus, Printer, Search, Trash2 } from 'lucide-react'
+import { FileText, Printer, Search } from 'lucide-react'
 
 interface InventarioItem {
   id: string
@@ -17,18 +18,19 @@ interface InventarioItem {
   criadoEm: string
 }
 
-interface AssinaturaIA {
+interface ResponsavelAgrupado {
   nome: string
-  tipoPlano: string
-  emailConta: string
+  totalEquipamentos: number
+  setores: string[]
+  equipamentos: InventarioItem[]
 }
 
 const RESPONSABILIDADES_PADRAO = [
-  'Utilizar o equipamento exclusivamente para atividades profissionais autorizadas.',
-  'Zelar pela integridade física e lógica do equipamento recebido.',
-  'Não compartilhar credenciais, contas ou licenças de software sem autorização.',
-  'Comunicar imediatamente qualquer incidente, perda, roubo ou dano ao equipamento.',
-  'Devolver o equipamento e os acessos/licenças vinculados em caso de desligamento ou troca de função.',
+  'Utilizar os equipamentos exclusivamente para atividades profissionais autorizadas.',
+  'Zelar pela integridade física e lógica de todos os equipamentos recebidos.',
+  'Não compartilhar credenciais ou acessos corporativos sem autorização.',
+  'Comunicar imediatamente qualquer incidente, perda, roubo ou dano aos equipamentos.',
+  'Devolver todos os equipamentos em caso de desligamento ou troca de função.',
 ]
 
 const hojeISO = new Date().toISOString().slice(0, 10)
@@ -39,23 +41,17 @@ const formatarDataBR = (data: string) => {
 }
 
 export default function TermosPage() {
-  // Estado base da tela: inventário, busca e seleção.
   const [itens, setItens] = useState<InventarioItem[]>([])
   const [loading, setLoading] = useState(true)
   const [erro, setErro] = useState('')
   const [busca, setBusca] = useState('')
-  const [itemIdSelecionado, setItemIdSelecionado] = useState('')
+  const [responsavelSelecionado, setResponsavelSelecionado] = useState('')
 
-  // Estado do formulário do termo.
   const [empresa, setEmpresa] = useState('Minha Empresa LTDA')
   const [dataEntrega, setDataEntrega] = useState(hojeISO)
   const [dataDevolucao, setDataDevolucao] = useState('')
-  const [windowsLicenca, setWindowsLicenca] = useState('')
-  const [officeLicenca, setOfficeLicenca] = useState('')
-  const [assinaturasIA, setAssinaturasIA] = useState<AssinaturaIA[]>([{ nome: '', tipoPlano: '', emailConta: '' }])
   const [observacoesTermo, setObservacoesTermo] = useState('')
 
-  // Carrega inventário apenas uma vez ao abrir a página.
   useEffect(() => {
     const carregar = async () => {
       try {
@@ -65,8 +61,8 @@ export default function TermosPage() {
         const data = (await res.json()) as InventarioItem[]
         setItens(data)
 
-        // Seleciona automaticamente o primeiro item para facilitar o preenchimento.
-        if (data.length > 0) setItemIdSelecionado(data[0].id)
+        const primeiroResponsavel = data[0]?.responsavel
+        if (primeiroResponsavel) setResponsavelSelecionado(primeiroResponsavel)
       } catch {
         setErro('Não foi possível carregar o inventário para gerar o termo.')
       } finally {
@@ -77,33 +73,46 @@ export default function TermosPage() {
     carregar()
   }, [])
 
-  // Busca por responsável, etiqueta e equipamento para localizar rapidamente o termo.
-  const itensFiltrados = useMemo(() => {
-    if (!busca.trim()) return itens
+  const responsaveisAgrupados = useMemo<ResponsavelAgrupado[]>(() => {
+    const mapa = new Map<string, ResponsavelAgrupado>()
+
+    itens.forEach((item) => {
+      const chave = item.responsavel.trim()
+      const atual = mapa.get(chave)
+
+      if (atual) {
+        atual.totalEquipamentos += 1
+        atual.equipamentos.push(item)
+        if (!atual.setores.includes(item.setor)) atual.setores.push(item.setor)
+      } else {
+        mapa.set(chave, {
+          nome: chave,
+          totalEquipamentos: 1,
+          setores: [item.setor],
+          equipamentos: [item],
+        })
+      }
+    })
+
+    return Array.from(mapa.values()).sort((a, b) => a.nome.localeCompare(b.nome))
+  }, [itens])
+
+  const responsaveisFiltrados = useMemo(() => {
+    if (!busca.trim()) return responsaveisAgrupados
     const termo = busca.toLowerCase()
 
-    return itens.filter((item) => {
-      const chave = `${item.responsavel} ${item.etiqueta} ${item.marca} ${item.modelo} ${item.tipo}`.toLowerCase()
-      return chave.includes(termo)
+    return responsaveisAgrupados.filter((resp) => {
+      const chaveBusca = `${resp.nome} ${resp.setores.join(' ')} ${resp.equipamentos
+        .map((eq) => `${eq.etiqueta} ${eq.tipo} ${eq.marca} ${eq.modelo}`)
+        .join(' ')}`.toLowerCase()
+      return chaveBusca.includes(termo)
     })
-  }, [itens, busca])
+  }, [responsaveisAgrupados, busca])
 
-  const itemSelecionado = useMemo(
-    () => itens.find((item) => item.id === itemIdSelecionado) ?? null,
-    [itens, itemIdSelecionado]
+  const responsavelAtivo = useMemo(
+    () => responsaveisAgrupados.find((resp) => resp.nome === responsavelSelecionado) ?? null,
+    [responsaveisAgrupados, responsavelSelecionado]
   )
-
-  const adicionarAssinaturaIA = () => {
-    setAssinaturasIA((atual) => [...atual, { nome: '', tipoPlano: '', emailConta: '' }])
-  }
-
-  const removerAssinaturaIA = (idx: number) => {
-    setAssinaturasIA((atual) => atual.filter((_, i) => i !== idx))
-  }
-
-  const atualizarAssinaturaIA = (idx: number, campo: keyof AssinaturaIA, valor: string) => {
-    setAssinaturasIA((atual) => atual.map((item, i) => (i === idx ? { ...item, [campo]: valor } : item)))
-  }
 
   const imprimir = () => {
     window.print()
@@ -115,16 +124,21 @@ export default function TermosPage() {
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Termo de Responsabilidade</h1>
-            <p className="text-sm text-gray-500 mt-1">Geração por pessoa e equipamento, com controle de licenças de software e assinaturas de IA.</p>
+            <p className="text-sm text-gray-500 mt-1">Geração por pessoa com todos os equipamentos atualmente vinculados.</p>
           </div>
-          <Button icon={<Printer className="w-4 h-4" />} onClick={imprimir} disabled={!itemSelecionado}>
-            Imprimir termo
-          </Button>
+          <div className="flex items-center gap-2">
+            <Link href="/licencas-assinaturas">
+              <Button variant="secondary">Ir para Licenças e Assinaturas</Button>
+            </Link>
+            <Button icon={<Printer className="w-4 h-4" />} onClick={imprimir} disabled={!responsavelAtivo}>
+              Imprimir termo
+            </Button>
+          </div>
         </div>
 
         <section className="grid grid-cols-1 xl:grid-cols-3 gap-4">
           <div className="xl:col-span-1 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-4 space-y-3">
-            <h2 className="text-sm font-semibold text-gray-900 dark:text-white">1) Selecionar pessoa e equipamento</h2>
+            <h2 className="text-sm font-semibold text-gray-900 dark:text-white">1) Selecionar pessoa</h2>
 
             <Input
               placeholder="Buscar por responsável, etiqueta, marca..."
@@ -139,24 +153,25 @@ export default function TermosPage() {
               <p className="text-sm text-gray-500">Carregando inventário...</p>
             ) : (
               <div className="space-y-2 max-h-[360px] overflow-auto pr-1">
-                {itensFiltrados.length === 0 && <p className="text-sm text-gray-500">Nenhum item encontrado.</p>}
-                {itensFiltrados.map((item) => {
-                  const ativo = item.id === itemIdSelecionado
+                {responsaveisFiltrados.length === 0 && <p className="text-sm text-gray-500">Nenhuma pessoa encontrada.</p>}
+                {responsaveisFiltrados.map((resp) => {
+                  const ativo = resp.nome === responsavelSelecionado
                   return (
                     <button
-                      key={item.id}
-                      onClick={() => setItemIdSelecionado(item.id)}
+                      key={resp.nome}
+                      onClick={() => setResponsavelSelecionado(resp.nome)}
                       className={`w-full text-left border rounded-lg p-3 transition-colors ${
                         ativo
                           ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
                           : 'border-gray-200 dark:border-gray-800 hover:border-blue-300'
                       }`}
                     >
-                      <p className="text-sm font-semibold text-gray-900 dark:text-white">{item.responsavel}</p>
-                      <p className="text-xs text-gray-500">{item.tipo} • {item.marca} {item.modelo}</p>
+                      <p className="text-sm font-semibold text-gray-900 dark:text-white">{resp.nome}</p>
+                      <p className="text-xs text-gray-500">{resp.totalEquipamentos} equipamento(s) vinculado(s)</p>
                       <div className="mt-2 flex gap-2 flex-wrap">
-                        <Badge variant="info">{item.etiqueta}</Badge>
-                        <Badge>{item.setor}</Badge>
+                        {resp.setores.map((setor) => (
+                          <Badge key={setor}>{setor}</Badge>
+                        ))}
                       </div>
                     </button>
                   )
@@ -172,55 +187,6 @@ export default function TermosPage() {
               <Input label="Empresa" value={empresa} onChange={(e) => setEmpresa(e.target.value)} />
               <Input label="Data de entrega" type="date" value={dataEntrega} onChange={(e) => setDataEntrega(e.target.value)} />
               <Input label="Data prevista de devolução" type="date" value={dataDevolucao} onChange={(e) => setDataDevolucao(e.target.value)} />
-              <Input label="Licença Windows" placeholder="Ex.: OEM, MAK, conta corporativa" value={windowsLicenca} onChange={(e) => setWindowsLicenca(e.target.value)} />
-              <Input label="Licença Office" placeholder="Ex.: Microsoft 365 Business" value={officeLicenca} onChange={(e) => setOfficeLicenca(e.target.value)} />
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex items-center justify-between gap-2">
-                <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Assinaturas de IA vinculadas</h3>
-                <Button size="sm" variant="secondary" icon={<Plus className="w-4 h-4" />} onClick={adicionarAssinaturaIA}>
-                  Adicionar
-                </Button>
-              </div>
-
-              <div className="space-y-2">
-                {assinaturasIA.map((assinatura, idx) => (
-                  <div key={idx} className="border border-gray-200 dark:border-gray-800 rounded-lg p-3 grid grid-cols-1 md:grid-cols-3 gap-2">
-                    <Input
-                      label="Ferramenta"
-                      placeholder="Ex.: ChatGPT, Copilot"
-                      value={assinatura.nome}
-                      onChange={(e) => atualizarAssinaturaIA(idx, 'nome', e.target.value)}
-                    />
-                    <Input
-                      label="Plano"
-                      placeholder="Ex.: Team, Enterprise"
-                      value={assinatura.tipoPlano}
-                      onChange={(e) => atualizarAssinaturaIA(idx, 'tipoPlano', e.target.value)}
-                    />
-                    <div className="flex gap-2 items-end">
-                      <div className="flex-1">
-                        <Input
-                          label="Conta/E-mail"
-                          placeholder="usuario@empresa.com"
-                          value={assinatura.emailConta}
-                          onChange={(e) => atualizarAssinaturaIA(idx, 'emailConta', e.target.value)}
-                        />
-                      </div>
-                      {assinaturasIA.length > 1 && (
-                        <button
-                          onClick={() => removerAssinaturaIA(idx)}
-                          className="h-10 px-2 rounded-lg border border-red-300 text-red-600 hover:bg-red-50"
-                          aria-label="Remover assinatura"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
             </div>
 
             <div>
@@ -230,7 +196,7 @@ export default function TermosPage() {
                 value={observacoesTermo}
                 onChange={(e) => setObservacoesTermo(e.target.value)}
                 className="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="Ex.: notebook com mochila, mouse e carregador original."
+                placeholder="Ex.: colaborador recebeu também mochila e carregadores extras."
               />
             </div>
           </div>
@@ -242,44 +208,32 @@ export default function TermosPage() {
             <h2 className="text-lg font-bold text-gray-900 dark:text-white">Pré-visualização do termo</h2>
           </div>
 
-          {!itemSelecionado ? (
-            <p className="text-sm text-gray-500">Selecione um item de inventário para montar o termo.</p>
+          {!responsavelAtivo ? (
+            <p className="text-sm text-gray-500">Selecione uma pessoa para montar o termo.</p>
           ) : (
             <article className="prose prose-sm dark:prose-invert max-w-none">
               <p>
-                <strong>TERMO DE RESPONSABILIDADE DE EQUIPAMENTO E LICENÇAS DE SOFTWARE</strong>
+                <strong>TERMO DE RESPONSABILIDADE DE ATIVOS DE TI</strong>
               </p>
               <p>
                 Pelo presente termo, a empresa <strong>{empresa || '____________________'}</strong> entrega ao colaborador{' '}
-                <strong>{itemSelecionado.responsavel}</strong>, do setor <strong>{itemSelecionado.setor}</strong>, o equipamento abaixo especificado,
+                <strong>{responsavelAtivo.nome}</strong>, vinculado ao(s) setor(es) <strong>{responsavelAtivo.setores.join(', ')}</strong>, os equipamentos abaixo especificados,
                 para uso profissional.
               </p>
 
-              <p><strong>Dados do equipamento</strong></p>
+              <p><strong>Relação de equipamentos vinculados</strong></p>
               <ul>
-                <li>Tipo: {itemSelecionado.tipo}</li>
-                <li>Marca/Modelo: {itemSelecionado.marca} {itemSelecionado.modelo}</li>
-                <li>Etiqueta patrimonial: {itemSelecionado.etiqueta}</li>
+                {responsavelAtivo.equipamentos.map((equipamento) => (
+                  <li key={equipamento.id}>
+                    {equipamento.tipo} • {equipamento.marca} {equipamento.modelo} • Etiqueta: {equipamento.etiqueta} • Setor: {equipamento.setor}
+                  </li>
+                ))}
+              </ul>
+
+              <p><strong>Dados de vigência</strong></p>
+              <ul>
                 <li>Data de entrega: {formatarDataBR(dataEntrega)}</li>
                 <li>Data prevista de devolução: {formatarDataBR(dataDevolucao)}</li>
-              </ul>
-
-              <p><strong>Licenças vinculadas ao equipamento</strong></p>
-              <ul>
-                <li>Windows: {windowsLicenca || 'Não informado'}</li>
-                <li>Office: {officeLicenca || 'Não informado'}</li>
-              </ul>
-
-              <p><strong>Assinaturas de IA vinculadas ao colaborador/equipamento</strong></p>
-              <ul>
-                {assinaturasIA.filter((a) => a.nome || a.tipoPlano || a.emailConta).length === 0 && <li>Nenhuma assinatura vinculada.</li>}
-                {assinaturasIA
-                  .filter((a) => a.nome || a.tipoPlano || a.emailConta)
-                  .map((assinatura, idx) => (
-                    <li key={`${assinatura.nome}-${idx}`}>
-                      {assinatura.nome || 'Ferramenta'} • Plano: {assinatura.tipoPlano || 'N/I'} • Conta: {assinatura.emailConta || 'N/I'}
-                    </li>
-                  ))}
               </ul>
 
               <p><strong>Responsabilidades do colaborador</strong></p>
