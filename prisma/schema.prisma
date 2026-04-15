@@ -166,3 +166,19 @@ model Inventario {
 
   @@map("inventario")
 }
+
+
+model LicencaAssinatura {
+  id           String   @id @default(cuid())
+  solicitante  String
+  setor        String
+  tipoLicenca  String   @map("tipo_licenca")
+  codigoLicenca String? @map("codigo_licenca")
+  provedor     String?
+  status       String   @default("ATIVA")
+  observacoes  String?
+  criadoEm     DateTime @default(now()) @map("criado_em")
+  atualizadoEm DateTime @updatedAt @map("atualizado_em")
+
+  @@map("licencas_assinaturas")
+}
