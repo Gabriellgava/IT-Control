@@ -10,14 +10,16 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
     const { itens } = body as {
-      itens: { setor: string; responsavel: string; tipo: string; marca: string; modelo: string; etiqueta: string; observacoes?: string }[]
+      itens: { setor: string; responsavel: string; tipo: string; marca: string; modelo: string; etiqueta: string; numero?: string; observacoes?: string }[]
     }
 
     if (!itens || !Array.isArray(itens) || itens.length === 0)
       return NextResponse.json({ error: 'Nenhum item para importar' }, { status: 400 })
 
     const erros: string[] = []
-    const importados: string[] = []
+    let inseridos = 0
+    let atualizados = 0
+    let semMudancas = 0
 
     for (let i = 0; i < itens.length; i++) {
       const item = itens[i]
@@ -29,6 +31,7 @@ export async function POST(request: NextRequest) {
       const marca = item.marca?.trim()
       const modelo = item.modelo?.trim()
       const etiqueta = item.etiqueta?.trim()
+      const numero = item.numero?.trim() || null
       const observacoes = item.observacoes?.trim() || null
 
       if (!setor || !responsavel || !tipo || !marca || !modelo || !etiqueta) {
@@ -37,39 +40,51 @@ export async function POST(request: NextRequest) {
       }
 
       try {
-        await prisma.inventario.upsert({
+        const existente = await prisma.inventario.findUnique({ where: { etiqueta } })
+
+        if (!existente) {
+          await prisma.inventario.create({
+            data: { setor, responsavel, tipo, marca, modelo, etiqueta, numero, observacoes },
+          })
+          inseridos++
+          continue
+        }
+
+        const mudou =
+          existente.setor !== setor ||
+          existente.responsavel !== responsavel ||
+          existente.tipo !== tipo ||
+          existente.marca !== marca ||
+          existente.modelo !== modelo ||
+          existente.numero !== numero ||
+          existente.observacoes !== observacoes
+
+        if (!mudou) {
+          semMudancas++
+          continue
+        }
+
+        await prisma.inventario.update({
           where: { etiqueta },
-          update: {
-            setor,
-            responsavel,
-            tipo,
-            marca,
-            modelo,
-            observacoes,
-          },
-          create: {
-            setor,
-            responsavel,
-            tipo,
-            marca,
-            modelo,
-            etiqueta,
-            observacoes,
-          },
+          data: { setor, responsavel, tipo, marca, modelo, numero, observacoes },
         })
-        importados.push(etiqueta)
+        atualizados++
       } catch {
         erros.push(`Linha ${linha}: erro ao importar etiqueta "${etiqueta}"`)
       }
     }
 
+    const processados = inseridos + atualizados
     const payload = {
-      importados: importados.length,
+      importados: processados,
+      inseridos,
+      atualizados,
+      semMudancas,
       erros,
-      mensagem: `${importados.length} item(s) importado(s) com sucesso${erros.length > 0 ? `, ${erros.length} erro(s)` : ''}`,
+      mensagem: `${processados} item(s) processado(s): ${inseridos} novo(s), ${atualizados} atualizado(s), ${semMudancas} sem mudança${erros.length > 0 ? `, ${erros.length} erro(s)` : ''}`,
     }
 
-    if (importados.length === 0) {
+    if (processados === 0) {
       return NextResponse.json({ ...payload, error: 'Nenhum item foi importado. Verifique o formato da planilha.' }, { status: 400 })
     }
 

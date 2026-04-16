@@ -13,13 +13,14 @@ interface Item {
   marca: string
   modelo: string
   etiqueta: string
+  numero?: string | null
   observacoes?: string | null
   criadoEm: string
 }
 
 const CAMPOS_OBRIGATORIOS = ['setor', 'responsavel', 'tipo', 'marca', 'modelo', 'etiqueta'] as const
-const FORM_VAZIO = { setor: '', responsavel: '', tipo: '', marca: '', modelo: '', etiqueta: '', observacoes: '' }
-const ORDEM_COLUNAS_SEM_CABECALHO = ['setor', 'responsavel', 'tipo', 'marca', 'modelo', 'etiqueta', 'observacoes'] as const
+const FORM_VAZIO = { setor: '', responsavel: '', tipo: '', marca: '', modelo: '', etiqueta: '', numero: '', observacoes: '' }
+const ORDEM_COLUNAS_SEM_CABECALHO = ['setor', 'responsavel', 'tipo', 'marca', 'modelo', 'etiqueta', 'numero', 'observacoes'] as const
 
 // Mapeamentos de colunas aceitos (PT e EN)
 const MAPA_COLUNAS: Record<string, string> = {
@@ -29,6 +30,7 @@ const MAPA_COLUNAS: Record<string, string> = {
   marca: 'marca', brand: 'marca', fabricante: 'marca', manufacturer: 'marca',
   modelo: 'modelo', model: 'modelo',
   etiqueta: 'etiqueta', tag: 'etiqueta', 'etiqueta interna': 'etiqueta', 'internal tag': 'etiqueta', patrimonio: 'etiqueta', patrimônio: 'etiqueta',
+  numero: 'numero', telefone: 'numero', celular: 'numero', linha: 'numero', phone: 'numero',
   observacoes: 'observacoes', observações: 'observacoes', notes: 'observacoes', obs: 'observacoes',
 }
 
@@ -108,7 +110,7 @@ export default function InventarioPage() {
   const abrirNovo = () => { setEditando(null); setForm(FORM_VAZIO); setErroForm(''); setModalForm(true) }
   const abrirEditar = (item: Item) => {
     setEditando(item)
-    setForm({ setor: item.setor, responsavel: item.responsavel, tipo: item.tipo, marca: item.marca, modelo: item.modelo, etiqueta: item.etiqueta, observacoes: item.observacoes ?? '' })
+    setForm({ setor: item.setor, responsavel: item.responsavel, tipo: item.tipo, marca: item.marca, modelo: item.modelo, etiqueta: item.etiqueta, numero: item.numero ?? '', observacoes: item.observacoes ?? '' })
     setErroForm('')
     setModalForm(true)
   }
@@ -134,12 +136,12 @@ export default function InventarioPage() {
   const exportar = () => exportarCSV(itens.map(i => ({
     Setor: i.setor, Responsável: i.responsavel, Tipo: i.tipo,
     Marca: i.marca, Modelo: i.modelo, Etiqueta: i.etiqueta,
-    Observações: i.observacoes ?? '', 'Cadastrado em': formatData(i.criadoEm),
+    Número: i.numero ?? '', Observações: i.observacoes ?? '', 'Cadastrado em': formatData(i.criadoEm),
   })), 'inventario-ti')
 
   const baixarModelo = () => exportarCSV([
-    { Setor: 'TI', Responsável: 'João Silva', Tipo: 'Notebook', Marca: 'Dell', Modelo: 'Latitude 5520', Etiqueta: 'ETQ-001', Observações: '' },
-    { Setor: 'RH', Responsável: 'Maria Souza', Tipo: 'Mouse', Marca: 'Logitech', Modelo: 'MX Master', Etiqueta: 'ETQ-002', Observações: '' },
+    { Setor: 'Comercial', Responsável: 'João Silva', Tipo: 'Smartphone', Marca: 'Samsung', Modelo: 'Galaxy S23', Etiqueta: 'ETQ-001', Número: '(11) 91234-5678', Observações: '' },
+    { Setor: 'Operação', Responsável: 'Maria Souza', Tipo: 'Tablet', Marca: 'Apple', Modelo: 'iPad 10', Etiqueta: 'ETQ-002', Número: '(11) 99876-5432', Observações: '' },
   ], 'modelo-inventario')
 
   // Lê CSV ou Excel e monta preview
@@ -246,7 +248,7 @@ export default function InventarioPage() {
         {loading ? (
           <div className="flex items-center justify-center h-48"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" /></div>
         ) : (
-          <Table headers={['Setor', 'Responsável', 'Tipo', 'Marca / Modelo', 'Etiqueta', 'Ações']} empty={itens.length === 0}>
+          <Table headers={['Setor', 'Responsável', 'Tipo', 'Marca / Modelo', 'Etiqueta', 'Número', 'Ações']} empty={itens.length === 0}>
             {itens.map(item => (
               <tr key={item.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
                 <td className="px-4 py-3"><Badge variant="info">{item.setor}</Badge></td>
@@ -257,6 +259,7 @@ export default function InventarioPage() {
                   <p className="text-xs text-gray-400">{item.modelo}</p>
                 </td>
                 <td className="px-4 py-3"><span className="font-mono text-sm text-gray-700 dark:text-gray-300">{item.etiqueta}</span></td>
+                <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">{item.numero || '—'}</td>
                 <td className="px-4 py-3">
                   <div className="flex gap-1">
                     <button onClick={() => abrirEditar(item)} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-400 hover:text-blue-600 transition-colors"><Edit2 className="w-4 h-4" /></button>
@@ -279,6 +282,7 @@ export default function InventarioPage() {
               <Input label="Etiqueta *" value={form.etiqueta} onChange={e => s('etiqueta', e.target.value)} placeholder="Ex: ETQ-001" />
               <Input label="Marca *" value={form.marca} onChange={e => s('marca', e.target.value)} placeholder="Ex: Dell, Logitech" />
               <Input label="Modelo *" value={form.modelo} onChange={e => s('modelo', e.target.value)} placeholder="Ex: Latitude 5520" />
+              <Input label="Número" value={form.numero} onChange={e => s('numero', e.target.value)} placeholder="Ex: (11) 91234-5678" />
               <div className="col-span-2">
                 <Input label="Observações" value={form.observacoes} onChange={e => s('observacoes', e.target.value)} placeholder="Informações adicionais..." />
               </div>
@@ -295,7 +299,7 @@ export default function InventarioPage() {
           <div className="space-y-4">
             <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg text-sm text-blue-700 dark:text-blue-400">
               <p className="font-semibold mb-1">Colunas esperadas no CSV:</p>
-              <p className="font-mono text-xs">Setor, Responsável, Tipo, Marca, Modelo, Etiqueta, Observações</p>
+              <p className="font-mono text-xs">Setor, Responsável, Tipo, Marca, Modelo, Etiqueta, Número, Observações</p>
               <button onClick={baixarModelo} className="mt-2 text-xs underline hover:no-underline">Baixar modelo de planilha</button>
             </div>
 
@@ -312,7 +316,7 @@ export default function InventarioPage() {
                 <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700 max-h-48">
                   <table className="w-full text-xs">
                     <thead><tr className="bg-gray-50 dark:bg-gray-800">
-                      {['Setor', 'Responsável', 'Tipo', 'Marca', 'Modelo', 'Etiqueta'].map(h => <th key={h} className="px-3 py-2 text-left font-semibold text-gray-500">{h}</th>)}
+                      {['Setor', 'Responsável', 'Tipo', 'Marca', 'Modelo', 'Etiqueta', 'Número'].map(h => <th key={h} className="px-3 py-2 text-left font-semibold text-gray-500">{h}</th>)}
                     </tr></thead>
                     <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
                       {previewImport.slice(0, 5).map((item, i) => (
@@ -323,6 +327,7 @@ export default function InventarioPage() {
                           <td className="px-3 py-1.5">{item.marca}</td>
                           <td className="px-3 py-1.5">{item.modelo}</td>
                           <td className="px-3 py-1.5 font-mono">{item.etiqueta}</td>
+                          <td className="px-3 py-1.5">{item.numero || '—'}</td>
                         </tr>
                       ))}
                     </tbody>
