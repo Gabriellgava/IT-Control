@@ -34,6 +34,61 @@ const MAPA_COLUNAS: Record<string, string> = {
   observacoes: 'observacoes', observações: 'observacoes', notes: 'observacoes', obs: 'observacoes',
 }
 
+
+const SETORES_COMUNS = new Set([
+  'operacional', 'marketing', 'diretoria', 'financeiro', 'crm', 'vip', 'bi', 'compliance', 'rh', 'ti', 'estoque', 'marcas',
+])
+
+const normalizarColunasSemCabecalho = (colunasBrutas: string[]) => {
+  const colunas = [...colunasBrutas]
+
+  // Remove espaços extras em colunas vazias de cauda (ex: ", ,")
+  while (colunas.length > 0 && !colunas[colunas.length - 1].trim()) {
+    colunas.pop()
+  }
+
+  // Corrige linhas no formato antigo: Responsável, Modelo, Tipo, Marca, Setor, Etiqueta, Número, Observações
+  if (
+    colunas.length >= 6 &&
+    !SETORES_COMUNS.has(normalizarCabecalho(colunas[0])) &&
+    SETORES_COMUNS.has(normalizarCabecalho(colunas[4]))
+  ) {
+    return {
+      setor: colunas[4] ?? '',
+      responsavel: colunas[0] ?? '',
+      tipo: colunas[2] ?? '',
+      marca: colunas[3] ?? '',
+      modelo: colunas[1] ?? '',
+      etiqueta: colunas[5] ?? '',
+      numero: colunas[6] ?? '',
+      observacoes: colunas[7] ?? '',
+    }
+  }
+
+  // Corrige CSV sem aspas quando o Modelo contém vírgulas
+  if (colunas.length > ORDEM_COLUNAS_SEM_CABECALHO.length) {
+    const base = colunas.slice(0, 4)
+    const etiqueta = colunas[colunas.length - 1] ?? ''
+    const numero = ''
+    const observacoes = ''
+    const modeloComVirgula = colunas.slice(4, -1).join(', ')
+
+    return {
+      setor: base[0] ?? '',
+      responsavel: base[1] ?? '',
+      tipo: base[2] ?? '',
+      marca: base[3] ?? '',
+      modelo: modeloComVirgula,
+      etiqueta,
+      numero,
+      observacoes,
+    }
+  }
+
+  const [setor = '', responsavel = '', tipo = '', marca = '', modelo = '', etiqueta = '', numero = '', observacoes = ''] = colunas
+  return { setor, responsavel, tipo, marca, modelo, etiqueta, numero, observacoes }
+}
+
 const normalizarCabecalho = (v: string) =>
   v
     .trim()
@@ -118,6 +173,7 @@ export default function InventarioPage() {
   const [importStatus, setImportStatus] = useState<{ tipo: 'ok' | 'erro'; msg: string } | null>(null)
   const [importando, setImportando] = useState(false)
   const [previewImport, setPreviewImport] = useState<Record<string, string>[]>([])
+  const [textoImportacao, setTextoImportacao] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
 
   // Setores e tipos únicos para filtros
@@ -199,43 +255,46 @@ export default function InventarioPage() {
     { Setor: 'Operação', Responsável: 'Maria Souza', Tipo: 'Tablet', Marca: 'Apple', Modelo: 'iPad 10', Etiqueta: 'ETQ-002', Número: '(11) 99876-5432', Observações: '' },
   ], 'modelo-inventario')
 
-  // Lê CSV ou Excel e monta preview
+  const processarTextoImportacao = (textoRaw: string) => {
+    const texto = textoRaw.replace(/^\uFEFF/, '').replace(/\\n/g, '\n')
+    const linhas = texto.split(/\r?\n/).map(l => l.trim()).filter(l => l)
+    if (linhas.length < 1) { setImportStatus({ tipo: 'erro', msg: 'Arquivo/texto vazio ou sem dados' }); return }
+
+    const delimitador = detectarDelimitador(linhas[0])
+    const primeiraLinha = parseCsvLine(linhas[0], delimitador).map(normalizarCabecalho)
+    const temCabecalho = primeiraLinha.some(c => MAPA_COLUNAS[c])
+    const colunas = temCabecalho
+      ? primeiraLinha.map(c => MAPA_COLUNAS[c] ?? c)
+      : [...ORDEM_COLUNAS_SEM_CABECALHO]
+    const linhasDados = temCabecalho ? linhas.slice(1) : linhas
+
+    const dados = linhasDados
+      .map(linha => parseCsvLine(linha, delimitador))
+      .map(cols => {
+        if (!temCabecalho) return normalizarColunasSemCabecalho(cols)
+
+        const obj: Record<string, string> = {}
+        colunas.forEach((campo, i) => { obj[campo] = (cols[i] ?? '').trim() })
+        return obj
+      })
+      .filter(obj => Object.values(obj).some(v => v))
+
+    if (dados.length === 0) {
+      setImportStatus({ tipo: 'erro', msg: 'Nenhum dado válido encontrado no arquivo/texto.' })
+      return
+    }
+
+    setPreviewImport(dados)
+  }
+
+  // Lê CSV e monta preview
   const onArquivo = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
     setImportStatus(null)
 
     const reader = new FileReader()
-    reader.onload = (ev) => {
-      const textoRaw = ev.target?.result as string
-      const texto = textoRaw.replace(/^\uFEFF/, '').replace(/\\n/g, '\n')
-      const linhas = texto.split(/\r?\n/).map(l => l.trim()).filter(l => l)
-      if (linhas.length < 2) { setImportStatus({ tipo: 'erro', msg: 'Arquivo vazio ou sem dados' }); return }
-
-      const delimitador = detectarDelimitador(linhas[0])
-      const primeiraLinha = parseCsvLine(linhas[0], delimitador).map(normalizarCabecalho)
-      const temCabecalho = primeiraLinha.some(c => MAPA_COLUNAS[c])
-      const colunas = temCabecalho
-        ? primeiraLinha.map(c => MAPA_COLUNAS[c] ?? c)
-        : [...ORDEM_COLUNAS_SEM_CABECALHO]
-      const linhasDados = temCabecalho ? linhas.slice(1) : linhas
-
-      const dados = linhasDados
-        .map(linha => parseCsvLine(linha, delimitador))
-        .map(cols => {
-          const obj: Record<string, string> = {}
-          colunas.forEach((campo, i) => { obj[campo] = (cols[i] ?? '').trim() })
-          return obj
-        })
-        .filter(obj => Object.values(obj).some(v => v))
-
-      if (dados.length === 0) {
-        setImportStatus({ tipo: 'erro', msg: 'Nenhum dado válido encontrado no arquivo.' })
-        return
-      }
-
-      setPreviewImport(dados)
-    }
+    reader.onload = (ev) => processarTextoImportacao((ev.target?.result as string) || '')
     reader.readAsText(file, 'UTF-8')
   }
 
@@ -273,7 +332,7 @@ export default function InventarioPage() {
           </div>
           <div className="flex gap-2 flex-wrap">
             <Button variant="secondary" size="sm" icon={<Download className="w-4 h-4" />} onClick={exportar}>Exportar CSV</Button>
-            <Button variant="secondary" size="sm" icon={<Upload className="w-4 h-4" />} onClick={() => { setModalImport(true); setImportStatus(null); setPreviewImport([]) }}>Importar</Button>
+            <Button variant="secondary" size="sm" icon={<Upload className="w-4 h-4" />} onClick={() => { setModalImport(true); setImportStatus(null); setPreviewImport([]); setTextoImportacao('') }}>Importar</Button>
             <Button size="sm" icon={<Plus className="w-4 h-4" />} onClick={abrirNovo}>Adicionar Item</Button>
           </div>
         </div>
@@ -365,10 +424,37 @@ export default function InventarioPage() {
               <button onClick={baixarModelo} className="mt-2 text-xs underline hover:no-underline">Baixar modelo de planilha</button>
             </div>
 
-            <div>
+            <div className="space-y-3">
               <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide mb-1">Arquivo CSV *</label>
               <input ref={fileRef} type="file" accept=".csv,.txt" onChange={onArquivo}
                 className="w-full border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-white file:mr-3 file:py-1 file:px-3 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" />
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide mb-1">Ou cole os dados CSV</label>
+                <textarea
+                  rows={5}
+                  value={textoImportacao}
+                  onChange={e => setTextoImportacao(e.target.value)}
+                  placeholder="Cole aqui as linhas do inventário (CSV)"
+                  className="w-full border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                />
+                <div className="mt-2 flex justify-end">
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => {
+                      if (!textoImportacao.trim()) {
+                        setImportStatus({ tipo: 'erro', msg: 'Cole algum conteúdo CSV antes de processar.' })
+                        return
+                      }
+                      setImportStatus(null)
+                      processarTextoImportacao(textoImportacao)
+                    }}
+                  >
+                    Processar texto colado
+                  </Button>
+                </div>
+              </div>
             </div>
 
             {/* Preview */}
