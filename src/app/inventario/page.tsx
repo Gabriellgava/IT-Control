@@ -308,8 +308,8 @@ export default function InventarioPage() {
     })
     const data = await res.json()
     if (!res.ok) { setImportStatus({ tipo: 'erro', msg: data.error }); setImportando(false); return }
-    if (data.importados === 0) {
-      setImportStatus({ tipo: 'erro', msg: data.erros?.join(' | ') || 'Nenhum item foi importado.' })
+    if (data.importados === 0 && (data.semMudancas ?? 0) === 0) {
+      setImportStatus({ tipo: 'erro', msg: data.erros?.join(' | ') || data.error || 'Nenhum item foi importado.' })
       setImportando(false)
       return
     }

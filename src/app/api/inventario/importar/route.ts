@@ -84,8 +84,17 @@ export async function POST(request: NextRequest) {
       mensagem: `${processados} item(s) processado(s): ${inseridos} novo(s), ${atualizados} atualizado(s), ${semMudancas} sem mudança${erros.length > 0 ? `, ${erros.length} erro(s)` : ''}`,
     }
 
+    if (processados === 0 && semMudancas > 0) {
+      return NextResponse.json(payload)
+    }
+
     if (processados === 0) {
-      return NextResponse.json({ ...payload, error: 'Nenhum item foi importado. Verifique o formato da planilha.' }, { status: 400 })
+      return NextResponse.json({
+        ...payload,
+        error: erros.length > 0
+          ? 'Nenhum item foi importado. Revise os erros informados.'
+          : 'Nenhum item foi importado. Verifique o formato da planilha.',
+      }, { status: 400 })
     }
 
     return NextResponse.json(payload)
