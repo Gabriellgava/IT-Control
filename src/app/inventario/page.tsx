@@ -25,12 +25,19 @@ const ORDEM_COLUNAS_SEM_CABECALHO = ['setor', 'responsavel', 'tipo', 'marca', 'm
 // Mapeamentos de colunas aceitos (PT e EN)
 const MAPA_COLUNAS: Record<string, string> = {
   setor: 'setor', sector: 'setor', departamento: 'setor', department: 'setor',
-  responsavel: 'responsavel', responsável: 'responsavel', responsible: 'responsavel', colaborador: 'responsavel', employee: 'responsavel',
+  responsavel: 'responsavel', responsável: 'responsavel', responsible: 'responsavel', colaborador: 'responsavel', employee: 'responsavel', 'responsavel pelo item': 'responsavel',
   tipo: 'tipo', type: 'tipo', 'tipo de equipamento': 'tipo', 'equipment type': 'tipo',
   marca: 'marca', brand: 'marca', fabricante: 'marca', manufacturer: 'marca',
   modelo: 'modelo', model: 'modelo',
   etiqueta: 'etiqueta', tag: 'etiqueta', 'etiqueta interna': 'etiqueta', 'internal tag': 'etiqueta', patrimonio: 'etiqueta', patrimônio: 'etiqueta',
-  numero: 'numero', telefone: 'numero', celular: 'numero', linha: 'numero', phone: 'numero',
+  numero: 'numero',
+  'numero do inventario': 'numero',
+  'numero de inventario': 'numero',
+  'numero da tela de inventario': 'numero',
+  telefone: 'numero',
+  celular: 'numero',
+  linha: 'numero',
+  phone: 'numero',
   observacoes: 'observacoes', observações: 'observacoes', notes: 'observacoes', obs: 'observacoes',
 }
 
@@ -251,8 +258,8 @@ export default function InventarioPage() {
   })), 'inventario-ti')
 
   const baixarModelo = () => exportarCSV([
-    { Setor: 'Comercial', Responsável: 'João Silva', Tipo: 'Smartphone', Marca: 'Samsung', Modelo: 'Galaxy S23', Etiqueta: 'ETQ-001', Número: '(11) 91234-5678', Observações: '' },
-    { Setor: 'Operação', Responsável: 'Maria Souza', Tipo: 'Tablet', Marca: 'Apple', Modelo: 'iPad 10', Etiqueta: 'ETQ-002', Número: '(11) 99876-5432', Observações: '' },
+    { Setor: 'Comercial', Responsável: 'João Silva', Tipo: 'Smartphone', Marca: 'Samsung', Modelo: 'Galaxy S23', Etiqueta: 'ETQ-001', Número: 'INV-2026-001', Observações: '' },
+    { Setor: 'Operação', Responsável: 'Maria Souza', Tipo: 'Tablet', Marca: 'Apple', Modelo: 'iPad 10', Etiqueta: 'ETQ-002', Número: 'INV-2026-002', Observações: '' },
   ], 'modelo-inventario')
 
   const processarTextoImportacao = (textoRaw: string) => {
@@ -403,7 +410,7 @@ export default function InventarioPage() {
               <Input label="Etiqueta *" value={form.etiqueta} onChange={e => s('etiqueta', e.target.value)} placeholder="Ex: ETQ-001" />
               <Input label="Marca *" value={form.marca} onChange={e => s('marca', e.target.value)} placeholder="Ex: Dell, Logitech" />
               <Input label="Modelo *" value={form.modelo} onChange={e => s('modelo', e.target.value)} placeholder="Ex: Latitude 5520" />
-              <Input label="Número" value={form.numero} onChange={e => s('numero', e.target.value)} placeholder="Ex: (11) 91234-5678" />
+              <Input label="Número de inventário" value={form.numero} onChange={e => s('numero', e.target.value)} placeholder="Ex: INV-2026-001" />
               <div className="col-span-2">
                 <Input label="Observações" value={form.observacoes} onChange={e => s('observacoes', e.target.value)} placeholder="Informações adicionais..." />
               </div>
@@ -421,6 +428,9 @@ export default function InventarioPage() {
             <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg text-sm text-blue-700 dark:text-blue-400">
               <p className="font-semibold mb-1">Colunas esperadas no CSV:</p>
               <p className="font-mono text-xs">Setor, Responsável, Tipo, Marca, Modelo, Etiqueta, Número, Observações</p>
+              <p className="mt-1 text-xs">
+                O campo <strong>Número</strong> é o número de inventário. Se vier vazio na importação, usamos automaticamente a data do dia.
+              </p>
               <button onClick={baixarModelo} className="mt-2 text-xs underline hover:no-underline">Baixar modelo de planilha</button>
             </div>
 

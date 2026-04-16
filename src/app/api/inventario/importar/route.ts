@@ -16,6 +16,13 @@ export async function POST(request: NextRequest) {
     if (!itens || !Array.isArray(itens) || itens.length === 0)
       return NextResponse.json({ error: 'Nenhum item para importar' }, { status: 400 })
 
+    const dataInventarioPadrao = new Intl.DateTimeFormat('pt-BR', {
+      timeZone: 'America/Sao_Paulo',
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    }).format(new Date())
+
     const erros: string[] = []
     let inseridos = 0
     let atualizados = 0
@@ -31,7 +38,7 @@ export async function POST(request: NextRequest) {
       const marca = item.marca?.trim()
       const modelo = item.modelo?.trim()
       const etiqueta = item.etiqueta?.trim()
-      const numero = item.numero?.trim() || null
+      const numero = item.numero?.trim() || dataInventarioPadrao
       const observacoes = item.observacoes?.trim() || null
 
       if (!setor || !responsavel || !tipo || !marca || !modelo || !etiqueta) {
