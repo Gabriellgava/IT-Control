@@ -82,7 +82,22 @@ const parseCsvLine = (linha: string, delimitador: ',' | ';' | '\t' = ',') => {
     atual += ch
   }
   cols.push(atual.trim())
-  return cols.map(c => c.replace(/^["']|["']$/g, '').trim())
+
+  const normalizadas = cols.map(c => c.replace(/^["']|["']$/g, '').trim())
+
+  // Alguns exportadores envolvem a linha inteira em aspas,
+  // ex: "Setor,Responsável,Tipo,...". Nesse caso, reprocessa sem as aspas externas.
+  if (
+    normalizadas.length === 1 &&
+    linha.length >= 2 &&
+    linha.startsWith('"') &&
+    linha.endsWith('"') &&
+    linha.includes(delimitador)
+  ) {
+    return parseCsvLine(linha.slice(1, -1), delimitador)
+  }
+
+  return normalizadas
 }
 
 export default function InventarioPage() {
