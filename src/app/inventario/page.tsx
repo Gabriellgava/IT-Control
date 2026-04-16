@@ -42,7 +42,23 @@ const normalizarCabecalho = (v: string) =>
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
 
-const parseCsvLine = (linha: string) => {
+const detectarDelimitador = (linha: string) => {
+  const candidatos: Array<',' | ';' | '\t'> = [',', ';', '\t']
+  let melhor: ',' | ';' | '\t' = ','
+  let melhorContagem = -1
+
+  for (const d of candidatos) {
+    const partes = parseCsvLine(linha, d)
+    if (partes.length > melhorContagem) {
+      melhor = d
+      melhorContagem = partes.length
+    }
+  }
+
+  return melhor
+}
+
+const parseCsvLine = (linha: string, delimitador: ',' | ';' | '\t' = ',') => {
   const cols: string[] = []
   let atual = ''
   let emAspas = false
@@ -58,7 +74,7 @@ const parseCsvLine = (linha: string) => {
       }
       continue
     }
-    if (ch === ',' && !emAspas) {
+    if (ch === delimitador && !emAspas) {
       cols.push(atual.trim())
       atual = ''
       continue
@@ -177,11 +193,12 @@ export default function InventarioPage() {
     const reader = new FileReader()
     reader.onload = (ev) => {
       const textoRaw = ev.target?.result as string
-      const texto = textoRaw.replace(/\\n/g, '\n')
+      const texto = textoRaw.replace(/^\uFEFF/, '').replace(/\\n/g, '\n')
       const linhas = texto.split(/\r?\n/).map(l => l.trim()).filter(l => l)
       if (linhas.length < 2) { setImportStatus({ tipo: 'erro', msg: 'Arquivo vazio ou sem dados' }); return }
 
-      const primeiraLinha = parseCsvLine(linhas[0]).map(normalizarCabecalho)
+      const delimitador = detectarDelimitador(linhas[0])
+      const primeiraLinha = parseCsvLine(linhas[0], delimitador).map(normalizarCabecalho)
       const temCabecalho = primeiraLinha.some(c => MAPA_COLUNAS[c])
       const colunas = temCabecalho
         ? primeiraLinha.map(c => MAPA_COLUNAS[c] ?? c)
@@ -189,7 +206,7 @@ export default function InventarioPage() {
       const linhasDados = temCabecalho ? linhas.slice(1) : linhas
 
       const dados = linhasDados
-        .map(linha => parseCsvLine(linha))
+        .map(linha => parseCsvLine(linha, delimitador))
         .map(cols => {
           const obj: Record<string, string> = {}
           colunas.forEach((campo, i) => { obj[campo] = (cols[i] ?? '').trim() })
