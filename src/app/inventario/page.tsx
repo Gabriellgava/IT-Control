@@ -72,6 +72,7 @@ const parseCsvLine = (linha: string) => {
 export default function InventarioPage() {
   const [itens, setItens] = useState<Item[]>([])
   const [loading, setLoading] = useState(true)
+  const [erroCarregamento, setErroCarregamento] = useState('')
   const [busca, setBusca] = useState('')
   const [filtroSetor, setFiltroSetor] = useState('')
   const [filtroTipo, setFiltroTipo] = useState('')
@@ -94,15 +95,38 @@ export default function InventarioPage() {
   const responsaveisUnicos = [...new Set(itens.map(i => i.responsavel))].sort()
 
   const buscarItens = useCallback(async () => {
-    setLoading(true)
-    const p = new URLSearchParams()
-    if (busca) p.set('search', busca)
-    if (filtroSetor) p.set('setor', filtroSetor)
-    if (filtroTipo) p.set('tipo', filtroTipo)
-    if (filtroResponsavel) p.set('responsavel', filtroResponsavel)
-    const res = await fetch(`/api/inventario?${p}`)
-    setItens(await res.json())
-    setLoading(false)
+    try {
+      setLoading(true)
+      setErroCarregamento('')
+
+      const p = new URLSearchParams()
+      if (busca) p.set('search', busca)
+      if (filtroSetor) p.set('setor', filtroSetor)
+      if (filtroTipo) p.set('tipo', filtroTipo)
+      if (filtroResponsavel) p.set('responsavel', filtroResponsavel)
+
+      const res = await fetch(`/api/inventario?${p}`)
+      const data = await res.json()
+
+      if (!res.ok) {
+        setItens([])
+        setErroCarregamento(data?.error || 'Não foi possível carregar o inventário.')
+        return
+      }
+
+      if (!Array.isArray(data)) {
+        setItens([])
+        setErroCarregamento('Resposta inválida ao carregar inventário.')
+        return
+      }
+
+      setItens(data)
+    } catch {
+      setItens([])
+      setErroCarregamento('Erro de conexão ao carregar inventário.')
+    } finally {
+      setLoading(false)
+    }
   }, [busca, filtroSetor, filtroTipo, filtroResponsavel])
 
   useEffect(() => { buscarItens() }, [buscarItens])
@@ -221,6 +245,12 @@ export default function InventarioPage() {
             <Button size="sm" icon={<Plus className="w-4 h-4" />} onClick={abrirNovo}>Adicionar Item</Button>
           </div>
         </div>
+
+        {erroCarregamento && (
+          <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-900/20 dark:text-red-300">
+            {erroCarregamento}
+          </div>
+        )}
 
         {/* Filtros */}
         <div className="flex flex-col sm:flex-row gap-3">

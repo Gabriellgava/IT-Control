@@ -127,6 +127,9 @@ export default function TermosPage() {
             <p className="text-sm text-gray-500 mt-1">Geração por pessoa com todos os equipamentos atualmente vinculados.</p>
           </div>
           <div className="flex items-center gap-2">
+            <Link href="/inventario">
+              <Button variant="secondary">Ir para Inventário</Button>
+            </Link>
             <Link href="/licencas-assinaturas">
               <Button variant="secondary">Ir para Licenças e Assinaturas</Button>
             </Link>
