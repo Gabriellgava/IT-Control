@@ -9,7 +9,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
 
   try {
     const body = await request.json()
-    const { setor, responsavel, tipo, marca, modelo, etiqueta, observacoes } = body
+    const { setor, responsavel, tipo, marca, modelo, etiqueta, numero, observacoes } = body
 
     if (!setor || !responsavel || !tipo || !marca || !modelo || !etiqueta)
       return NextResponse.json({ error: 'Todos os campos obrigatórios devem ser preenchidos' }, { status: 400 })
@@ -23,6 +23,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
         marca: marca.trim(),
         modelo: modelo.trim(),
         etiqueta: etiqueta.trim(),
+        numero: numero?.trim() || null,
         observacoes: observacoes?.trim() || null,
       },
     })
