@@ -118,8 +118,15 @@ export function MovimentacaoForm({ tipo }: { tipo: 'ENTRADA' | 'SAIDA' }) {
           : form.observacoes,
       }),
     })
-  const data = await res.json()
-  if (!res.ok) { setErros({ geral: data.error || 'Erro ao salvar' }); setLoading(false); return }
+    const data = await res.json()
+    if (!res.ok) {
+      const detalhesPendencia = tipo === 'ENTRADA' && modoEntrada === 'DEVOLUCAO' && Array.isArray(data?.pendencias) && data.pendencias.length > 0
+        ? ` Pendências: ${data.pendencias.map((p: { etiqueta: string, motivo: string }) => `${p.etiqueta} (${p.motivo})`).join(', ')}`
+        : ''
+      setErros({ geral: `${data.error || 'Erro ao salvar'}${detalhesPendencia}` })
+      setLoading(false)
+      return
+    }
     if (tipo === 'ENTRADA' && modoEntrada === 'DEVOLUCAO' && data?.pendencias?.length) {
       setErros({
         geral: `Devolução concluída com ${data.quantidadeDevolvida} item(ns). Pendências: ${data.pendencias.map((p: { etiqueta: string, motivo: string }) => `${p.etiqueta} (${p.motivo})`).join(', ')}`,

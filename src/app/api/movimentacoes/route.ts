@@ -84,12 +84,18 @@ export async function POST(request: NextRequest) {
             })
 
             if (!unidade) {
-              pendencias.push({ etiqueta: item.etiqueta, motivo: 'Unidade não encontrada' })
+              pendencias.push({
+                etiqueta: item.etiqueta,
+                motivo: 'Etiqueta sem cadastro de unidade (apenas no inventário)',
+              })
               continue
             }
 
             if (unidade.status !== 'ATIVA') {
-              pendencias.push({ etiqueta: item.etiqueta, motivo: 'Unidade descartada' })
+              pendencias.push({
+                etiqueta: item.etiqueta,
+                motivo: `Unidade com status ${unidade.status}`,
+              })
               continue
             }
 
