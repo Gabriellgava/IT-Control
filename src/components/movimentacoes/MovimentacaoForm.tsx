@@ -9,6 +9,9 @@ import type { Produto, Fornecedor, Setor } from '@/types'
 interface InventarioItem {
   responsavel: string
   etiqueta: string
+  modelo: string
+  marca: string
+  tipo: string
 }
 
 export function MovimentacaoForm({ tipo }: { tipo: 'ENTRADA' | 'SAIDA' }) {
@@ -43,7 +46,13 @@ export function MovimentacaoForm({ tipo }: { tipo: 'ENTRADA' | 'SAIDA' }) {
       .then(r => r.ok ? r.json() : [])
       .then((dados) => {
         if (!Array.isArray(dados)) return setItensInventario([])
-        setItensInventario(dados.map((item) => ({ responsavel: item.responsavel ?? '', etiqueta: item.etiqueta ?? '' })))
+        setItensInventario(dados.map((item) => ({
+          responsavel: item.responsavel ?? '',
+          etiqueta: item.etiqueta ?? '',
+          modelo: item.modelo ?? '',
+          marca: item.marca ?? '',
+          tipo: item.tipo ?? '',
+        })))
       })
       .catch(() => setItensInventario([]))
   }, [])
@@ -265,9 +274,15 @@ export function MovimentacaoForm({ tipo }: { tipo: 'ENTRADA' | 'SAIDA' }) {
                   {itensParaDevolver.length} item(ns) serão devolvidos ao estoque
                 </p>
                 {itensParaDevolver.length > 0 && (
-                  <p className="text-xs text-emerald-700 dark:text-emerald-300 font-mono">
-                    Etiquetas: {itensParaDevolver.map(i => i.etiqueta).join(', ')}
-                  </p>
+                  <ul className="mt-2 space-y-1">
+                    {itensParaDevolver.map((item) => (
+                      <li key={item.etiqueta} className="text-xs text-emerald-800 dark:text-emerald-300">
+                        <span className="font-mono font-medium">{item.etiqueta}</span>
+                        <span className="mx-1">•</span>
+                        <span>{item.tipo} {item.marca} {item.modelo}</span>
+                      </li>
+                    ))}
+                  </ul>
                 )}
               </div>
             )}
