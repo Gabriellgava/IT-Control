@@ -56,10 +56,82 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { tipo, subtipo, produtoId, etiqueta, dataCompra, valorUnitario, fornecedorId, setorId, usuarioId, responsavel, observacoes, funcionarioRecebe } = body
+    const { tipo, subtipo, produtoId, etiqueta, dataCompra, valorUnitario, fornecedorId, setorId, usuarioId, responsavel, observacoes, funcionarioRecebe, funcionarioDevolve } = body
 
     // ENTRADA: cria nova unidade física
     if (tipo === 'ENTRADA') {
+      if (subtipo === 'DEVOLUCAO') {
+        if (!funcionarioDevolve?.trim())
+          return NextResponse.json({ error: 'Funcionário é obrigatório para devolução' }, { status: 400 })
+
+        const devolucao = await prisma.$transaction(async (tx) => {
+          const itensInventario = await tx.inventario.findMany({
+            where: { responsavel: { equals: funcionarioDevolve.trim(), mode: 'insensitive' } },
+            orderBy: { etiqueta: 'asc' },
+          })
+
+          if (itensInventario.length === 0) {
+            return { erro: 'Nenhum item encontrado no inventário para este funcionário' }
+          }
+
+          const pendencias: Array<{ etiqueta: string, motivo: string }> = []
+          const etiquetasProcessadas: string[] = []
+
+          for (const item of itensInventario) {
+            const unidade = await tx.unidade.findUnique({
+              where: { etiqueta: item.etiqueta.trim() },
+              include: { produto: true },
+            })
+
+            if (!unidade) {
+              pendencias.push({ etiqueta: item.etiqueta, motivo: 'Unidade não encontrada' })
+              continue
+            }
+
+            if (unidade.status !== 'ATIVA') {
+              pendencias.push({ etiqueta: item.etiqueta, motivo: 'Unidade descartada' })
+              continue
+            }
+
+            await tx.movimentacao.create({
+              data: {
+                tipo: 'ENTRADA',
+                subtipo: 'DEVOLUCAO',
+                unidadeId: unidade.id,
+                valorUnitario: unidade.produto.valorUnitario,
+                data: parseDateWithCurrentTime(body.data),
+                fornecedorId: null,
+                usuarioId: usuarioId || null,
+                responsavel: responsavel || funcionarioDevolve.trim(),
+                observacoes: observacoes || null,
+              },
+            })
+
+            etiquetasProcessadas.push(item.etiqueta.trim())
+          }
+
+          if (etiquetasProcessadas.length === 0) {
+            return { erro: 'Nenhum item pôde ser devolvido ao estoque', pendencias }
+          }
+
+          await tx.inventario.deleteMany({ where: { etiqueta: { in: etiquetasProcessadas } } })
+
+          return {
+            quantidadeDevolvida: etiquetasProcessadas.length,
+            pendencias,
+          }
+        })
+
+        if ('erro' in devolucao)
+          return NextResponse.json({ error: devolucao.erro, pendencias: devolucao.pendencias ?? [] }, { status: 400 })
+
+        return NextResponse.json({
+          mensagem: `${devolucao.quantidadeDevolvida} item(ns) devolvido(s) ao estoque`,
+          quantidadeDevolvida: devolucao.quantidadeDevolvida,
+          pendencias: devolucao.pendencias,
+        }, { status: 201 })
+      }
+
       if (!produtoId) return NextResponse.json({ error: 'Produto é obrigatório' }, { status: 400 })
       if (!etiqueta?.trim()) return NextResponse.json({ error: 'Etiqueta é obrigatória' }, { status: 400 })
 

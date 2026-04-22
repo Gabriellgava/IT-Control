@@ -59,7 +59,7 @@ export interface Unidade {
 export interface Movimentacao {
   id: string
   tipo: 'ENTRADA' | 'SAIDA'
-  subtipo?: 'USUARIO' | 'DESCARTE' | null
+  subtipo?: 'USUARIO' | 'DESCARTE' | 'DEVOLUCAO' | null
   unidadeId: string
   unidade?: Unidade & { produto?: Produto }
   valorUnitario: number

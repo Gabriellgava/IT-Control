@@ -20,14 +20,54 @@ export async function DELETE(_: NextRequest, { params }: { params: { id: string 
     // Estorna: ENTRADA → remove unidade (ou marca DESCARTADA se já tem saída)
     // SAIDA USUARIO → reativa unidade | SAIDA DESCARTE → reativa unidade
     if (mov.tipo === 'ENTRADA') {
-      const temSaida = await prisma.movimentacao.count({
-        where: { unidadeId: mov.unidadeId, tipo: 'SAIDA', cancelado: false },
-      })
-      if (temSaida > 0)
-        return NextResponse.json({ error: 'Não é possível cancelar: unidade já possui saída registrada' }, { status: 400 })
+      if (mov.subtipo === 'DEVOLUCAO') {
+        const ultimaSaidaUsuario = await prisma.movimentacao.findFirst({
+          where: {
+            unidadeId: mov.unidadeId,
+            tipo: 'SAIDA',
+            subtipo: 'USUARIO',
+            cancelado: false,
+            data: { lte: mov.data },
+          },
+          include: {
+            unidade: { include: { produto: { include: { categoria: true } } } },
+            setor: true,
+          },
+          orderBy: { data: 'desc' },
+        })
 
-      await prisma.unidade.delete({ where: { id: mov.unidadeId } })
-      await prisma.inventario.deleteMany({ where: { etiqueta: mov.unidade.etiqueta } })
+        if (ultimaSaidaUsuario?.setor) {
+          await prisma.inventario.upsert({
+            where: { etiqueta: mov.unidade.etiqueta },
+            update: {
+              setor: ultimaSaidaUsuario.setor.nome,
+              responsavel: ultimaSaidaUsuario.responsavel || 'Não informado',
+              tipo: ultimaSaidaUsuario.unidade.produto.categoria?.nome || ultimaSaidaUsuario.unidade.produto.nome,
+              marca: ultimaSaidaUsuario.unidade.produto.nome,
+              modelo: ultimaSaidaUsuario.unidade.produto.codigo,
+              observacoes: ultimaSaidaUsuario.observacoes || null,
+            },
+            create: {
+              setor: ultimaSaidaUsuario.setor.nome,
+              responsavel: ultimaSaidaUsuario.responsavel || 'Não informado',
+              tipo: ultimaSaidaUsuario.unidade.produto.categoria?.nome || ultimaSaidaUsuario.unidade.produto.nome,
+              marca: ultimaSaidaUsuario.unidade.produto.nome,
+              modelo: ultimaSaidaUsuario.unidade.produto.codigo,
+              etiqueta: mov.unidade.etiqueta,
+              observacoes: ultimaSaidaUsuario.observacoes || null,
+            },
+          })
+        }
+      } else {
+        const temSaida = await prisma.movimentacao.count({
+          where: { unidadeId: mov.unidadeId, tipo: 'SAIDA', cancelado: false },
+        })
+        if (temSaida > 0)
+          return NextResponse.json({ error: 'Não é possível cancelar: unidade já possui saída registrada' }, { status: 400 })
+
+        await prisma.unidade.delete({ where: { id: mov.unidadeId } })
+        await prisma.inventario.deleteMany({ where: { etiqueta: mov.unidade.etiqueta } })
+      }
     }
 
     if (mov.tipo === 'SAIDA') {
