@@ -2,7 +2,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { Button, Input, Modal, Table, Badge } from '@/components/ui'
-import { Search, Plus, Edit2, Trash2, Download, Upload, AlertCircle, CheckCircle } from 'lucide-react'
+import { Search, Plus, Edit2, Trash2, Download, Upload, AlertCircle, CheckCircle, RefreshCw } from 'lucide-react'
 import { exportarCSV, formatData } from '@/lib/utils'
 
 interface Item {
@@ -179,6 +179,8 @@ export default function InventarioPage() {
   const [loadingForm, setLoadingForm] = useState(false)
   const [importStatus, setImportStatus] = useState<{ tipo: 'ok' | 'erro'; msg: string } | null>(null)
   const [importando, setImportando] = useState(false)
+  const [sincronizando, setSincronizando] = useState(false)
+  const [syncStatus, setSyncStatus] = useState<{ tipo: 'ok' | 'erro'; msg: string } | null>(null)
   const [previewImport, setPreviewImport] = useState<Record<string, string>[]>([])
   const [textoImportacao, setTextoImportacao] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
@@ -326,6 +328,29 @@ export default function InventarioPage() {
     buscarItens(); setImportando(false)
   }
 
+  const sincronizarProdutos = async () => {
+    setSincronizando(true)
+    setSyncStatus(null)
+
+    try {
+      const res = await fetch('/api/inventario/sincronizar', { method: 'POST' })
+      const data = await res.json()
+
+      if (!res.ok) {
+        setSyncStatus({ tipo: 'erro', msg: data.error || 'Erro ao sincronizar inventário' })
+        setSincronizando(false)
+        return
+      }
+
+      setSyncStatus({ tipo: 'ok', msg: data.mensagem || 'Sincronização concluída com sucesso.' })
+      buscarItens()
+    } catch {
+      setSyncStatus({ tipo: 'erro', msg: 'Erro de conexão ao sincronizar inventário.' })
+    } finally {
+      setSincronizando(false)
+    }
+  }
+
   const s = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }))
 
   return (
@@ -340,9 +365,27 @@ export default function InventarioPage() {
           <div className="flex gap-2 flex-wrap">
             <Button variant="secondary" size="sm" icon={<Download className="w-4 h-4" />} onClick={exportar}>Exportar CSV</Button>
             <Button variant="secondary" size="sm" icon={<Upload className="w-4 h-4" />} onClick={() => { setModalImport(true); setImportStatus(null); setPreviewImport([]); setTextoImportacao('') }}>Importar</Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              icon={<RefreshCw className={`w-4 h-4 ${sincronizando ? 'animate-spin' : ''}`} />}
+              onClick={sincronizarProdutos}
+              loading={sincronizando}
+            >
+              Sincronizar com Produtos
+            </Button>
             <Button size="sm" icon={<Plus className="w-4 h-4" />} onClick={abrirNovo}>Adicionar Item</Button>
           </div>
         </div>
+
+        {syncStatus && (
+          <div className={`rounded-xl border px-4 py-3 text-sm ${syncStatus.tipo === 'ok'
+            ? 'border-green-200 bg-green-50 text-green-700 dark:border-green-900/50 dark:bg-green-900/20 dark:text-green-300'
+            : 'border-red-200 bg-red-50 text-red-700 dark:border-red-900/50 dark:bg-red-900/20 dark:text-red-300'
+          }`}>
+            {syncStatus.msg}
+          </div>
+        )}
 
         {erroCarregamento && (
           <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-900/20 dark:text-red-300">
