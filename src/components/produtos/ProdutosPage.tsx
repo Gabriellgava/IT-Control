@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
-import { Search, Plus, Edit2, Trash2, Download, Package, Tag, ChevronDown, ChevronRight, Eye } from 'lucide-react'
+import { Search, Plus, Edit2, Trash2, Download, Package, Tag, ChevronDown, ChevronRight, Eye, ArrowRightLeft } from 'lucide-react'
 import { Button, Badge, Input, Select, Modal, Table, PageHeader, LoadingState, ErrorState } from '@/components/ui'
 import { formatMoeda, formatData, exportarCSV } from '@/lib/utils'
 import type { Produto, Categoria, Fornecedor } from '@/types'
@@ -19,6 +19,10 @@ export function ProdutosPage() {
   const [editando, setEditando] = useState<Produto | null>(null)
   const [consultando, setConsultando] = useState<Produto | null>(null)
   const [deletandoId, setDeletandoId] = useState<string | null>(null)
+  const [movendoUnidade, setMovendoUnidade] = useState<{ id: string, etiqueta: string, produtoId: string } | null>(null)
+  const [produtoDestinoId, setProdutoDestinoId] = useState('')
+  const [excluindoUnidade, setExcluindoUnidade] = useState<{ id: string, etiqueta: string } | null>(null)
+  const [acaoLoading, setAcaoLoading] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -65,6 +69,51 @@ export function ProdutosPage() {
     }
     setDeletandoId(null)
     buscarProdutos()
+  }
+
+  const iniciarMoverUnidade = (unidadeId: string, etiqueta: string, produtoId: string) => {
+    setError('')
+    setMovendoUnidade({ id: unidadeId, etiqueta, produtoId })
+    setProdutoDestinoId('')
+  }
+
+  const confirmarMoverUnidade = async () => {
+    if (!movendoUnidade || !produtoDestinoId) return
+    setAcaoLoading(true)
+    setError('')
+    try {
+      const res = await fetch(`/api/unidades/${movendoUnidade.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ produtoId: produtoDestinoId }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Não foi possível mover o item.')
+      setMovendoUnidade(null)
+      setProdutoDestinoId('')
+      buscarProdutos()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Erro inesperado ao mover item.')
+    } finally {
+      setAcaoLoading(false)
+    }
+  }
+
+  const confirmarExcluirUnidade = async () => {
+    if (!excluindoUnidade) return
+    setAcaoLoading(true)
+    setError('')
+    try {
+      const res = await fetch(`/api/unidades/${excluindoUnidade.id}`, { method: 'DELETE' })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Não foi possível excluir o item.')
+      setExcluindoUnidade(null)
+      buscarProdutos()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Erro inesperado ao excluir item.')
+    } finally {
+      setAcaoLoading(false)
+    }
   }
 
   const exportar = () => exportarCSV(produtos.map(p => ({
@@ -161,6 +210,22 @@ export function ProdutosPage() {
                         <span className="text-sm font-mono font-medium text-gray-700 dark:text-gray-300">{u.etiqueta}</span>
                         {u.dataCompra && <span className="text-xs text-gray-400">Compra: {formatData(u.dataCompra)}</span>}
                         <Badge variant={u.status === 'ATIVA' ? 'success' : 'danger'}>{u.status === 'ATIVA' ? 'Ativa' : 'Descartada'}</Badge>
+                        <div className="ml-auto flex items-center gap-1">
+                          <button
+                            onClick={() => iniciarMoverUnidade(u.id, u.etiqueta, p.id)}
+                            className="p-1.5 rounded-lg hover:bg-blue-50 dark:hover:bg-gray-700 text-gray-400 hover:text-blue-600 transition-colors"
+                            title="Mover para outro produto"
+                          >
+                            <ArrowRightLeft className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => setExcluindoUnidade({ id: u.id, etiqueta: u.etiqueta })}
+                            className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-600 transition-colors"
+                            title="Excluir item"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
                       </div>
                     ))}
                 </div>
@@ -170,7 +235,7 @@ export function ProdutosPage() {
         </div>
       ) : (
         /* MODO INDIVIDUAL — por etiqueta */
-        <Table headers={['Etiqueta', 'Produto', 'Categoria', 'Fornecedor', 'Valor', 'Data Compra', 'Status']} empty={produtos.flatMap(p => p.unidades ?? []).length === 0}>
+        <Table headers={['Etiqueta', 'Produto', 'Categoria', 'Fornecedor', 'Valor', 'Data Compra', 'Status', 'Ações']} empty={produtos.flatMap(p => p.unidades ?? []).length === 0}>
           {produtos.flatMap(p =>
             (p.unidades ?? []).map(u => (
               <tr key={u.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
@@ -181,6 +246,24 @@ export function ProdutosPage() {
                 <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">{formatMoeda(p.valorUnitario)}</td>
                 <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">{u.dataCompra ? formatData(u.dataCompra) : '—'}</td>
                 <td className="px-4 py-3"><Badge variant={u.status === 'ATIVA' ? 'success' : 'danger'}>{u.status === 'ATIVA' ? 'Ativa' : 'Descartada'}</Badge></td>
+                <td className="px-4 py-3">
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => iniciarMoverUnidade(u.id, u.etiqueta, p.id)}
+                      className="p-1.5 rounded-lg hover:bg-blue-50 dark:hover:bg-gray-700 text-gray-400 hover:text-blue-600 transition-colors"
+                      title="Mover para outro produto"
+                    >
+                      <ArrowRightLeft className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => setExcluindoUnidade({ id: u.id, etiqueta: u.etiqueta })}
+                      className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-600 transition-colors"
+                      title="Excluir item"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </td>
               </tr>
             ))
           )}
@@ -262,6 +345,43 @@ export function ProdutosPage() {
           <Button variant="secondary" onClick={() => setDeletandoId(null)}>Cancelar</Button>
           <Button variant="danger" onClick={deletar}>Excluir</Button>
         </div>
+      </Modal>
+
+      <Modal open={!!movendoUnidade} onClose={() => { setMovendoUnidade(null); setProdutoDestinoId('') }} title="Mover item para outro produto">
+        {movendoUnidade && (
+          <div className="space-y-4">
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Selecione o produto de destino para a etiqueta <span className="font-mono font-medium">{movendoUnidade.etiqueta}</span>.
+            </p>
+            <Select value={produtoDestinoId} onChange={e => setProdutoDestinoId(e.target.value)}>
+              <option value="">Selecionar produto</option>
+              {produtos
+                .filter(p => p.id !== movendoUnidade.produtoId)
+                .map(p => <option key={p.id} value={p.id}>{p.nome} ({p.codigo})</option>)}
+            </Select>
+            <div className="flex justify-end gap-3">
+              <Button variant="secondary" onClick={() => { setMovendoUnidade(null); setProdutoDestinoId('') }}>Cancelar</Button>
+              <Button loading={acaoLoading} onClick={confirmarMoverUnidade} disabled={!produtoDestinoId}>Mover item</Button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      <Modal open={!!excluindoUnidade} onClose={() => setExcluindoUnidade(null)} title="Excluir item">
+        {excluindoUnidade && (
+          <div className="space-y-4">
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Tem certeza que deseja excluir a etiqueta <span className="font-mono font-medium">{excluindoUnidade.etiqueta}</span>?
+            </p>
+            <p className="text-xs text-gray-500">
+              A exclusão só é permitida para itens sem movimentações.
+            </p>
+            <div className="flex justify-end gap-3">
+              <Button variant="secondary" onClick={() => setExcluindoUnidade(null)}>Cancelar</Button>
+              <Button variant="danger" loading={acaoLoading} onClick={confirmarExcluirUnidade}>Excluir item</Button>
+            </div>
+          </div>
+        )}
       </Modal>
     </div>
   )
