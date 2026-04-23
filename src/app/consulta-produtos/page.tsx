@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { AppLayout } from '@/components/layout/AppLayout'
-import { Badge, Input, Table } from '@/components/ui'
+import { Badge, Input, Select, Table } from '@/components/ui'
 import { PackageSearch, Search } from 'lucide-react'
 
 interface ItemInventario {
@@ -24,6 +24,7 @@ const estaEmEstoque = (item: ItemInventario) => {
 export default function ConsultaProdutosPage() {
   const [itens, setItens] = useState<ItemInventario[]>([])
   const [busca, setBusca] = useState('')
+  const [filtroSituacao, setFiltroSituacao] = useState<'todos' | 'estoque' | 'alocados'>('todos')
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -42,15 +43,23 @@ export default function ConsultaProdutosPage() {
 
   const filtrados = useMemo(() => {
     const termo = busca.trim().toLowerCase()
-    if (!termo) return itens
+    let resultado = itens
 
-    return itens.filter((item) =>
+    if (filtroSituacao === 'estoque') {
+      resultado = resultado.filter(estaEmEstoque)
+    } else if (filtroSituacao === 'alocados') {
+      resultado = resultado.filter((item) => !estaEmEstoque(item))
+    }
+
+    if (!termo) return resultado
+
+    return resultado.filter((item) =>
       [item.etiqueta, item.marca, item.modelo, item.responsavel, item.setor]
         .join(' ')
         .toLowerCase()
         .includes(termo),
     )
-  }, [itens, busca])
+  }, [itens, busca, filtroSituacao])
 
   return (
     <AppLayout>
@@ -65,13 +74,20 @@ export default function ConsultaProdutosPage() {
           </p>
         </div>
 
-        <div className="max-w-xl">
-          <Input
-            placeholder="Buscar por etiqueta, marca, modelo, responsável ou setor..."
-            value={busca}
-            onChange={(e) => setBusca(e.target.value)}
-            icon={<Search className="w-4 h-4" />}
-          />
+        <div className="flex flex-col sm:flex-row gap-3">
+          <div className="sm:max-w-xl w-full">
+            <Input
+              placeholder="Buscar por etiqueta, marca, modelo, responsável ou setor..."
+              value={busca}
+              onChange={(e) => setBusca(e.target.value)}
+              icon={<Search className="w-4 h-4" />}
+            />
+          </div>
+          <Select value={filtroSituacao} onChange={(e) => setFiltroSituacao(e.target.value as 'todos' | 'estoque' | 'alocados')}>
+            <option value="todos">Todas as situações</option>
+            <option value="estoque">Em estoque</option>
+            <option value="alocados">Com responsável</option>
+          </Select>
         </div>
 
         {loading ? (
