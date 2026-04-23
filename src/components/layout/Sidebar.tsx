@@ -73,6 +73,10 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
                 <PlusCircle className="w-3.5 h-3.5 flex-shrink-0" />
                 Novo Produto
               </Link>
+              <Link href="/consulta-produtos" onClick={onClose} className={subCls(path === '/consulta-produtos')}>
+                <PackageSearch className="w-3.5 h-3.5 flex-shrink-0" />
+                Consulta Produtos
+              </Link>
             </div>
           )}
         </div>
@@ -116,11 +120,6 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
         <Link href="/smartphones" onClick={onClose} className={itemCls(path === '/smartphones')}>
           <Smartphone className="w-4 h-4 flex-shrink-0" />
           <span className="flex-1">Smartphones</span>
-        </Link>
-
-        <Link href="/consulta-produtos" onClick={onClose} className={itemCls(path === '/consulta-produtos')}>
-          <PackageSearch className="w-4 h-4 flex-shrink-0" />
-          <span className="flex-1">Consulta Produtos</span>
         </Link>
 
         <Link href="/termos" onClick={onClose} className={itemCls(path === '/termos')}>
