@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { normalizarTexto } from '@/lib/texto'
+import { normalizarNomePessoa, normalizarTexto } from '@/lib/texto'
 
 type InventarioItem = {
   id: string
@@ -22,7 +22,7 @@ type InventarioItem = {
 const normalizarItem = (item: Partial<InventarioItem> & { id: string }) => ({
   id: item.id,
   setor: normalizarTexto(item.setor),
-  responsavel: normalizarTexto(item.responsavel),
+  responsavel: normalizarNomePessoa(item.responsavel),
   tipo: normalizarTexto(item.tipo),
   marca: normalizarTexto(item.marca),
   modelo: normalizarTexto(item.modelo),
@@ -185,7 +185,7 @@ export async function POST(request: NextRequest) {
     const { setor, responsavel, tipo, marca, modelo, etiqueta, numero, observacoes } = body
     const payload = {
       setor: normalizarTexto(setor),
-      responsavel: normalizarTexto(responsavel),
+      responsavel: normalizarNomePessoa(responsavel),
       tipo: normalizarTexto(tipo),
       marca: normalizarTexto(marca),
       modelo: normalizarTexto(modelo),
