@@ -4,6 +4,7 @@ import { AppLayout } from '@/components/layout/AppLayout'
 import { Button, Input, Modal, Table, Badge } from '@/components/ui'
 import { Search, Plus, Edit2, Trash2, Download, Upload, AlertCircle, CheckCircle, RefreshCw } from 'lucide-react'
 import { exportarCSV, formatData } from '@/lib/utils'
+import { corrigirMojibake, decodificarCsvComFallback } from '@/lib/csv'
 
 interface Item {
   id: string
@@ -162,6 +163,8 @@ const parseCsvLine = (linha: string, delimitador: ',' | ';' | '\t' = ',') => {
   return normalizadas
 }
 
+const limparValorImportado = (valor: string) => corrigirMojibake(valor).trim()
+
 export default function InventarioPage() {
   const [itens, setItens] = useState<Item[]>([])
   const [loading, setLoading] = useState(true)
@@ -280,10 +283,15 @@ export default function InventarioPage() {
     const dados = linhasDados
       .map(linha => parseCsvLine(linha, delimitador))
       .map(cols => {
-        if (!temCabecalho) return normalizarColunasSemCabecalho(cols)
+        if (!temCabecalho) {
+          const semCabecalho = normalizarColunasSemCabecalho(cols)
+          return Object.fromEntries(
+            Object.entries(semCabecalho).map(([k, v]) => [k, limparValorImportado(v)])
+          )
+        }
 
         const obj: Record<string, string> = {}
-        colunas.forEach((campo, i) => { obj[campo] = (cols[i] ?? '').trim() })
+        colunas.forEach((campo, i) => { obj[campo] = limparValorImportado(cols[i] ?? '') })
         return obj
       })
       .filter(obj => Object.values(obj).some(v => v))
@@ -301,10 +309,7 @@ export default function InventarioPage() {
     const file = e.target.files?.[0]
     if (!file) return
     setImportStatus(null)
-
-    const reader = new FileReader()
-    reader.onload = (ev) => processarTextoImportacao((ev.target?.result as string) || '')
-    reader.readAsText(file, 'UTF-8')
+    decodificarCsvComFallback(file).then(processarTextoImportacao)
   }
 
   const confirmarImport = async () => {
