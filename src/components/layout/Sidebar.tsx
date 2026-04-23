@@ -1,7 +1,7 @@
 'use client'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, Package, PlusCircle, ArrowDownCircle, ArrowUpCircle, Truck, Monitor, Moon, Sun, Users, LogOut, Building2, History, ChevronDown, List, Tag, FileSignature, KeyRound, Smartphone } from 'lucide-react'
+import { LayoutDashboard, Package, PlusCircle, ArrowDownCircle, ArrowUpCircle, Truck, Monitor, Moon, Sun, Users, LogOut, Building2, History, ChevronDown, List, Tag, FileSignature, KeyRound, Smartphone, PackageSearch } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { useSession, signOut } from 'next-auth/react'
 import { ClipboardList } from 'lucide-react'
@@ -116,6 +116,11 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
         <Link href="/smartphones" onClick={onClose} className={itemCls(path === '/smartphones')}>
           <Smartphone className="w-4 h-4 flex-shrink-0" />
           <span className="flex-1">Smartphones</span>
+        </Link>
+
+        <Link href="/consulta-produtos" onClick={onClose} className={itemCls(path === '/consulta-produtos')}>
+          <PackageSearch className="w-4 h-4 flex-shrink-0" />
+          <span className="flex-1">Consulta Produtos</span>
         </Link>
 
         <Link href="/termos" onClick={onClose} className={itemCls(path === '/termos')}>

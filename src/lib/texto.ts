@@ -10,5 +10,13 @@ export const corrigirMojibake = (texto: string) => {
   }
 }
 
+const corrigirNomeComInterrogacao = (texto: string) =>
+  texto
+    .replace(/\bjos[?�]\b/gi, 'José')
+    .replace(/\bjose[?�]\b/gi, 'José')
+
 export const normalizarTexto = (valor: string | null | undefined) =>
   corrigirMojibake(valor ?? '').trim()
+
+export const normalizarNomePessoa = (valor: string | null | undefined) =>
+  corrigirNomeComInterrogacao(normalizarTexto(valor))

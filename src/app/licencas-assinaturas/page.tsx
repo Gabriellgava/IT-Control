@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { Badge, Button, Input, Select, Table } from '@/components/ui'
 import { AlertCircle, CheckCircle, Plus, Trash2, Upload } from 'lucide-react'
@@ -87,6 +87,7 @@ export default function LicencasAssinaturasPage() {
   const [erro, setErro] = useState('')
   const [importando, setImportando] = useState(false)
   const [importStatus, setImportStatus] = useState<{ tipo: 'ok' | 'erro'; msg: string } | null>(null)
+  const inputFileRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     const carregarInventario = async () => {
@@ -274,24 +275,27 @@ export default function LicencasAssinaturasPage() {
               Importe aqui o CSV de licenças (não depende da tela de Inventário). Aceita arquivo <strong>sem cabeçalho</strong> na ordem:
               <strong> Solicitado por, Setor, Tipo da licença, Código</strong>.
             </p>
-            <label className="inline-flex">
-              <input
-                type="file"
-                accept=".csv,.txt"
-                className="hidden"
-                onChange={(e) => {
-                  const file = e.target.files?.[0]
-                  if (!file) return
-                  importarCsvSemCabecalho(file)
-                  e.currentTarget.value = ''
-                }}
-              />
-              <span>
-                <Button icon={<Upload className="w-4 h-4" />} variant="secondary" loading={importando}>
-                  Subir CSV de licenças
-                </Button>
-              </span>
-            </label>
+            <input
+              ref={inputFileRef}
+              type="file"
+              accept=".csv,.txt"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0]
+                if (!file) return
+                importarCsvSemCabecalho(file)
+                e.currentTarget.value = ''
+              }}
+            />
+            <Button
+              type="button"
+              icon={<Upload className="w-4 h-4" />}
+              variant="secondary"
+              loading={importando}
+              onClick={() => inputFileRef.current?.click()}
+            >
+              Subir CSV de licenças
+            </Button>
 
             {importStatus && (
               <div className={`flex items-start gap-2 p-3 rounded-lg text-sm ${importStatus.tipo === 'ok'
