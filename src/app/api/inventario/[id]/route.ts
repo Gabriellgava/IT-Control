@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { normalizarTexto } from '@/lib/texto'
 
 export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions)
@@ -10,22 +11,23 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
   try {
     const body = await request.json()
     const { setor, responsavel, tipo, marca, modelo, etiqueta, numero, observacoes } = body
+    const payload = {
+      setor: normalizarTexto(setor),
+      responsavel: normalizarTexto(responsavel),
+      tipo: normalizarTexto(tipo),
+      marca: normalizarTexto(marca),
+      modelo: normalizarTexto(modelo),
+      etiqueta: normalizarTexto(etiqueta),
+      numero: normalizarTexto(numero) || null,
+      observacoes: normalizarTexto(observacoes) || null,
+    }
 
-    if (!setor || !responsavel || !tipo || !marca || !modelo || !etiqueta)
+    if (!payload.setor || !payload.responsavel || !payload.tipo || !payload.marca || !payload.modelo || !payload.etiqueta)
       return NextResponse.json({ error: 'Todos os campos obrigatórios devem ser preenchidos' }, { status: 400 })
 
     const item = await prisma.inventario.update({
       where: { id: params.id },
-      data: {
-        setor: setor.trim(),
-        responsavel: responsavel.trim(),
-        tipo: tipo.trim(),
-        marca: marca.trim(),
-        modelo: modelo.trim(),
-        etiqueta: etiqueta.trim(),
-        numero: numero?.trim() || null,
-        observacoes: observacoes?.trim() || null,
-      },
+      data: payload,
     })
 
     return NextResponse.json(item)

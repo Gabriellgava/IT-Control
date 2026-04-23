@@ -25,6 +25,7 @@ const STORAGE_KEY = 'licencas-assinaturas-registros-v1'
 const ORDEM_CSV_SEM_CABECALHO = ['solicitadoPor', 'setor', 'tipoLicenca', 'codigoLicenca'] as const
 
 const gerarId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+const normalizarTexto = (valor: string) => corrigirMojibake(valor ?? '').trim()
 
 const formatarDataHora = (iso: string) => {
   if (!iso) return '—'
@@ -93,7 +94,13 @@ export default function LicencasAssinaturasPage() {
         const res = await fetch('/api/inventario')
         if (!res.ok) return
         const data = (await res.json()) as InventarioItem[]
-        setInventario(data)
+        setInventario(
+          data.map((item) => ({
+            ...item,
+            setor: normalizarTexto(item.setor),
+            responsavel: normalizarTexto(item.responsavel),
+          }))
+        )
       } catch {
         // fallback silencioso: a tela funciona mesmo sem inventário carregado
       }
@@ -105,7 +112,17 @@ export default function LicencasAssinaturasPage() {
       const salvo = localStorage.getItem(STORAGE_KEY)
       if (!salvo) return
       const data = JSON.parse(salvo) as RegistroLicenca[]
-      if (Array.isArray(data)) setRegistros(data)
+      if (Array.isArray(data)) {
+        setRegistros(
+          data.map((registro) => ({
+            ...registro,
+            solicitadoPor: normalizarTexto(registro.solicitadoPor),
+            setor: normalizarTexto(registro.setor),
+            tipoLicenca: normalizarTexto(registro.tipoLicenca),
+            codigoLicenca: normalizarTexto(registro.codigoLicenca),
+          }))
+        )
+      }
     } catch {
       // ignora dados inválidos no localStorage
     }
@@ -133,10 +150,10 @@ export default function LicencasAssinaturasPage() {
 
     const novo: RegistroLicenca = {
       id: gerarId(),
-      solicitadoPor: solicitadoPor.trim(),
-      setor: setor.trim(),
-      tipoLicenca: tipoLicenca.trim(),
-      codigoLicenca: codigoLicenca.trim(),
+      solicitadoPor: normalizarTexto(solicitadoPor),
+      setor: normalizarTexto(setor),
+      tipoLicenca: normalizarTexto(tipoLicenca),
+      codigoLicenca: normalizarTexto(codigoLicenca),
       criadoEm: new Date().toISOString(),
     }
 
@@ -170,7 +187,7 @@ export default function LicencasAssinaturasPage() {
       for (const linha of linhas) {
         const cols = parseCsvLine(linha, delimitador)
         const registro = Object.fromEntries(
-          ORDEM_CSV_SEM_CABECALHO.map((campo, index) => [campo, (cols[index] ?? '').trim()])
+          ORDEM_CSV_SEM_CABECALHO.map((campo, index) => [campo, normalizarTexto(cols[index] ?? '')])
         ) as Record<(typeof ORDEM_CSV_SEM_CABECALHO)[number], string>
 
         if (!registro.solicitadoPor || !registro.setor || !registro.tipoLicenca) {
@@ -254,7 +271,8 @@ export default function LicencasAssinaturasPage() {
 
           <div className="border-t border-gray-200 dark:border-gray-800 pt-4 space-y-3">
             <p className="text-xs text-gray-500">
-              Importação CSV <strong>sem cabeçalho</strong> (ordem obrigatória): <strong>Solicitado por, Setor, Tipo da licença, Código</strong>.
+              Importe aqui o CSV de licenças (não depende da tela de Inventário). Aceita arquivo <strong>sem cabeçalho</strong> na ordem:
+              <strong> Solicitado por, Setor, Tipo da licença, Código</strong>.
             </p>
             <label className="inline-flex">
               <input
@@ -270,7 +288,7 @@ export default function LicencasAssinaturasPage() {
               />
               <span>
                 <Button icon={<Upload className="w-4 h-4" />} variant="secondary" loading={importando}>
-                  Importar CSV sem cabeçalho
+                  Subir CSV de licenças
                 </Button>
               </span>
             </label>

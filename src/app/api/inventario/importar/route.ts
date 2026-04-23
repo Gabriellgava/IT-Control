@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { normalizarTexto } from '@/lib/texto'
 
 export async function POST(request: NextRequest) {
   const session = await getServerSession(authOptions)
@@ -32,14 +33,14 @@ export async function POST(request: NextRequest) {
       const item = itens[i]
       const linha = i + 2 // linha 1 = cabeçalho
 
-      const setor = item.setor?.trim()
-      const responsavel = item.responsavel?.trim()
-      const tipo = item.tipo?.trim()
-      const marca = item.marca?.trim()
-      const modelo = item.modelo?.trim()
-      const etiqueta = item.etiqueta?.trim()
-      const numero = item.numero?.trim() || dataInventarioPadrao
-      const observacoes = item.observacoes?.trim() || null
+      const setor = normalizarTexto(item.setor)
+      const responsavel = normalizarTexto(item.responsavel)
+      const tipo = normalizarTexto(item.tipo)
+      const marca = normalizarTexto(item.marca)
+      const modelo = normalizarTexto(item.modelo)
+      const etiqueta = normalizarTexto(item.etiqueta)
+      const numero = normalizarTexto(item.numero) || dataInventarioPadrao
+      const observacoes = normalizarTexto(item.observacoes) || null
 
       if (!setor || !responsavel || !tipo || !marca || !modelo || !etiqueta) {
         erros.push(`Linha ${linha}: campos obrigatórios faltando`)

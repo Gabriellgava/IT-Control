@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { normalizarTexto } from '@/lib/texto'
 
 type InventarioItem = {
   id: string
@@ -20,17 +21,53 @@ type InventarioItem = {
 
 const normalizarItem = (item: Partial<InventarioItem> & { id: string }) => ({
   id: item.id,
-  setor: item.setor ?? '',
-  responsavel: item.responsavel ?? '',
-  tipo: item.tipo ?? '',
-  marca: item.marca ?? '',
-  modelo: item.modelo ?? '',
-  etiqueta: item.etiqueta ?? '',
-  numero: item.numero ?? null,
-  observacoes: item.observacoes ?? null,
+  setor: normalizarTexto(item.setor),
+  responsavel: normalizarTexto(item.responsavel),
+  tipo: normalizarTexto(item.tipo),
+  marca: normalizarTexto(item.marca),
+  modelo: normalizarTexto(item.modelo),
+  etiqueta: normalizarTexto(item.etiqueta),
+  numero: normalizarTexto(item.numero) || null,
+  observacoes: normalizarTexto(item.observacoes) || null,
   criadoEm: item.criadoEm,
   atualizadoEm: item.atualizadoEm,
 })
+
+const precisaAtualizar = (original: InventarioItem, normalizado: ReturnType<typeof normalizarItem>) =>
+  original.setor !== normalizado.setor ||
+  original.responsavel !== normalizado.responsavel ||
+  original.tipo !== normalizado.tipo ||
+  original.marca !== normalizado.marca ||
+  original.modelo !== normalizado.modelo ||
+  original.etiqueta !== normalizado.etiqueta ||
+  (original.numero ?? null) !== (normalizado.numero ?? null) ||
+  (original.observacoes ?? null) !== (normalizado.observacoes ?? null)
+
+const corrigirRegistrosComMojibake = async (originais: InventarioItem[], normalizados: ReturnType<typeof normalizarItem>[]) => {
+  const paraCorrigir = originais
+    .map((item, index) => ({ item, normalizado: normalizados[index] }))
+    .filter(({ item, normalizado }) => precisaAtualizar(item, normalizado))
+
+  if (paraCorrigir.length === 0) return
+
+  await Promise.all(
+    paraCorrigir.map(({ item, normalizado }) =>
+      prisma.inventario.update({
+        where: { id: item.id },
+        data: {
+          setor: normalizado.setor,
+          responsavel: normalizado.responsavel,
+          tipo: normalizado.tipo,
+          marca: normalizado.marca,
+          modelo: normalizado.modelo,
+          etiqueta: normalizado.etiqueta,
+          numero: normalizado.numero,
+          observacoes: normalizado.observacoes,
+        },
+      })
+    )
+  )
+}
 
 const buscarInventarioResiliente = async ({
   busca,
@@ -120,7 +157,9 @@ export async function GET(request: NextRequest) {
         orderBy: [{ setor: 'asc' }, { responsavel: 'asc' }],
       })
 
-      return NextResponse.json(itens.map(normalizarItem))
+      const itensNormalizados = itens.map(normalizarItem)
+      await corrigirRegistrosComMojibake(itens as InventarioItem[], itensNormalizados)
+      return NextResponse.json(itensNormalizados)
     } catch (error: unknown) {
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
@@ -144,21 +183,22 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
     const { setor, responsavel, tipo, marca, modelo, etiqueta, numero, observacoes } = body
+    const payload = {
+      setor: normalizarTexto(setor),
+      responsavel: normalizarTexto(responsavel),
+      tipo: normalizarTexto(tipo),
+      marca: normalizarTexto(marca),
+      modelo: normalizarTexto(modelo),
+      etiqueta: normalizarTexto(etiqueta),
+      numero: normalizarTexto(numero) || null,
+      observacoes: normalizarTexto(observacoes) || null,
+    }
 
-    if (!setor || !responsavel || !tipo || !marca || !modelo || !etiqueta)
+    if (!payload.setor || !payload.responsavel || !payload.tipo || !payload.marca || !payload.modelo || !payload.etiqueta)
       return NextResponse.json({ error: 'Todos os campos obrigatórios devem ser preenchidos' }, { status: 400 })
 
     const item = await prisma.inventario.create({
-      data: {
-        setor: setor.trim(),
-        responsavel: responsavel.trim(),
-        tipo: tipo.trim(),
-        marca: marca.trim(),
-        modelo: modelo.trim(),
-        etiqueta: etiqueta.trim(),
-        numero: numero?.trim() || null,
-        observacoes: observacoes?.trim() || null,
-      },
+      data: payload,
     })
 
     return NextResponse.json(item, { status: 201 })
