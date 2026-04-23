@@ -54,6 +54,7 @@ export interface Unidade {
   status: 'ATIVA' | 'DESCARTADA'
   criadoEm: string
   movimentacoes?: Movimentacao[]
+  localAtual?: string
 }
 
 export interface Movimentacao {

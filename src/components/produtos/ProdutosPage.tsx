@@ -210,6 +210,7 @@ export function ProdutosPage() {
                         <span className="text-sm font-mono font-medium text-gray-700 dark:text-gray-300">{u.etiqueta}</span>
                         {u.dataCompra && <span className="text-xs text-gray-400">Compra: {formatData(u.dataCompra)}</span>}
                         <Badge variant={u.status === 'ATIVA' ? 'success' : 'danger'}>{u.status === 'ATIVA' ? 'Ativa' : 'Descartada'}</Badge>
+                        {u.status === 'ATIVA' && <Badge variant="info">{u.localAtual ?? 'Estoque'}</Badge>}
                         <div className="ml-auto flex items-center gap-1">
                           <button
                             onClick={() => iniciarMoverUnidade(u.id, u.etiqueta, p.id)}
@@ -245,7 +246,12 @@ export function ProdutosPage() {
                 <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">{p.fornecedor?.nome ?? '—'}</td>
                 <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">{formatMoeda(p.valorUnitario)}</td>
                 <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">{u.dataCompra ? formatData(u.dataCompra) : '—'}</td>
-                <td className="px-4 py-3"><Badge variant={u.status === 'ATIVA' ? 'success' : 'danger'}>{u.status === 'ATIVA' ? 'Ativa' : 'Descartada'}</Badge></td>
+                <td className="px-4 py-3">
+                  <div className="flex items-center gap-2">
+                    <Badge variant={u.status === 'ATIVA' ? 'success' : 'danger'}>{u.status === 'ATIVA' ? 'Ativa' : 'Descartada'}</Badge>
+                    {u.status === 'ATIVA' && <Badge variant="info">{u.localAtual ?? 'Estoque'}</Badge>}
+                  </div>
+                </td>
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-1">
                     <button

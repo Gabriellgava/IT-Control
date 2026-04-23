@@ -32,6 +32,16 @@ export async function GET(request: NextRequest) {
             status: true,
             criadoEm: true,
             produtoId: true,
+            movimentacoes: {
+              where: { cancelado: false },
+              orderBy: { data: 'desc' },
+              take: 1,
+              select: {
+                tipo: true,
+                subtipo: true,
+                responsavel: true,
+              },
+            },
           },
         },
         _count: { select: { unidades: { where: { status: 'ATIVA' } } } },
@@ -39,7 +49,23 @@ export async function GET(request: NextRequest) {
       orderBy: { nome: 'asc' },
     })
 
-    return NextResponse.json(produtos)
+    const produtosComLocalizacao = produtos.map((produto) => ({
+      ...produto,
+      unidades: produto.unidades.map((unidade) => {
+        const ultimaMovimentacao = unidade.movimentacoes[0]
+        const emPosseDeColaborador =
+          ultimaMovimentacao?.tipo === 'SAIDA' && ultimaMovimentacao?.subtipo === 'USUARIO'
+
+        return {
+          ...unidade,
+          localAtual: emPosseDeColaborador
+            ? ultimaMovimentacao.responsavel?.trim() || 'Responsável não informado'
+            : 'Estoque',
+        }
+      }),
+    }))
+
+    return NextResponse.json(produtosComLocalizacao)
   } catch (error) {
     console.error(error)
     return NextResponse.json({ error: 'Erro ao buscar produtos' }, { status: 500 })
