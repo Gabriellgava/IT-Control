@@ -7,9 +7,12 @@ import { PackageSearch, Search } from 'lucide-react'
 
 interface ItemInventario {
   id: string
+  tipo: string
   etiqueta: string
   marca: string
   modelo: string
+  numero?: string | null
+  observacoes?: string | null
   responsavel: string
   setor: string
 }
@@ -30,8 +33,13 @@ export default function ConsultaProdutosPage() {
   useEffect(() => {
     const carregar = async () => {
       try {
-        const res = await fetch('/api/inventario')
+        const res = await fetch('/api/inventario', { cache: 'no-store' })
         const data = await res.json()
+        if (!res.ok) {
+          setItens([])
+          return
+        }
+
         setItens(Array.isArray(data) ? data : [])
       } finally {
         setLoading(false)
@@ -54,7 +62,7 @@ export default function ConsultaProdutosPage() {
     if (!termo) return resultado
 
     return resultado.filter((item) =>
-      [item.etiqueta, item.marca, item.modelo, item.responsavel, item.setor]
+      [item.etiqueta, item.marca, item.modelo, item.tipo, item.numero, item.observacoes, item.responsavel, item.setor]
         .join(' ')
         .toLowerCase()
         .includes(termo),
@@ -74,16 +82,21 @@ export default function ConsultaProdutosPage() {
           </p>
         </div>
 
-        <div className="flex flex-col sm:flex-row gap-3">
-          <div className="sm:max-w-xl w-full">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+          <div className="lg:col-span-2">
             <Input
+              label="Busca"
               placeholder="Buscar por etiqueta, marca, modelo, responsável ou setor..."
               value={busca}
               onChange={(e) => setBusca(e.target.value)}
               icon={<Search className="w-4 h-4" />}
             />
           </div>
-          <Select value={filtroSituacao} onChange={(e) => setFiltroSituacao(e.target.value as 'todos' | 'estoque' | 'alocados')}>
+          <Select
+            label="Situação"
+            value={filtroSituacao}
+            onChange={(e) => setFiltroSituacao(e.target.value as 'todos' | 'estoque' | 'alocados')}
+          >
             <option value="todos">Todas as situações</option>
             <option value="estoque">Em estoque</option>
             <option value="alocados">Com responsável</option>
@@ -95,7 +108,7 @@ export default function ConsultaProdutosPage() {
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
           </div>
         ) : (
-          <Table headers={['Etiqueta', 'Marca', 'Modelo', 'Situação']} empty={filtrados.length === 0}>
+          <Table headers={['Etiqueta', 'Tipo', 'Marca', 'Modelo', 'Número', 'Responsável', 'Setor', 'Situação', 'Observações']} empty={filtrados.length === 0}>
             {filtrados.map((item) => {
               const emEstoque = estaEmEstoque(item)
 
@@ -104,8 +117,12 @@ export default function ConsultaProdutosPage() {
                   <td className="px-4 py-3">
                     <span className="font-mono text-sm text-gray-700 dark:text-gray-300">{item.etiqueta}</span>
                   </td>
+                  <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">{item.tipo || '—'}</td>
                   <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">{item.marca || '—'}</td>
                   <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">{item.modelo || '—'}</td>
+                  <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">{item.numero || '—'}</td>
+                  <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">{item.responsavel || '—'}</td>
+                  <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">{item.setor || '—'}</td>
                   <td className="px-4 py-3">
                     {emEstoque ? (
                       <Badge variant="warning">Em estoque</Badge>
@@ -113,6 +130,7 @@ export default function ConsultaProdutosPage() {
                       <Badge variant="success">Com {item.responsavel}</Badge>
                     )}
                   </td>
+                  <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">{item.observacoes || '—'}</td>
                 </tr>
               )
             })}
