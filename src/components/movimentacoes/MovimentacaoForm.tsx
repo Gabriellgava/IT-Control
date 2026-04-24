@@ -487,8 +487,8 @@ export function MovimentacaoForm({ tipo }: { tipo: 'ENTRADA' | 'SAIDA' }) {
               {erros.etiqueta && <p className="text-xs text-red-500">{erros.etiqueta}</p>}
               {ativosSelecionados.length > 0 && (
                 <div className="overflow-auto rounded-lg border border-gray-200 dark:border-gray-700">
-                  <table className="w-full text-sm">
-                    <thead className="bg-gray-50 dark:bg-gray-800/80">
+                  <table className="w-full text-sm text-gray-900 dark:text-white">
+                    <thead className="bg-gray-50 dark:bg-gray-800/80 text-gray-700 dark:text-white">
                       <tr>
                         <th className="text-left px-3 py-2">Etiqueta</th>
                         <th className="text-left px-3 py-2">Produto</th>
@@ -498,7 +498,7 @@ export function MovimentacaoForm({ tipo }: { tipo: 'ENTRADA' | 'SAIDA' }) {
                     </thead>
                     <tbody>
                       {ativosSelecionados.map((ativo) => (
-                        <tr key={ativo.etiqueta} className="border-t border-gray-200 dark:border-gray-700">
+                        <tr key={ativo.etiqueta} className="border-t border-gray-200 dark:border-gray-700 text-gray-800 dark:text-white">
                           <td className="px-3 py-2 font-mono">{ativo.etiqueta}</td>
                           <td className="px-3 py-2">{ativo.produtoNome}</td>
                           <td className="px-3 py-2">{ativo.categoriaNome}</td>
