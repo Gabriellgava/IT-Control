@@ -24,6 +24,7 @@ export function MovimentacaoForm({ tipo }: { tipo: 'ENTRADA' | 'SAIDA' }) {
   const [setores, setSetores] = useState<Setor[]>([])
   const [subtipo, setSubtipo] = useState<'USUARIO' | 'DESCARTE'>('USUARIO')
   const [modoEntrada, setModoEntrada] = useState<'CADASTRO' | 'DEVOLUCAO'>('CADASTRO')
+  const [modoDevolucao, setModoDevolucao] = useState<'TODOS' | 'UM'>('TODOS')
   const [itensInventario, setItensInventario] = useState<InventarioItem[]>([])
   const [form, setForm] = useState({
     produtoId: '',
@@ -76,6 +77,8 @@ export function MovimentacaoForm({ tipo }: { tipo: 'ENTRADA' | 'SAIDA' }) {
     if (tipo === 'ENTRADA' && modoEntrada === 'CADASTRO' && !form.produtoId) e.produtoId = 'Selecione um produto'
     if (tipo === 'ENTRADA' && modoEntrada === 'DEVOLUCAO' && !form.funcionarioDevolve.trim())
       e.funcionarioDevolve = 'Selecione o funcionário para devolver os itens'
+    if (tipo === 'ENTRADA' && modoEntrada === 'DEVOLUCAO' && modoDevolucao === 'UM' && !form.etiqueta.trim())
+      e.etiqueta = 'Selecione o item que será devolvido'
     if (tipo === 'SAIDA' && subtipo === 'USUARIO') {
       if (!form.setorId) e.setorId = 'Selecione o setor destino'
       if (!form.funcionarioRecebe.trim()) e.funcionarioRecebe = 'Informe o funcionário que receberá o item'
@@ -97,7 +100,9 @@ export function MovimentacaoForm({ tipo }: { tipo: 'ENTRADA' | 'SAIDA' }) {
         tipo,
         subtipo: tipo === 'SAIDA' ? subtipo : (modoEntrada === 'DEVOLUCAO' ? 'DEVOLUCAO' : undefined),
         produtoId: form.produtoId,
-        etiqueta: form.etiqueta.trim(),
+        etiqueta: tipo === 'ENTRADA' && modoEntrada === 'DEVOLUCAO' && modoDevolucao === 'TODOS'
+          ? ''
+          : form.etiqueta.trim(),
         dataCompra: tipo === 'ENTRADA' ? form.data : undefined,
         data: form.data,
         fornecedorId: form.fornecedorId || null,
@@ -144,6 +149,9 @@ export function MovimentacaoForm({ tipo }: { tipo: 'ENTRADA' | 'SAIDA' }) {
   const itensParaDevolver = itensInventario.filter(
     item => item.responsavel.trim().toLowerCase() === form.funcionarioDevolve.trim().toLowerCase(),
   )
+  const itemSelecionadoDevolucao = itensParaDevolver.find(
+    item => item.etiqueta.trim().toLowerCase() === form.etiqueta.trim().toLowerCase(),
+  )
 
   return (
     <div className="max-w-2xl space-y-6">
@@ -173,11 +181,11 @@ export function MovimentacaoForm({ tipo }: { tipo: 'ENTRADA' | 'SAIDA' }) {
       {/* Toggle saída/descarte */}
       {tipo === 'ENTRADA' && (
         <div className="grid grid-cols-2 gap-3">
-          <button onClick={() => { setModoEntrada('CADASTRO'); setErros({}) }}
+          <button onClick={() => { setModoEntrada('CADASTRO'); setModoDevolucao('TODOS'); setErros({}) }}
             className={`flex items-center justify-center gap-2 px-4 py-3 rounded-xl border-2 text-sm font-semibold transition-all ${modoEntrada === 'CADASTRO' ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400' : 'border-gray-200 dark:border-gray-700 text-gray-500 hover:border-gray-300'}`}>
             <Tag className="w-4 h-4" /> Entrada Individual
           </button>
-          <button onClick={() => { setModoEntrada('DEVOLUCAO'); setErros({}) }}
+          <button onClick={() => { setModoEntrada('DEVOLUCAO'); setModoDevolucao('TODOS'); setErros({}) }}
             className={`flex items-center justify-center gap-2 px-4 py-3 rounded-xl border-2 text-sm font-semibold transition-all ${modoEntrada === 'DEVOLUCAO' ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400' : 'border-gray-200 dark:border-gray-700 text-gray-500 hover:border-gray-300'}`}>
             <User className="w-4 h-4" /> Devolução por Funcionário
           </button>
@@ -268,7 +276,10 @@ export function MovimentacaoForm({ tipo }: { tipo: 'ENTRADA' | 'SAIDA' }) {
               <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide">Funcionário *</label>
               <select
                 value={form.funcionarioDevolve}
-                onChange={e => s('funcionarioDevolve', e.target.value)}
+                onChange={e => {
+                  s('funcionarioDevolve', e.target.value)
+                  s('etiqueta', '')
+                }}
                 className={`w-full border bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all ${erros.funcionarioDevolve ? 'border-red-400' : 'border-gray-300 dark:border-gray-700'}`}>
                 <option value="">Selecionar funcionário</option>
                 {responsaveisInventario.map(nome => <option key={nome} value={nome}>{nome}</option>)}
@@ -277,12 +288,49 @@ export function MovimentacaoForm({ tipo }: { tipo: 'ENTRADA' | 'SAIDA' }) {
             </div>
             {form.funcionarioDevolve && (
               <div className="p-3 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-800 rounded-lg space-y-1">
+                <div className="grid grid-cols-2 gap-2 mb-2">
+                  <button
+                    type="button"
+                    onClick={() => { setModoDevolucao('TODOS'); s('etiqueta', '') }}
+                    className={`px-3 py-2 rounded-lg border text-xs font-semibold transition-all ${modoDevolucao === 'TODOS' ? 'border-emerald-500 bg-emerald-100/80 text-emerald-800 dark:text-emerald-300' : 'border-emerald-200 text-emerald-700 dark:text-emerald-400 hover:border-emerald-300'}`}>
+                    Devolver todos os itens
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setModoDevolucao('UM')}
+                    className={`px-3 py-2 rounded-lg border text-xs font-semibold transition-all ${modoDevolucao === 'UM' ? 'border-emerald-500 bg-emerald-100/80 text-emerald-800 dark:text-emerald-300' : 'border-emerald-200 text-emerald-700 dark:text-emerald-400 hover:border-emerald-300'}`}>
+                    Devolver apenas um item
+                  </button>
+                </div>
                 <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-400">
-                  {itensParaDevolver.length} item(ns) serão devolvidos ao estoque
+                  {modoDevolucao === 'TODOS'
+                    ? `${itensParaDevolver.length} item(ns) serão devolvidos ao estoque`
+                    : itemSelecionadoDevolucao
+                      ? '1 item será devolvido ao estoque'
+                      : `${itensParaDevolver.length} item(ns) disponíveis para seleção`}
                 </p>
+                {modoDevolucao === 'UM' && (
+                  <div className="mt-2 space-y-1">
+                    <label className="block text-[11px] font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-400">
+                      Item para devolução *
+                    </label>
+                    <select
+                      value={form.etiqueta}
+                      onChange={e => s('etiqueta', e.target.value)}
+                      className={`w-full border bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all ${erros.etiqueta ? 'border-red-400' : 'border-emerald-200 dark:border-emerald-700'}`}>
+                      <option value="">Selecionar item</option>
+                      {itensParaDevolver.map((item) => (
+                        <option key={item.etiqueta} value={item.etiqueta}>
+                          {item.etiqueta} • {item.tipo} {item.marca} {item.modelo}
+                        </option>
+                      ))}
+                    </select>
+                    {erros.etiqueta && <p className="text-xs text-red-500">{erros.etiqueta}</p>}
+                  </div>
+                )}
                 {itensParaDevolver.length > 0 && (
                   <ul className="mt-2 space-y-1">
-                    {itensParaDevolver.map((item) => (
+                    {(modoDevolucao === 'UM' && itemSelecionadoDevolucao ? [itemSelecionadoDevolucao] : itensParaDevolver).map((item) => (
                       <li key={item.etiqueta} className="text-xs text-emerald-800 dark:text-emerald-300">
                         <span className="font-mono font-medium">{item.etiqueta}</span>
                         <span className="mx-1">•</span>
