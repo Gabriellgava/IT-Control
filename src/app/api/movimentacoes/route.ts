@@ -65,13 +65,21 @@ export async function POST(request: NextRequest) {
           return NextResponse.json({ error: 'Funcionário é obrigatório para devolução' }, { status: 400 })
 
         const devolucao = await prisma.$transaction(async (tx) => {
+          const etiquetaFiltro = etiqueta?.trim()
           const itensInventario = await tx.inventario.findMany({
-            where: { responsavel: { equals: funcionarioDevolve.trim(), mode: 'insensitive' } },
+            where: {
+              responsavel: { equals: funcionarioDevolve.trim(), mode: 'insensitive' },
+              ...(etiquetaFiltro ? { etiqueta: etiquetaFiltro } : {}),
+            },
             orderBy: { etiqueta: 'asc' },
           })
 
           if (itensInventario.length === 0) {
-            return { erro: 'Nenhum item encontrado no inventário para este funcionário' }
+            return {
+              erro: etiquetaFiltro
+                ? 'O item selecionado não está com este funcionário no inventário'
+                : 'Nenhum item encontrado no inventário para este funcionário',
+            }
           }
 
           const pendencias: Array<{ etiqueta: string, motivo: string }> = []
