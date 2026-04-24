@@ -1,7 +1,7 @@
 'use client'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, Package, PlusCircle, ArrowDownCircle, ArrowUpCircle, Truck, Monitor, Moon, Sun, Users, LogOut, Building2, History, ChevronDown, List, Tag, FileSignature, KeyRound, Smartphone, PackageSearch } from 'lucide-react'
+import { LayoutDashboard, Package, PlusCircle, ArrowDownCircle, ArrowUpCircle, Truck, Monitor, Moon, Sun, Users, LogOut, Building2, History, ChevronDown, List, Tag, FileSignature, KeyRound, Smartphone, PackageSearch, User } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { useSession, signOut } from 'next-auth/react'
 import { ClipboardList } from 'lucide-react'
@@ -153,6 +153,10 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
                 <Link href="/admin/setores" onClick={onClose} className={subCls(path === '/admin/setores')}>
                   <Building2 className="w-3.5 h-3.5 flex-shrink-0" />
                   Setores
+                </Link>
+                <Link href="/admin/funcionarios" onClick={onClose} className={subCls(path === '/admin/funcionarios')}>
+                  <User className="w-3.5 h-3.5 flex-shrink-0" />
+                  Funcionários
                 </Link>
                 <Link href="/admin/categorias" onClick={onClose} className={subCls(path === '/admin/categorias')}>
                   <Tag className="w-3.5 h-3.5 flex-shrink-0" />

@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { Button, Input, Textarea } from '@/components/ui'
 import { User, Trash2, Tag } from 'lucide-react'
-import type { Produto, Fornecedor, Setor } from '@/types'
+import type { Produto, Fornecedor, Funcionario } from '@/types'
 
 interface InventarioItem {
   responsavel: string
@@ -21,7 +21,7 @@ export function MovimentacaoForm({ tipo }: { tipo: 'ENTRADA' | 'SAIDA' }) {
   const [erros, setErros] = useState<Record<string, string>>({})
   const [produtos, setProdutos] = useState<Produto[]>([])
   const [fornecedores, setFornecedores] = useState<Fornecedor[]>([])
-  const [setores, setSetores] = useState<Setor[]>([])
+  const [funcionarios, setFuncionarios] = useState<Funcionario[]>([])
   const [subtipo, setSubtipo] = useState<'USUARIO' | 'DESCARTE'>('USUARIO')
   const [modoEntrada, setModoEntrada] = useState<'CADASTRO' | 'DEVOLUCAO'>('CADASTRO')
   const [modoDevolucao, setModoDevolucao] = useState<'TODOS' | 'UM'>('TODOS')
@@ -32,8 +32,9 @@ export function MovimentacaoForm({ tipo }: { tipo: 'ENTRADA' | 'SAIDA' }) {
     data: new Date().toISOString().split('T')[0],
     fornecedorId: '',
     setorId: '',
-    funcionarioRecebe: '',
+    funcionarioId: '',
     funcionarioDevolve: '',
+    etiquetasSaida: '',
     observacoes: '',
     valorUnitario: '',
   })
@@ -42,7 +43,7 @@ export function MovimentacaoForm({ tipo }: { tipo: 'ENTRADA' | 'SAIDA' }) {
   useEffect(() => {
     fetch('/api/produtos').then(r => r.json()).then(setProdutos)
     fetch('/api/fornecedores').then(r => r.json()).then(setFornecedores)
-    fetch('/api/setores').then(r => r.json()).then(setSetores)
+    fetch('/api/funcionarios').then(r => r.json()).then((dados) => setFuncionarios(Array.isArray(dados) ? dados.filter((f) => f.ativo) : []))
     fetch('/api/inventario')
       .then(r => r.ok ? r.json() : [])
       .then((dados) => {
@@ -68,11 +69,13 @@ export function MovimentacaoForm({ tipo }: { tipo: 'ENTRADA' | 'SAIDA' }) {
   }
 
   const produtoSel = produtos.find(p => p.id === form.produtoId)
+  const funcionarioSelecionado = funcionarios.find((f) => f.id === form.funcionarioId)
+  const etiquetasSaida = form.etiquetasSaida.split(/[\n,;]+/).map(e => e.trim()).filter(Boolean)
 
   const validar = () => {
     const e: Record<string, string> = {}
-    if (!form.etiqueta.trim() && (tipo === 'SAIDA' || modoEntrada === 'CADASTRO'))
-      e.etiqueta = tipo === 'ENTRADA' ? 'Informe a etiqueta do item' : 'Informe a etiqueta do item a ser baixado'
+    if (tipo === 'ENTRADA' && modoEntrada === 'CADASTRO' && !form.etiqueta.trim())
+      e.etiqueta = 'Informe a etiqueta do item'
     if (!form.data) e.data = 'Informe a data'
     if (tipo === 'ENTRADA' && modoEntrada === 'CADASTRO' && !form.produtoId) e.produtoId = 'Selecione um produto'
     if (tipo === 'ENTRADA' && modoEntrada === 'DEVOLUCAO' && !form.funcionarioDevolve.trim())
@@ -80,10 +83,11 @@ export function MovimentacaoForm({ tipo }: { tipo: 'ENTRADA' | 'SAIDA' }) {
     if (tipo === 'ENTRADA' && modoEntrada === 'DEVOLUCAO' && modoDevolucao === 'UM' && !form.etiqueta.trim())
       e.etiqueta = 'Selecione o item que será devolvido'
     if (tipo === 'SAIDA' && subtipo === 'USUARIO') {
-      if (!form.setorId) e.setorId = 'Selecione o setor destino'
-      if (!form.funcionarioRecebe.trim()) e.funcionarioRecebe = 'Informe o funcionário que receberá o item'
+      if (!form.funcionarioId) e.funcionarioId = 'Selecione o funcionário que receberá os itens'
+      if (etiquetasSaida.length === 0) e.etiqueta = 'Informe ao menos uma etiqueta'
     }
     if (tipo === 'SAIDA' && subtipo === 'DESCARTE') {
+      if (etiquetasSaida.length === 0) e.etiqueta = 'Informe ao menos uma etiqueta'
       if (!form.observacoes.trim()) e.observacoes = 'Informe o motivo do descarte'
     }
     setErros(e)
@@ -103,29 +107,31 @@ export function MovimentacaoForm({ tipo }: { tipo: 'ENTRADA' | 'SAIDA' }) {
         etiqueta: tipo === 'ENTRADA' && modoEntrada === 'DEVOLUCAO' && modoDevolucao === 'TODOS'
           ? ''
           : form.etiqueta.trim(),
+        etiquetas: tipo === 'SAIDA' ? etiquetasSaida : undefined,
         dataCompra: tipo === 'ENTRADA' ? form.data : undefined,
         data: form.data,
         fornecedorId: form.fornecedorId || null,
-        setorId: form.setorId || null,
-        funcionarioRecebe: form.funcionarioRecebe.trim() || null,
+        setorId: subtipo === 'USUARIO' ? funcionarioSelecionado?.setorId || null : form.setorId || null,
+        funcionarioId: form.funcionarioId || null,
+        funcionarioRecebe: funcionarioSelecionado?.nome || null,
         funcionarioDevolve: form.funcionarioDevolve.trim() || null,
         valorUnitario: form.valorUnitario,
         usuarioId: session?.user.id,
         responsavel: tipo === 'SAIDA' && subtipo === 'USUARIO'
-          ? form.funcionarioRecebe.trim()
+          ? funcionarioSelecionado?.nome || null
           : tipo === 'ENTRADA' && modoEntrada === 'DEVOLUCAO'
             ? form.funcionarioDevolve.trim()
           : (session?.user.name ?? session?.user.email),
         observacoes: tipo === 'ENTRADA' && modoEntrada === 'DEVOLUCAO'
           ? `Devolução de itens de: ${form.funcionarioDevolve.trim()}${form.observacoes ? ' | ' + form.observacoes : ''}`
-          : tipo === 'SAIDA' && subtipo === 'USUARIO' && form.funcionarioRecebe
+          : tipo === 'SAIDA' && subtipo === 'USUARIO' && funcionarioSelecionado?.nome
           ? `Registrado por: ${session?.user.name ?? session?.user.email}${form.observacoes ? ' | ' + form.observacoes : ''}`
           : form.observacoes,
       }),
     })
     const data = await res.json()
     if (!res.ok) {
-      const detalhesPendencia = tipo === 'ENTRADA' && modoEntrada === 'DEVOLUCAO' && Array.isArray(data?.pendencias) && data.pendencias.length > 0
+      const detalhesPendencia = Array.isArray(data?.pendencias) && data.pendencias.length > 0
         ? ` Pendências: ${data.pendencias.map((p: { etiqueta: string, motivo: string }) => `${p.etiqueta} (${p.motivo})`).join(', ')}`
         : ''
       setErros({ geral: `${data.error || 'Erro ao salvar'}${detalhesPendencia}` })
@@ -135,6 +141,11 @@ export function MovimentacaoForm({ tipo }: { tipo: 'ENTRADA' | 'SAIDA' }) {
     if (tipo === 'ENTRADA' && modoEntrada === 'DEVOLUCAO' && data?.pendencias?.length) {
       setErros({
         geral: `Devolução concluída com ${data.quantidadeDevolvida} item(ns). Pendências: ${data.pendencias.map((p: { etiqueta: string, motivo: string }) => `${p.etiqueta} (${p.motivo})`).join(', ')}`,
+      })
+    }
+    if (tipo === 'SAIDA' && data?.pendencias?.length) {
+      setErros({
+        geral: `Saída concluída com ${data.totalProcessado} item(ns). Pendências: ${data.pendencias.map((p: { etiqueta: string, motivo: string }) => `${p.etiqueta} (${p.motivo})`).join(', ')}`,
       })
     }
     router.push('/movimentacoes')
@@ -214,7 +225,7 @@ export function MovimentacaoForm({ tipo }: { tipo: 'ENTRADA' | 'SAIDA' }) {
       <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-6 space-y-5">
 
         {/* Etiqueta — campo principal */}
-        {(tipo === 'SAIDA' || modoEntrada === 'CADASTRO') && (
+        {modoEntrada === 'CADASTRO' && tipo === 'ENTRADA' && (
           <div className="space-y-1">
             <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide">
               <Tag className="w-3.5 h-3.5 inline mr-1" />
@@ -227,7 +238,24 @@ export function MovimentacaoForm({ tipo }: { tipo: 'ENTRADA' | 'SAIDA' }) {
               className={`w-full border bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all font-mono ${erros.etiqueta ? 'border-red-400' : 'border-gray-300 dark:border-gray-700'}`}
             />
             {erros.etiqueta && <p className="text-xs text-red-500">{erros.etiqueta}</p>}
-            {tipo === 'SAIDA' && <p className="text-xs text-gray-400">O produto e valor serão identificados automaticamente pela etiqueta</p>}
+          </div>
+        )}
+
+        {tipo === 'SAIDA' && (
+          <div className="space-y-1">
+            <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide">
+              <Tag className="w-3.5 h-3.5 inline mr-1" />
+              Etiquetas *
+            </label>
+            <textarea
+              value={form.etiquetasSaida}
+              onChange={e => s('etiquetasSaida', e.target.value)}
+              placeholder="Informe uma ou várias etiquetas (separadas por vírgula ou quebra de linha)"
+              rows={4}
+              className={`w-full border bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all font-mono ${erros.etiqueta ? 'border-red-400' : 'border-gray-300 dark:border-gray-700'}`}
+            />
+            {erros.etiqueta && <p className="text-xs text-red-500">{erros.etiqueta}</p>}
+            <p className="text-xs text-gray-400">Você pode registrar 1 item ou vários itens de uma vez</p>
           </div>
         )}
 
@@ -351,15 +379,15 @@ export function MovimentacaoForm({ tipo }: { tipo: 'ENTRADA' | 'SAIDA' }) {
         {tipo === 'SAIDA' && subtipo === 'USUARIO' && (
           <>
             <div className="space-y-1">
-              <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide">Setor Destino *</label>
-              <select value={form.setorId} onChange={e => s('setorId', e.target.value)}
-                className={`w-full border bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all ${erros.setorId ? 'border-red-400' : 'border-gray-300 dark:border-gray-700'}`}>
-                <option value="">Selecionar setor</option>
-                {setores.map(s => <option key={s.id} value={s.id}>{s.nome}</option>)}
+              <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide">Funcionário *</label>
+              <select value={form.funcionarioId} onChange={e => s('funcionarioId', e.target.value)}
+                className={`w-full border bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all ${erros.funcionarioId ? 'border-red-400' : 'border-gray-300 dark:border-gray-700'}`}>
+                <option value="">Selecionar funcionário</option>
+                {funcionarios.map(f => <option key={f.id} value={f.id}>{f.nome} — {f.setor?.nome}</option>)}
               </select>
-              {erros.setorId && <p className="text-xs text-red-500">{erros.setorId}</p>}
+              {erros.funcionarioId && <p className="text-xs text-red-500">{erros.funcionarioId}</p>}
             </div>
-            <Input label="Funcionário que receberá o item *" value={form.funcionarioRecebe} onChange={e => s('funcionarioRecebe', e.target.value)} error={erros.funcionarioRecebe} placeholder="Nome completo" />
+            <Input label="Setor (vinculado ao funcionário)" value={funcionarioSelecionado?.setor?.nome || ''} readOnly placeholder="Selecione um funcionário" />
           </>
         )}
 

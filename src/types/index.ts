@@ -21,6 +21,14 @@ export interface Setor {
   nome: string
 }
 
+export interface Funcionario {
+  id: string
+  nome: string
+  setorId: string
+  setor?: Setor
+  ativo: boolean
+}
+
 export interface Usuario {
   id: string
   nome: string

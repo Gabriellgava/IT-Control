@@ -92,8 +92,21 @@ model Setor {
   nome          String         @unique
   criadoEm      DateTime       @default(now()) @map("criado_em")
   movimentacoes Movimentacao[]
+  funcionarios  Funcionario[]
 
   @@map("setores")
+}
+
+model Funcionario {
+  id        String   @id @default(cuid())
+  nome      String
+  setorId   String   @map("setor_id")
+  setor     Setor    @relation(fields: [setorId], references: [id])
+  ativo     Boolean  @default(true)
+  criadoEm  DateTime @default(now()) @map("criado_em")
+
+  @@unique([nome, setorId])
+  @@map("funcionarios")
 }
 
 model Produto {
