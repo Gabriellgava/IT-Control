@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { Button, Input, Textarea } from '@/components/ui'
@@ -14,6 +14,18 @@ interface InventarioItem {
   tipo: string
 }
 
+interface AtivoSaida {
+  etiqueta: string
+  produtoNome: string
+  categoriaNome: string
+}
+
+interface UnidadeSaida {
+  etiqueta: string
+  status: 'ATIVA' | 'DESCARTADA'
+  localAtual?: string
+}
+
 export function MovimentacaoForm({ tipo }: { tipo: 'ENTRADA' | 'SAIDA' }) {
   const router = useRouter()
   const { data: session } = useSession()
@@ -26,6 +38,9 @@ export function MovimentacaoForm({ tipo }: { tipo: 'ENTRADA' | 'SAIDA' }) {
   const [modoEntrada, setModoEntrada] = useState<'CADASTRO' | 'DEVOLUCAO'>('CADASTRO')
   const [modoDevolucao, setModoDevolucao] = useState<'TODOS' | 'UM'>('TODOS')
   const [itensInventario, setItensInventario] = useState<InventarioItem[]>([])
+  const [filtroAtivo, setFiltroAtivo] = useState<'ETIQUETA' | 'PRODUTO' | 'CATEGORIA'>('ETIQUETA')
+  const [buscaAtivo, setBuscaAtivo] = useState('')
+  const [ativosSelecionados, setAtivosSelecionados] = useState<AtivoSaida[]>([])
   const [form, setForm] = useState({
     produtoId: '',
     etiqueta: '',
@@ -34,7 +49,6 @@ export function MovimentacaoForm({ tipo }: { tipo: 'ENTRADA' | 'SAIDA' }) {
     setorId: '',
     funcionarioId: '',
     funcionarioDevolve: '',
-    etiquetasSaida: '',
     observacoes: '',
     valorUnitario: '',
   })
@@ -70,7 +84,48 @@ export function MovimentacaoForm({ tipo }: { tipo: 'ENTRADA' | 'SAIDA' }) {
 
   const produtoSel = produtos.find(p => p.id === form.produtoId)
   const funcionarioSelecionado = funcionarios.find((f) => f.id === form.funcionarioId)
-  const etiquetasSaida = form.etiquetasSaida.split(/[\n,;]+/).map(e => e.trim()).filter(Boolean)
+  const etiquetasSaida = ativosSelecionados.map((item) => item.etiqueta)
+  const ativosDisponiveisSaida = useMemo<AtivoSaida[]>(() => (
+    produtos.flatMap((produto) => (
+      ((produto.unidades || []) as UnidadeSaida[])
+        .filter((unidade) =>
+          unidade.status === 'ATIVA' && unidade.localAtual?.toLowerCase() === 'estoque',
+        )
+        .map((unidade) => ({
+          etiqueta: unidade.etiqueta,
+          produtoNome: produto.nome,
+          categoriaNome: produto.categoria?.nome || 'Sem categoria',
+        }))
+    ))
+  ), [produtos])
+
+  const ativosFiltrados = useMemo(() => {
+    const termo = buscaAtivo.trim().toLowerCase()
+    const etiquetasSelecionadas = new Set(ativosSelecionados.map((item) => item.etiqueta.toLowerCase()))
+
+    return ativosDisponiveisSaida
+      .filter((ativo) => !etiquetasSelecionadas.has(ativo.etiqueta.toLowerCase()))
+      .filter((ativo) => {
+        if (!termo) return true
+        if (filtroAtivo === 'ETIQUETA') return ativo.etiqueta.toLowerCase().includes(termo)
+        if (filtroAtivo === 'PRODUTO') return ativo.produtoNome.toLowerCase().includes(termo)
+        return ativo.categoriaNome.toLowerCase().includes(termo)
+      })
+      .sort((a, b) => a.etiqueta.localeCompare(b.etiqueta, 'pt-BR'))
+  }, [ativosDisponiveisSaida, ativosSelecionados, buscaAtivo, filtroAtivo])
+
+  const adicionarAtivoSaida = (ativo: AtivoSaida) => {
+    setAtivosSelecionados((atual) => {
+      if (atual.some((item) => item.etiqueta.toLowerCase() === ativo.etiqueta.toLowerCase())) return atual
+      return [...atual, ativo]
+    })
+    setErros((atual) => ({ ...atual, etiqueta: '' }))
+    setBuscaAtivo('')
+  }
+
+  const removerAtivoSaida = (etiqueta: string) => {
+    setAtivosSelecionados((atual) => atual.filter((item) => item.etiqueta !== etiqueta))
+  }
 
   const validar = () => {
     const e: Record<string, string> = {}
@@ -241,24 +296,6 @@ export function MovimentacaoForm({ tipo }: { tipo: 'ENTRADA' | 'SAIDA' }) {
           </div>
         )}
 
-        {tipo === 'SAIDA' && (
-          <div className="space-y-1">
-            <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide">
-              <Tag className="w-3.5 h-3.5 inline mr-1" />
-              Etiquetas *
-            </label>
-            <textarea
-              value={form.etiquetasSaida}
-              onChange={e => s('etiquetasSaida', e.target.value)}
-              placeholder="Informe uma ou várias etiquetas (separadas por vírgula ou quebra de linha)"
-              rows={4}
-              className={`w-full border bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all font-mono ${erros.etiqueta ? 'border-red-400' : 'border-gray-300 dark:border-gray-700'}`}
-            />
-            {erros.etiqueta && <p className="text-xs text-red-500">{erros.etiqueta}</p>}
-            <p className="text-xs text-gray-400">Você pode registrar 1 item ou vários itens de uma vez</p>
-          </div>
-        )}
-
         {/* Produto — só na entrada */}
         {tipo === 'ENTRADA' && modoEntrada === 'CADASTRO' && (
           <div className="space-y-1">
@@ -372,15 +409,17 @@ export function MovimentacaoForm({ tipo }: { tipo: 'ENTRADA' | 'SAIDA' }) {
           </>
         )}
 
-        {tipo === 'SAIDA' && (
-          <Input label="Data *" type="date" value={form.data} onChange={e => s('data', e.target.value)} error={erros.data} />
-        )}
-
         {tipo === 'SAIDA' && subtipo === 'USUARIO' && (
           <>
             <div className="space-y-1">
               <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide">Funcionário *</label>
-              <select value={form.funcionarioId} onChange={e => s('funcionarioId', e.target.value)}
+              <select
+                value={form.funcionarioId}
+                onChange={e => {
+                  s('funcionarioId', e.target.value)
+                  setAtivosSelecionados([])
+                  setBuscaAtivo('')
+                }}
                 className={`w-full border bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all ${erros.funcionarioId ? 'border-red-400' : 'border-gray-300 dark:border-gray-700'}`}>
                 <option value="">Selecionar funcionário</option>
                 {funcionarios.map(f => <option key={f.id} value={f.id}>{f.nome} — {f.setor?.nome}</option>)}
@@ -388,6 +427,97 @@ export function MovimentacaoForm({ tipo }: { tipo: 'ENTRADA' | 'SAIDA' }) {
               {erros.funcionarioId && <p className="text-xs text-red-500">{erros.funcionarioId}</p>}
             </div>
             <Input label="Setor (vinculado ao funcionário)" value={funcionarioSelecionado?.setor?.nome || ''} readOnly placeholder="Selecione um funcionário" />
+          </>
+        )}
+
+        {tipo === 'SAIDA' && (
+          <>
+            <Input label="Data *" type="date" value={form.data} onChange={e => s('data', e.target.value)} error={erros.data} />
+            <div className={`space-y-3 rounded-lg border p-3 ${erros.etiqueta ? 'border-red-300 bg-red-50/30 dark:bg-red-900/10' : 'border-gray-200 dark:border-gray-700'}`}>
+              <div className="flex items-center justify-between gap-2">
+                <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide">
+                  Ativos para saída *
+                </label>
+                <span className="text-xs text-gray-500 dark:text-gray-400">{ativosSelecionados.length} selecionado(s)</span>
+              </div>
+              {subtipo === 'USUARIO' && !form.funcionarioId ? (
+                <p className="text-xs text-amber-600 dark:text-amber-400">
+                  Selecione o funcionário primeiro para liberar a seleção dos ativos.
+                </p>
+              ) : (
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                    <select
+                      value={filtroAtivo}
+                      onChange={(e) => setFiltroAtivo(e.target.value as 'ETIQUETA' | 'PRODUTO' | 'CATEGORIA')}
+                      className="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                    >
+                      <option value="ETIQUETA">Buscar por etiqueta</option>
+                      <option value="PRODUTO">Buscar por produto</option>
+                      <option value="CATEGORIA">Buscar por categoria</option>
+                    </select>
+                    <input
+                      value={buscaAtivo}
+                      onChange={(e) => setBuscaAtivo(e.target.value)}
+                      placeholder={filtroAtivo === 'ETIQUETA' ? 'Digite a etiqueta...' : filtroAtivo === 'PRODUTO' ? 'Digite o nome do produto...' : 'Digite a categoria...'}
+                      className="md:col-span-2 w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                    />
+                  </div>
+                  <div className="max-h-44 overflow-auto rounded-lg border border-gray-200 dark:border-gray-700">
+                    {ativosFiltrados.length === 0 ? (
+                      <p className="px-3 py-2 text-xs text-gray-500 dark:text-gray-400">Nenhum ativo disponível com esse filtro.</p>
+                    ) : (
+                      <ul className="divide-y divide-gray-200 dark:divide-gray-700">
+                        {ativosFiltrados.slice(0, 30).map((ativo) => (
+                          <li key={ativo.etiqueta} className="px-3 py-2 flex items-center justify-between gap-3">
+                            <div className="min-w-0">
+                              <p className="text-sm font-mono text-gray-800 dark:text-gray-200 truncate">{ativo.etiqueta}</p>
+                              <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                                {ativo.produtoNome} • {ativo.categoriaNome}
+                              </p>
+                            </div>
+                            <Button size="sm" onClick={() => adicionarAtivoSaida(ativo)}>Adicionar</Button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                </>
+              )}
+              {erros.etiqueta && <p className="text-xs text-red-500">{erros.etiqueta}</p>}
+              {ativosSelecionados.length > 0 && (
+                <div className="overflow-auto rounded-lg border border-gray-200 dark:border-gray-700">
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-50 dark:bg-gray-800/80">
+                      <tr>
+                        <th className="text-left px-3 py-2">Etiqueta</th>
+                        <th className="text-left px-3 py-2">Produto</th>
+                        <th className="text-left px-3 py-2">Categoria</th>
+                        <th className="text-right px-3 py-2">Ação</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {ativosSelecionados.map((ativo) => (
+                        <tr key={ativo.etiqueta} className="border-t border-gray-200 dark:border-gray-700">
+                          <td className="px-3 py-2 font-mono">{ativo.etiqueta}</td>
+                          <td className="px-3 py-2">{ativo.produtoNome}</td>
+                          <td className="px-3 py-2">{ativo.categoriaNome}</td>
+                          <td className="px-3 py-2 text-right">
+                            <button
+                              type="button"
+                              onClick={() => removerAtivoSaida(ativo.etiqueta)}
+                              className="text-xs font-semibold text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
+                            >
+                              Remover
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
           </>
         )}
 
