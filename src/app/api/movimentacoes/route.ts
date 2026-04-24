@@ -56,7 +56,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { tipo, subtipo, produtoId, etiqueta, dataCompra, valorUnitario, fornecedorId, setorId, usuarioId, responsavel, observacoes, funcionarioRecebe, funcionarioDevolve } = body
+    const { tipo, subtipo, produtoId, etiqueta, etiquetas, dataCompra, valorUnitario, fornecedorId, setorId, usuarioId, responsavel, observacoes, funcionarioId, funcionarioRecebe, funcionarioDevolve } = body
 
     // ENTRADA: cria nova unidade física
     if (tipo === 'ENTRADA') {
@@ -196,81 +196,106 @@ export async function POST(request: NextRequest) {
 
     // SAIDA (usuário ou descarte): opera sobre unidade existente por etiqueta
     if (tipo === 'SAIDA') {
-      if (!etiqueta?.trim()) return NextResponse.json({ error: 'Etiqueta é obrigatória' }, { status: 400 })
+      const etiquetasNormalizadas = Array.from(new Set(
+        (Array.isArray(etiquetas) ? etiquetas : [etiqueta])
+          .map((v) => String(v || '').trim())
+          .filter(Boolean),
+      ))
+      if (etiquetasNormalizadas.length === 0)
+        return NextResponse.json({ error: 'Informe ao menos uma etiqueta' }, { status: 400 })
 
-      const unidade = await prisma.unidade.findUnique({
-        where: { etiqueta: etiqueta.trim() },
-        include: { produto: { include: { categoria: true } } },
-      })
-
-      if (!unidade) return NextResponse.json({ error: 'Etiqueta não encontrada' }, { status: 404 })
-      if (unidade.status !== 'ATIVA') return NextResponse.json({ error: 'Esta unidade já foi descartada' }, { status: 400 })
-
-      // Atualiza status se for descarte
-      if (subtipo === 'DESCARTE') {
-        await prisma.unidade.update({
-          where: { id: unidade.id },
-          data: { status: 'DESCARTADA' },
-        })
-        await prisma.inventario.deleteMany({
-          where: { etiqueta: { equals: etiqueta.trim(), mode: 'insensitive' } },
-        })
+      const subtipoSaida = subtipo || 'USUARIO'
+      let funcionario: { id: string, nome: string, ativo: boolean, setorId: string, setor: { id: string, nome: string } } | null = null
+      if (subtipoSaida === 'USUARIO') {
+        if (!funcionarioId) return NextResponse.json({ error: 'Funcionário é obrigatório para saída de usuário' }, { status: 400 })
+        funcionario = await prisma.funcionario.findUnique({ where: { id: funcionarioId }, include: { setor: true } })
+        if (!funcionario) return NextResponse.json({ error: 'Funcionário não encontrado' }, { status: 404 })
+        if (!funcionario.ativo) return NextResponse.json({ error: 'Funcionário inativo não pode receber itens' }, { status: 400 })
       }
 
-      if ((subtipo || 'USUARIO') === 'USUARIO') {
-        if (!setorId) return NextResponse.json({ error: 'Setor é obrigatório para saída de usuário' }, { status: 400 })
-        if (!funcionarioRecebe?.trim()) return NextResponse.json({ error: 'Funcionário é obrigatório para saída de usuário' }, { status: 400 })
+      const resultado = await prisma.$transaction(async (tx) => {
+        const movimentacoesCriadas = []
+        const pendencias: Array<{ etiqueta: string, motivo: string }> = []
 
-        const setor = await prisma.setor.findUnique({ where: { id: setorId } })
-        if (!setor) return NextResponse.json({ error: 'Setor não encontrado' }, { status: 404 })
+        for (const etiquetaAtual of etiquetasNormalizadas) {
+          const unidade = await tx.unidade.findUnique({
+            where: { etiqueta: etiquetaAtual },
+            include: { produto: { include: { categoria: true } } },
+          })
 
-        const tipoInventario = unidade.produto.categoria?.nome || unidade.produto.nome
-        const responsavelInventario = funcionarioRecebe.trim()
+          if (!unidade) {
+            pendencias.push({ etiqueta: etiquetaAtual, motivo: 'Etiqueta não encontrada' })
+            continue
+          }
 
-        await prisma.inventario.upsert({
-          where: { etiqueta: etiqueta.trim() },
-          update: {
-            setor: setor.nome,
-            responsavel: responsavelInventario,
-            tipo: tipoInventario,
-            marca: unidade.produto.nome,
-            modelo: unidade.produto.codigo,
-            observacoes: observacoes || null,
-          },
-          create: {
-            setor: setor.nome,
-            responsavel: responsavelInventario,
-            tipo: tipoInventario,
-            marca: unidade.produto.nome,
-            modelo: unidade.produto.codigo,
-            etiqueta: etiqueta.trim(),
-            observacoes: observacoes || null,
-          },
-        })
-      }
+          if (unidade.status !== 'ATIVA') {
+            pendencias.push({ etiqueta: etiquetaAtual, motivo: 'Unidade não está ativa' })
+            continue
+          }
 
-      const movimentacao = await prisma.movimentacao.create({
-        data: {
-          tipo: 'SAIDA',
-          subtipo: subtipo || 'USUARIO',
-          unidadeId: unidade.id,
-          valorUnitario: unidade.produto.valorUnitario,
-          data: parseDateWithCurrentTime(body.data),
-          fornecedorId: null,
-          setorId: setorId || null,
-          usuarioId: usuarioId || null,
-          responsavel: responsavel || null,
-          observacoes: observacoes || null,
-        },
-        include: {
-          unidade: { include: { produto: { include: { categoria: true } } } },
-          fornecedor: true,
-          setor: true,
-          usuario: true,
-        },
+          if (subtipoSaida === 'DESCARTE') {
+            await tx.unidade.update({ where: { id: unidade.id }, data: { status: 'DESCARTADA' } })
+            await tx.inventario.deleteMany({ where: { etiqueta: { equals: etiquetaAtual, mode: 'insensitive' } } })
+          }
+
+          if (subtipoSaida === 'USUARIO' && funcionario) {
+            const tipoInventario = unidade.produto.categoria?.nome || unidade.produto.nome
+            await tx.inventario.upsert({
+              where: { etiqueta: etiquetaAtual },
+              update: {
+                setor: funcionario.setor.nome,
+                responsavel: funcionario.nome,
+                tipo: tipoInventario,
+                marca: unidade.produto.nome,
+                modelo: unidade.produto.codigo,
+                observacoes: observacoes || null,
+              },
+              create: {
+                setor: funcionario.setor.nome,
+                responsavel: funcionario.nome,
+                tipo: tipoInventario,
+                marca: unidade.produto.nome,
+                modelo: unidade.produto.codigo,
+                etiqueta: etiquetaAtual,
+                observacoes: observacoes || null,
+              },
+            })
+          }
+
+          const movimentacao = await tx.movimentacao.create({
+            data: {
+              tipo: 'SAIDA',
+              subtipo: subtipoSaida,
+              unidadeId: unidade.id,
+              valorUnitario: unidade.produto.valorUnitario,
+              data: parseDateWithCurrentTime(body.data),
+              fornecedorId: null,
+              setorId: subtipoSaida === 'USUARIO' ? funcionario?.setorId || null : setorId || null,
+              usuarioId: usuarioId || null,
+              responsavel: subtipoSaida === 'USUARIO' ? funcionario?.nome || funcionarioRecebe || null : responsavel || null,
+              observacoes: observacoes || null,
+            },
+            include: {
+              unidade: { include: { produto: { include: { categoria: true } } } },
+              fornecedor: true,
+              setor: true,
+              usuario: true,
+            },
+          })
+          movimentacoesCriadas.push(movimentacao)
+        }
+
+        return { movimentacoesCriadas, pendencias }
       })
 
-      return NextResponse.json(movimentacao, { status: 201 })
+      if (resultado.movimentacoesCriadas.length === 0)
+        return NextResponse.json({ error: 'Nenhuma etiqueta pôde ser processada', pendencias: resultado.pendencias }, { status: 400 })
+
+      return NextResponse.json({
+        movimentacoes: resultado.movimentacoesCriadas,
+        totalProcessado: resultado.movimentacoesCriadas.length,
+        pendencias: resultado.pendencias,
+      }, { status: 201 })
     }
 
     return NextResponse.json({ error: 'Tipo inválido' }, { status: 400 })
