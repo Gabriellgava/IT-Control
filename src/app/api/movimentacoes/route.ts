@@ -69,7 +69,9 @@ export async function POST(request: NextRequest) {
           const itensInventario = await tx.inventario.findMany({
             where: {
               responsavel: { equals: funcionarioDevolve.trim(), mode: 'insensitive' },
-              ...(etiquetaFiltro ? { etiqueta: etiquetaFiltro } : {}),
+              ...(etiquetaFiltro
+                ? { etiqueta: { equals: etiquetaFiltro, mode: 'insensitive' } }
+                : {}),
             },
             orderBy: { etiqueta: 'asc' },
           })
@@ -165,7 +167,9 @@ export async function POST(request: NextRequest) {
         },
       })
 
-      await prisma.inventario.deleteMany({ where: { etiqueta: etiqueta.trim() } })
+      await prisma.inventario.deleteMany({
+        where: { etiqueta: { equals: etiqueta.trim(), mode: 'insensitive' } },
+      })
 
       const movimentacao = await prisma.movimentacao.create({
         data: {
@@ -208,7 +212,9 @@ export async function POST(request: NextRequest) {
           where: { id: unidade.id },
           data: { status: 'DESCARTADA' },
         })
-        await prisma.inventario.deleteMany({ where: { etiqueta: etiqueta.trim() } })
+        await prisma.inventario.deleteMany({
+          where: { etiqueta: { equals: etiqueta.trim(), mode: 'insensitive' } },
+        })
       }
 
       if ((subtipo || 'USUARIO') === 'USUARIO') {
@@ -220,14 +226,6 @@ export async function POST(request: NextRequest) {
 
         const tipoInventario = unidade.produto.categoria?.nome || unidade.produto.nome
         const responsavelInventario = funcionarioRecebe.trim()
-
-        await prisma.inventario.deleteMany({
-          where: {
-            responsavel: responsavelInventario,
-            tipo: tipoInventario,
-            NOT: { etiqueta: etiqueta.trim() },
-          },
-        })
 
         await prisma.inventario.upsert({
           where: { etiqueta: etiqueta.trim() },

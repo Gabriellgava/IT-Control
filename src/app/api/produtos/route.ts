@@ -49,18 +49,46 @@ export async function GET(request: NextRequest) {
       orderBy: { nome: 'asc' },
     })
 
+    const etiquetas = produtos.flatMap((produto) =>
+      produto.unidades.map((unidade) => unidade.etiqueta)
+    )
+
+    const itensInventario = etiquetas.length > 0
+      ? await prisma.inventario.findMany({
+        where: {
+          etiqueta: { in: etiquetas },
+        },
+        select: {
+          etiqueta: true,
+          responsavel: true,
+          setor: true,
+        },
+      })
+      : []
+
+    const inventarioPorEtiqueta = new Map(
+      itensInventario.map((item) => [item.etiqueta.trim().toUpperCase(), item])
+    )
+
     const produtosComLocalizacao = produtos.map((produto) => ({
       ...produto,
       unidades: produto.unidades.map((unidade) => {
         const ultimaMovimentacao = unidade.movimentacoes[0]
         const emPosseDeColaborador =
           ultimaMovimentacao?.tipo === 'SAIDA' && ultimaMovimentacao?.subtipo === 'USUARIO'
+        const inventarioAtual = inventarioPorEtiqueta.get(unidade.etiqueta.trim().toUpperCase())
+        const estaNoInventario = Boolean(inventarioAtual?.responsavel?.trim())
 
         return {
           ...unidade,
-          localAtual: emPosseDeColaborador
-            ? ultimaMovimentacao.responsavel?.trim() || 'Responsável não informado'
-            : 'Estoque',
+          localAtual: estaNoInventario
+            ? inventarioAtual?.responsavel?.trim() || 'Responsável não informado'
+            : emPosseDeColaborador
+              ? ultimaMovimentacao.responsavel?.trim() || 'Responsável não informado'
+              : 'Estoque',
+          setorAtual: estaNoInventario
+            ? inventarioAtual?.setor?.trim() || null
+            : null,
         }
       }),
     }))
