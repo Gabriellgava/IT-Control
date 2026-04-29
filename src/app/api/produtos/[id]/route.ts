@@ -1,7 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import {
+  enforceRateLimit,
+  enforceSameOriginForMutations,
+  requireAuthenticatedUser,
+  sanitizeMoney,
+  sanitizeNullableText,
+  sanitizeOptionalUrl,
+} from '@/lib/api-security'
 
-export async function GET(_: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+  const rateLimit = enforceRateLimit(request)
+  if (rateLimit) return rateLimit
+
+  const { response } = await requireAuthenticatedUser()
+  if (response) return response
+
   try {
     const produto = await prisma.produto.findUnique({
       where: { id: params.id },
@@ -23,21 +37,32 @@ export async function GET(_: NextRequest, { params }: { params: { id: string } }
 }
 
 export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
+  const rateLimit = enforceRateLimit(request)
+  if (rateLimit) return rateLimit
+  const sameOrigin = enforceSameOriginForMutations(request)
+  if (sameOrigin) return sameOrigin
+
+  const { response } = await requireAuthenticatedUser()
+  if (response) return response
+
   try {
     const body = await request.json()
-    if (!body.nome || !body.codigo)
+    const nome = sanitizeNullableText(body.nome)
+    const codigo = sanitizeNullableText(body.codigo)
+
+    if (!nome || !codigo)
       return NextResponse.json({ error: 'Nome e código são obrigatórios' }, { status: 400 })
 
     const produto = await prisma.produto.update({
       where: { id: params.id },
       data: {
-        nome: body.nome.trim(),
-        codigo: body.codigo.trim(),
-        categoriaId: body.categoriaId || null,
-        fornecedorId: body.fornecedorId || null,
-        valorUnitario: parseFloat(body.valorUnitario) || 0,
-        linkCompra: body.linkCompra || null,
-        observacoes: body.observacoes || null,
+        nome,
+        codigo,
+        categoriaId: sanitizeNullableText(body.categoriaId),
+        fornecedorId: sanitizeNullableText(body.fornecedorId),
+        valorUnitario: sanitizeMoney(body.valorUnitario),
+        linkCompra: sanitizeOptionalUrl(body.linkCompra),
+        observacoes: sanitizeNullableText(body.observacoes),
       },
       include: { categoria: true, fornecedor: true },
     })
@@ -49,7 +74,15 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
   }
 }
 
-export async function DELETE(_: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
+  const rateLimit = enforceRateLimit(request)
+  if (rateLimit) return rateLimit
+  const sameOrigin = enforceSameOriginForMutations(request)
+  if (sameOrigin) return sameOrigin
+
+  const { response } = await requireAuthenticatedUser()
+  if (response) return response
+
   try {
     const count = await prisma.unidade.count({ where: { produtoId: params.id, status: 'ATIVA' } })
     if (count > 0)
