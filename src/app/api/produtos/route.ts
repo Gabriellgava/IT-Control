@@ -1,7 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import {
+  enforceRateLimit,
+  enforceSameOriginForMutations,
+  requireAuthenticatedUser,
+  sanitizeMoney,
+  sanitizeNullableText,
+  sanitizeOptionalUrl,
+} from '@/lib/api-security'
 
 export async function GET(request: NextRequest) {
+  const rateLimit = enforceRateLimit(request)
+  if (rateLimit) return rateLimit
+
+  const { response } = await requireAuthenticatedUser()
+  if (response) return response
+
   try {
     const { searchParams } = new URL(request.url)
     const busca = searchParams.get('search') || ''
@@ -101,20 +115,31 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const rateLimit = enforceRateLimit(request)
+  if (rateLimit) return rateLimit
+  const sameOrigin = enforceSameOriginForMutations(request)
+  if (sameOrigin) return sameOrigin
+
+  const { response } = await requireAuthenticatedUser()
+  if (response) return response
+
   try {
     const body = await request.json()
-    if (!body.nome || !body.codigo)
+    const nome = sanitizeNullableText(body.nome)
+    const codigo = sanitizeNullableText(body.codigo)
+
+    if (!nome || !codigo)
       return NextResponse.json({ error: 'Nome e código são obrigatórios' }, { status: 400 })
 
     const produto = await prisma.produto.create({
       data: {
-        nome: body.nome.trim(),
-        codigo: body.codigo.trim(),
-        categoriaId: body.categoriaId || null,
-        fornecedorId: body.fornecedorId || null,
-        valorUnitario: parseFloat(body.valorUnitario) || 0,
-        linkCompra: body.linkCompra || null,
-        observacoes: body.observacoes || null,
+        nome,
+        codigo,
+        categoriaId: sanitizeNullableText(body.categoriaId),
+        fornecedorId: sanitizeNullableText(body.fornecedorId),
+        valorUnitario: sanitizeMoney(body.valorUnitario),
+        linkCompra: sanitizeOptionalUrl(body.linkCompra),
+        observacoes: sanitizeNullableText(body.observacoes),
       },
       include: { categoria: true, fornecedor: true },
     })

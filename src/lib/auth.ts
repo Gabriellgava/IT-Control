@@ -44,7 +44,7 @@ export const authOptions: NextAuthOptions = {
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID!,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-      allowDangerousEmailAccountLinking: true,
+      allowDangerousEmailAccountLinking: false,
     }),
 
     CredentialsProvider({
@@ -85,7 +85,7 @@ export const authOptions: NextAuthOptions = {
 
         return true
       } catch {
-        return true
+        return false
       }
     },
 
@@ -108,9 +108,7 @@ export const authOptions: NextAuthOptions = {
               token.perfil = dbUser.perfil
             }
             // Bloqueia se inativo
-            if (!dbUser.ativo) {
-              token.bloqueado = true
-            }
+            token.bloqueado = !dbUser.ativo
           }
         } catch {}
       }
