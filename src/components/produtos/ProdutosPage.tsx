@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import Link from 'next/link'
 import { Search, Plus, Edit2, Trash2, Download, Package, Tag, ChevronDown, ChevronRight, Eye, ArrowRightLeft } from 'lucide-react'
 import { Button, Badge, Input, Select, Modal, Table, PageHeader, LoadingState, ErrorState } from '@/components/ui'
@@ -25,6 +25,7 @@ export function ProdutosPage() {
   const [acaoLoading, setAcaoLoading] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [sortIndividual, setSortIndividual] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null)
 
   const buscarProdutos = useCallback(async () => {
     setLoading(true)
@@ -123,6 +124,36 @@ export function ProdutosPage() {
     'Valor Unit.': p.valorUnitario,
     'Unidades Ativas': p._count?.unidades ?? 0,
   })), 'produtos-ti')
+
+  const itensIndividuais = useMemo(() => {
+    const itens = produtos.flatMap((p) => (p.unidades ?? []).map((u) => ({ produto: p, unidade: u })))
+    if (!sortIndividual) return itens
+
+    const comparadores: Record<string, (item: (typeof itens)[number]) => string> = {
+      Etiqueta: ({ unidade }) => unidade.etiqueta ?? '',
+      Produto: ({ produto }) => produto.nome ?? '',
+      Categoria: ({ produto }) => produto.categoria?.nome ?? '',
+      Fornecedor: ({ produto }) => produto.fornecedor?.nome ?? '',
+      Valor: ({ produto }) => String(produto.valorUnitario ?? 0),
+      'Data Compra': ({ unidade }) => unidade.dataCompra ?? '',
+      Status: ({ unidade }) => unidade.status ?? '',
+    }
+    const extrair = comparadores[sortIndividual.key]
+    if (!extrair) return itens
+
+    return [...itens].sort((a, b) => {
+      const comparacao = extrair(a).localeCompare(extrair(b), 'pt-BR', { numeric: true, sensitivity: 'base' })
+      return sortIndividual.direction === 'asc' ? comparacao : -comparacao
+    })
+  }, [produtos, sortIndividual])
+
+  const alternarOrdenacaoIndividual = (header: string) => {
+    if (header === 'Ações') return
+    setSortIndividual((atual) => {
+      if (!atual || atual.key !== header) return { key: header, direction: 'asc' }
+      return { key: header, direction: atual.direction === 'asc' ? 'desc' : 'asc' }
+    })
+  }
 
   return (
     <div className="space-y-6">
@@ -236,9 +267,8 @@ export function ProdutosPage() {
         </div>
       ) : (
         /* MODO INDIVIDUAL — por etiqueta */
-        <Table headers={['Etiqueta', 'Produto', 'Categoria', 'Fornecedor', 'Valor', 'Data Compra', 'Status', 'Ações']} empty={produtos.flatMap(p => p.unidades ?? []).length === 0}>
-          {produtos.flatMap(p =>
-            (p.unidades ?? []).map(u => (
+        <Table headers={['Etiqueta', 'Produto', 'Categoria', 'Fornecedor', 'Valor', 'Data Compra', 'Status', 'Ações']} empty={itensIndividuais.length === 0} sort={sortIndividual} onSort={alternarOrdenacaoIndividual}>
+          {itensIndividuais.map(({ produto: p, unidade: u }) => (
               <tr key={u.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
                 <td className="px-4 py-3"><span className="font-mono text-sm font-medium text-gray-900 dark:text-white">{u.etiqueta}</span></td>
                 <td className="px-4 py-3"><p className="text-sm text-gray-900 dark:text-white">{p.nome}</p><p className="text-xs text-gray-400">{p.codigo}</p></td>
@@ -271,8 +301,7 @@ export function ProdutosPage() {
                   </div>
                 </td>
               </tr>
-            ))
-          )}
+            ))}
         </Table>
       )}
 
