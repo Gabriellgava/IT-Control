@@ -91,12 +91,12 @@ export async function GET(request: NextRequest) {
         const emPosseDeColaborador =
           ultimaMovimentacao?.tipo === 'SAIDA' && ultimaMovimentacao?.subtipo === 'USUARIO'
         const inventarioAtual = inventarioPorEtiqueta.get(unidade.etiqueta.trim().toUpperCase())
-        const estaNoInventario = Boolean(inventarioAtual?.responsavel?.trim())
+        const estaNoInventario = Boolean(inventarioAtual)
 
         return {
           ...unidade,
           localAtual: estaNoInventario
-            ? inventarioAtual?.responsavel?.trim() || 'Responsável não informado'
+            ? inventarioAtual?.responsavel?.trim() || 'Estoque'
             : emPosseDeColaborador
               ? ultimaMovimentacao.responsavel?.trim() || 'Responsável não informado'
               : 'Estoque',
