@@ -21,7 +21,7 @@ const estaEmEstoque = (item: ItemInventario) => {
   const responsavel = (item.responsavel || '').toLowerCase()
   const setor = (item.setor || '').toLowerCase()
 
-  return !item.responsavel.trim() || responsavel.includes('estoque') || setor.includes('estoque')
+  return !(item.responsavel || '').trim() || responsavel.includes('estoque') || setor.includes('estoque')
 }
 
 export default function ConsultaProdutosPage() {
@@ -29,6 +29,7 @@ export default function ConsultaProdutosPage() {
   const [busca, setBusca] = useState('')
   const [filtroSituacao, setFiltroSituacao] = useState<'todos' | 'estoque' | 'alocados'>('todos')
   const [loading, setLoading] = useState(true)
+  const [sort, setSort] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null)
 
   useEffect(() => {
     const carregar = async () => {
@@ -59,15 +60,48 @@ export default function ConsultaProdutosPage() {
       resultado = resultado.filter((item) => !estaEmEstoque(item))
     }
 
-    if (!termo) return resultado
-
-    return resultado.filter((item) =>
+    const dadosFiltrados = !termo ? resultado : resultado.filter((item) =>
       [item.etiqueta, item.marca, item.modelo, item.tipo, item.numero, item.observacoes, item.responsavel, item.setor]
         .join(' ')
         .toLowerCase()
         .includes(termo),
     )
-  }, [itens, busca, filtroSituacao])
+
+    if (!sort) return dadosFiltrados
+
+    const mapaCampos: Record<string, keyof ItemInventario | 'situacao'> = {
+      Etiqueta: 'etiqueta',
+      Tipo: 'tipo',
+      Marca: 'marca',
+      Modelo: 'modelo',
+      Número: 'numero',
+      Responsável: 'responsavel',
+      Setor: 'setor',
+      Situação: 'situacao',
+      Observações: 'observacoes',
+    }
+
+    const campo = mapaCampos[sort.key]
+    if (!campo) return dadosFiltrados
+
+    return [...dadosFiltrados].sort((a, b) => {
+      const aValor = campo === 'situacao'
+        ? (estaEmEstoque(a) ? 'em estoque' : 'com responsavel')
+        : String(a[campo] || '')
+      const bValor = campo === 'situacao'
+        ? (estaEmEstoque(b) ? 'em estoque' : 'com responsavel')
+        : String(b[campo] || '')
+      const comparacao = aValor.localeCompare(bValor, 'pt-BR', { numeric: true, sensitivity: 'base' })
+      return sort.direction === 'asc' ? comparacao : -comparacao
+    })
+  }, [itens, busca, filtroSituacao, sort])
+
+  const alternarOrdenacao = (header: string) => {
+    setSort((atual) => {
+      if (!atual || atual.key !== header) return { key: header, direction: 'asc' }
+      return { key: header, direction: atual.direction === 'asc' ? 'desc' : 'asc' }
+    })
+  }
 
   return (
     <AppLayout>
@@ -108,7 +142,12 @@ export default function ConsultaProdutosPage() {
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
           </div>
         ) : (
-          <Table headers={['Etiqueta', 'Tipo', 'Marca', 'Modelo', 'Número', 'Responsável', 'Setor', 'Situação', 'Observações']} empty={filtrados.length === 0}>
+          <Table
+            headers={['Etiqueta', 'Tipo', 'Marca', 'Modelo', 'Número', 'Responsável', 'Setor', 'Situação', 'Observações']}
+            empty={filtrados.length === 0}
+            sort={sort}
+            onSort={alternarOrdenacao}
+          >
             {filtrados.map((item) => {
               const emEstoque = estaEmEstoque(item)
 

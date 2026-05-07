@@ -1,6 +1,6 @@
 'use client'
 import { ReactNode, ButtonHTMLAttributes, InputHTMLAttributes, SelectHTMLAttributes, TextareaHTMLAttributes } from 'react'
-import { Loader2, X } from 'lucide-react'
+import { ArrowDownAZ, ArrowUpAZ, ArrowUpDown, Loader2, X } from 'lucide-react'
 
 export function Badge({ children, variant = 'default' }: { children: ReactNode; variant?: 'default' | 'success' | 'warning' | 'danger' | 'info' }) {
   const s = { default: 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300', success: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400', warning: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400', danger: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400', info: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' }
@@ -105,11 +105,52 @@ export function Modal({ open, onClose, title, children }: { open: boolean; onClo
   )
 }
 
-export function Table({ headers, children, empty }: { headers: string[]; children: ReactNode; empty?: boolean }) {
+interface SortState {
+  key: string
+  direction: 'asc' | 'desc'
+}
+
+export function Table({
+  headers,
+  children,
+  empty,
+  sort,
+  onSort,
+}: {
+  headers: string[]
+  children: ReactNode
+  empty?: boolean
+  sort?: SortState | null
+  onSort?: (header: string) => void
+}) {
   return (
     <div className="overflow-x-auto rounded-xl border border-gray-200 dark:border-gray-800">
       <table className="w-full text-sm">
-        <thead><tr className="bg-gray-50 dark:bg-gray-800/50">{headers.map(h => <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide whitespace-nowrap">{h}</th>)}</tr></thead>
+        <thead>
+          <tr className="bg-gray-50 dark:bg-gray-800/50">
+            {headers.map((h) => {
+              const ativo = sort?.key === h
+              return (
+                <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide whitespace-nowrap">
+                  {onSort ? (
+                    <button
+                      type="button"
+                      onClick={() => onSort(h)}
+                      className="inline-flex items-center gap-1 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
+                    >
+                      {h}
+                      {ativo ? (
+                        sort?.direction === 'asc' ? <ArrowUpAZ className="w-3.5 h-3.5" /> : <ArrowDownAZ className="w-3.5 h-3.5" />
+                      ) : (
+                        <ArrowUpDown className="w-3.5 h-3.5 opacity-60" />
+                      )}
+                    </button>
+                  ) : h}
+                </th>
+              )
+            })}
+          </tr>
+        </thead>
         <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
           {empty ? <tr><td colSpan={headers.length} className="px-4 py-12 text-center text-gray-400 text-sm">Nenhum registro encontrado</td></tr> : children}
         </tbody>
