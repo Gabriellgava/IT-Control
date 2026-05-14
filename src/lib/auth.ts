@@ -5,6 +5,9 @@ import { PrismaAdapter } from '@auth/prisma-adapter'
 import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
 
+const SUPER_ADMIN_EMAIL = process.env.SUPER_ADMIN_EMAIL?.toLowerCase().trim()
+const SUPER_ADMIN_NAME = 'Gabriel Gava'
+
 function CustomPrismaAdapter(p: any) {
   const adapter = PrismaAdapter(p) as any
   return {
@@ -69,11 +72,20 @@ export const authOptions: NextAuthOptions = {
   callbacks: {
     async signIn({ user, account }) {
       try {
-        const dbUser = await prisma.usuario.findUnique({ where: { email: user.email! } })
+        const email = user.email?.toLowerCase().trim()
+        if (!email) return false
 
-        // Primeiro usuário do sistema vira admin automaticamente
-        const totalUsuarios = await prisma.usuario.count()
-        if (totalUsuarios === 0 || !dbUser) return true
+        const dbUser = await prisma.usuario.findUnique({ where: { email } })
+        if (!dbUser) return true
+
+        // Somente o usuário principal pode receber admin automaticamente.
+        const isSuperAdmin =
+          (SUPER_ADMIN_EMAIL && email === SUPER_ADMIN_EMAIL) ||
+          (!SUPER_ADMIN_EMAIL && user.name?.trim() === SUPER_ADMIN_NAME)
+
+        if (isSuperAdmin && dbUser.perfil !== 'admin') {
+          await prisma.usuario.update({ where: { id: dbUser.id }, data: { perfil: 'admin', ativo: true } })
+        }
 
         // Bloqueia usuário inativo
         if (!dbUser.ativo) return false
@@ -99,14 +111,7 @@ export const authOptions: NextAuthOptions = {
         try {
           const dbUser = await prisma.usuario.findUnique({ where: { id: token.id as string } })
           if (dbUser) {
-            // Se for o primeiro usuário, promove a admin
-            const totalUsuarios = await prisma.usuario.count()
-            if (totalUsuarios === 1 && dbUser.perfil !== 'admin') {
-              await prisma.usuario.update({ where: { id: dbUser.id }, data: { perfil: 'admin', ativo: true } })
-              token.perfil = 'admin'
-            } else {
-              token.perfil = dbUser.perfil
-            }
+            token.perfil = dbUser.perfil
             // Bloqueia se inativo
             token.bloqueado = !dbUser.ativo
           }
