@@ -15,17 +15,26 @@ interface ItemInventario {
   observacoes?: string | null
   responsavel: string
   setor: string
+  status: string
 }
 
-const PALAVRAS_ESTOQUE = ['estoque', 'almoxarifado', 'disponivel', 'disponível', 'sem responsavel', 'sem responsável']
-
 const estaEmEstoque = (item: ItemInventario) => {
-  const campos = [item.responsavel, item.setor, item.observacoes]
-    .map((valor) => (valor || '').trim().toLowerCase())
+  return item.status === 'EM_ESTOQUE'
+}
 
-  if (!campos[0]) return true
+type UnidadeProduto = {
+  id: string
+  etiqueta: string
+  status: string
+  localAtual?: string | null
+  setorAtual?: string | null
+}
 
-  return campos.some((campo) => PALAVRAS_ESTOQUE.some((palavra) => campo.includes(palavra)))
+type ProdutoConsulta = {
+  id: string
+  nome: string
+  observacoes?: string | null
+  unidades: UnidadeProduto[]
 }
 
 export default function ConsultaProdutosPage() {
@@ -38,14 +47,31 @@ export default function ConsultaProdutosPage() {
   useEffect(() => {
     const carregar = async () => {
       try {
-        const res = await fetch('/api/inventario', { cache: 'no-store' })
+        const res = await fetch('/api/produtos', { cache: 'no-store' })
         const data = await res.json()
         if (!res.ok) {
           setItens([])
           return
         }
+        const itensMapeados: ItemInventario[] = (Array.isArray(data) ? data : [])
+          .flatMap((produto: ProdutoConsulta) => produto.unidades.map((unidade) => {
+            const responsavel = unidade.localAtual?.trim() || ''
+            const emEstoque = responsavel.localeCompare('Estoque', 'pt-BR', { sensitivity: 'base' }) === 0
 
-        setItens(Array.isArray(data) ? data : [])
+            return {
+              id: unidade.id,
+              tipo: produto.nome,
+              etiqueta: unidade.etiqueta,
+              marca: '',
+              modelo: '',
+              numero: null,
+              observacoes: produto.observacoes ?? null,
+              responsavel: emEstoque ? '' : responsavel,
+              setor: unidade.setorAtual?.trim() || '',
+              status: emEstoque ? 'EM_ESTOQUE' : 'COM_RESPONSAVEL',
+            }
+          }))
+        setItens(itensMapeados)
       } finally {
         setLoading(false)
       }
