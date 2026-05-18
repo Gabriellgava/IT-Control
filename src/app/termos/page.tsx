@@ -214,7 +214,7 @@ export default function TermosPage() {
           {!responsavelAtivo ? (
             <p className="text-sm text-gray-500">Selecione uma pessoa para montar o termo.</p>
           ) : (
-            <article className="prose prose-sm dark:prose-invert max-w-none">
+            <article className="prose prose-sm max-w-none text-gray-900 dark:text-gray-100 prose-headings:text-gray-900 dark:prose-headings:text-gray-100 prose-strong:text-gray-900 dark:prose-strong:text-gray-100 prose-li:text-gray-800 dark:prose-li:text-gray-200">
               <p>
                 <strong>TERMO DE RESPONSABILIDADE DE ATIVOS DE TI</strong>
               </p>
@@ -259,10 +259,10 @@ export default function TermosPage() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 mt-10">
                 <div>
-                  <div className="border-t border-gray-400 pt-2 text-center text-xs">Assinatura do colaborador</div>
+                  <div className="border-t border-gray-400 dark:border-gray-500 pt-2 text-center text-xs text-gray-700 dark:text-gray-300">Assinatura do colaborador</div>
                 </div>
                 <div>
-                  <div className="border-t border-gray-400 pt-2 text-center text-xs">Assinatura da empresa</div>
+                  <div className="border-t border-gray-400 dark:border-gray-500 pt-2 text-center text-xs text-gray-700 dark:text-gray-300">Assinatura da empresa</div>
                 </div>
               </div>
             </article>

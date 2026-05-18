@@ -17,11 +17,15 @@ interface ItemInventario {
   setor: string
 }
 
-const estaEmEstoque = (item: ItemInventario) => {
-  const responsavel = (item.responsavel || '').toLowerCase()
-  const setor = (item.setor || '').toLowerCase()
+const PALAVRAS_ESTOQUE = ['estoque', 'almoxarifado', 'disponivel', 'disponível', 'sem responsavel', 'sem responsável']
 
-  return !(item.responsavel || '').trim() || responsavel.includes('estoque') || setor.includes('estoque')
+const estaEmEstoque = (item: ItemInventario) => {
+  const campos = [item.responsavel, item.setor, item.observacoes]
+    .map((valor) => (valor || '').trim().toLowerCase())
+
+  if (!campos[0]) return true
+
+  return campos.some((campo) => PALAVRAS_ESTOQUE.some((palavra) => campo.includes(palavra)))
 }
 
 export default function ConsultaProdutosPage() {
