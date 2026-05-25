@@ -24,6 +24,11 @@ interface ResponsavelAgrupado {
   setores: string[]
   equipamentos: InventarioItem[]
 }
+interface Funcionario {
+  id: string
+  nome: string
+  email?: string | null
+}
 
 const RESPONSABILIDADES_PADRAO = [
   'Utilizar os equipamentos exclusivamente para atividades profissionais autorizadas.',
@@ -51,6 +56,10 @@ export default function TermosPage() {
   const [dataEntrega, setDataEntrega] = useState(hojeISO)
   const [dataDevolucao, setDataDevolucao] = useState('')
   const [observacoesTermo, setObservacoesTermo] = useState('')
+  const [funcionarios, setFuncionarios] = useState<Funcionario[]>([])
+  const [emailAssinatura, setEmailAssinatura] = useState('')
+  const [enviando, setEnviando] = useState(false)
+  const [statusEnvio, setStatusEnvio] = useState('')
 
   useEffect(() => {
     const carregar = async () => {
@@ -60,6 +69,9 @@ export default function TermosPage() {
         if (!res.ok) throw new Error('Falha ao buscar itens de inventário')
         const data = (await res.json()) as InventarioItem[]
         setItens(data)
+        const resFuncionarios = await fetch('/api/funcionarios')
+        const dataFuncionarios = (await resFuncionarios.json()) as Funcionario[]
+        setFuncionarios(Array.isArray(dataFuncionarios) ? dataFuncionarios : [])
 
         const primeiroResponsavel = data[0]?.responsavel
         if (primeiroResponsavel) setResponsavelSelecionado(primeiroResponsavel)
@@ -113,6 +125,43 @@ export default function TermosPage() {
     () => responsaveisAgrupados.find((resp) => resp.nome === responsavelSelecionado) ?? null,
     [responsaveisAgrupados, responsavelSelecionado]
   )
+  const funcionarioAtivo = useMemo(
+    () => funcionarios.find((f) => f.nome.trim().toLowerCase() === responsavelSelecionado.trim().toLowerCase()) ?? null,
+    [funcionarios, responsavelSelecionado]
+  )
+  useEffect(() => {
+    setEmailAssinatura(funcionarioAtivo?.email ?? '')
+  }, [funcionarioAtivo])
+
+  const enviarParaAssinatura = async () => {
+    if (!responsavelAtivo || !funcionarioAtivo?.id) return setStatusEnvio('Não foi possível localizar o funcionário cadastrado.')
+    if (!emailAssinatura.trim()) return setStatusEnvio('Informe o e-mail do funcionário para envio do link.')
+    try {
+      setEnviando(true)
+      setStatusEnvio('')
+      const conteudoHtml = `Termo gerado para ${responsavelAtivo.nome}.`
+      const criar = await fetch('/api/termos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ titulo: 'Termo de Responsabilidade de Ativos de TI', conteudoHtml, funcionarioId: funcionarioAtivo.id, validadeHoras: 72 }),
+      })
+      const criado = await criar.json()
+      if (!criar.ok) throw new Error(criado.error || 'Erro ao criar termo')
+      const link = `${window.location.origin}/assinatura/${criado.tokenAssinatura}`
+      const envio = await fetch(`/api/termos/${criado.termoId}/enviar`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: emailAssinatura.trim(), link }),
+      })
+      const enviado = await envio.json()
+      if (!envio.ok) throw new Error(enviado.error || 'Erro ao enviar e-mail')
+      setStatusEnvio(`Link enviado para ${emailAssinatura.trim()}.`)
+    } catch (e) {
+      setStatusEnvio(e instanceof Error ? e.message : 'Erro ao enviar')
+    } finally {
+      setEnviando(false)
+    }
+  }
 
   const imprimir = () => {
     window.print()
@@ -201,6 +250,12 @@ export default function TermosPage() {
                 className="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="Ex.: colaborador recebeu também mochila e carregadores extras."
               />
+            </div>
+            <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-3 space-y-2">
+              <p className="text-sm font-semibold text-gray-900 dark:text-white">3) Enviar para assinatura</p>
+              <Input label="E-mail do funcionário" type="email" value={emailAssinatura} onChange={(e) => setEmailAssinatura(e.target.value)} placeholder="nome@empresa.com" />
+              <Button onClick={enviarParaAssinatura} disabled={!responsavelAtivo || enviando}>{enviando ? 'Enviando...' : 'Enviar para funcionário'}</Button>
+              {statusEnvio && <p className="text-xs text-gray-600 dark:text-gray-300">{statusEnvio}</p>}
             </div>
           </div>
         </section>

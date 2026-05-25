@@ -24,6 +24,7 @@ export async function POST(request: NextRequest) {
         nome: body.nome.trim(),
         setorId: body.setorId,
         ativo: body.ativo ?? true,
+        email: body.email?.trim() || null,
       },
       include: { setor: true },
     })
