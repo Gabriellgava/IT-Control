@@ -9,3 +9,25 @@ body { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; -webkit-font-smo
 .dark ::-webkit-scrollbar-thumb { background: #374151; }
 @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
 .animate-fade-in { animation: fadeIn 0.2s ease-out; }
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+
+  .termo-print-area,
+  .termo-print-area * {
+    visibility: visible;
+  }
+
+  .termo-print-area {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    border: none !important;
+    box-shadow: none !important;
+    background: white !important;
+  }
+}

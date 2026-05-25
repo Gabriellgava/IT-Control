@@ -14,7 +14,8 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     await prisma.termo.update({ where: { id: termo.id }, data: { status: 'ENVIADO', enviadoEm: new Date() } })
     await registrarAuditoria(termo.id, 'EMAIL_ASSINATURA_ENVIADO', { email: body.email, link: body.link })
     return NextResponse.json({ ok: true })
-  } catch {
-    return NextResponse.json({ error: 'Erro ao enviar email' }, { status: 500 })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Erro ao enviar email'
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }
