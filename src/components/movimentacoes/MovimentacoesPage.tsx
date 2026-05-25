@@ -2,7 +2,7 @@
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import Link from 'next/link'
 import { useSession } from 'next-auth/react'
-import { ArrowDownCircle, ArrowUpCircle, Download, XCircle, Trash2 } from 'lucide-react'
+import { ArrowDownCircle, ArrowUpCircle, Download, FileText, XCircle, Trash2 } from 'lucide-react'
 import { Button, Badge, Table, Select, Modal, LoadingState, ErrorState, PageHeader } from '@/components/ui'
 import { formatMoeda, formatDataHora, exportarCSV } from '@/lib/utils'
 import type { Movimentacao, Produto } from '@/types'
@@ -78,6 +78,81 @@ export function MovimentacoesPage() {
     Observações: m.observacoes ?? '',
   })), 'movimentacoes-ti')
 
+
+
+  const gerarRelatorioPDF = () => {
+    const registros = movimentacoesFiltradas.filter((m) => !m.cancelado)
+
+    const filtrosAtivos = [
+      filtroTipo ? `Tipo: ${filtroTipo}` : 'Tipo: Todos',
+      filtroProduto
+        ? `Produto: ${produtos.find((p) => p.id === filtroProduto)?.nome ?? 'Selecionado'}`
+        : 'Produto: Todos',
+      filtroResponsavel.trim() ? `Responsável: ${filtroResponsavel.trim()}` : 'Responsável: Todos',
+      filtroDataInicio ? `Período de: ${filtroDataInicio}` : 'Período de: Início',
+      filtroDataFim ? `Período até: ${filtroDataFim}` : 'Período até: Hoje',
+    ]
+
+    const linhas = registros.map((m) => `
+      <tr>
+        <td>${m.tipo === 'ENTRADA' ? 'Entrada' : m.subtipo === 'DESCARTE' ? 'Descarte' : 'Saída'}</td>
+        <td>${m.unidade?.produto?.nome ?? '—'} / ${m.unidade?.etiqueta ?? '—'}</td>
+        <td>${formatMoeda(m.valorUnitario)}</td>
+        <td>${m.tipo === 'ENTRADA' ? (m.fornecedor?.nome ?? '—') : m.subtipo === 'DESCARTE' ? 'Descartado' : (m.setor?.nome ?? '—')}</td>
+        <td>${m.responsavel ?? m.usuario?.nome ?? '—'}</td>
+        <td>${formatDataHora(m.data)}</td>
+      </tr>
+    `).join('')
+
+    const html = `
+      <!DOCTYPE html>
+      <html lang="pt-BR">
+      <head>
+        <meta charset="UTF-8" />
+        <title>Relatório de Movimentações</title>
+        <style>
+          body { font-family: Arial, sans-serif; padding: 24px; color: #1f2937; }
+          h1 { margin: 0 0 4px; font-size: 20px; }
+          p { margin: 0 0 12px; color: #4b5563; }
+          .filtros { margin-bottom: 16px; font-size: 12px; display: grid; gap: 4px; }
+          table { width: 100%; border-collapse: collapse; font-size: 12px; }
+          th, td { border: 1px solid #d1d5db; padding: 8px; text-align: left; }
+          th { background: #f3f4f6; }
+          .rodape { margin-top: 12px; font-size: 11px; color: #6b7280; }
+          @media print { body { padding: 10px; } }
+        </style>
+      </head>
+      <body>
+        <h1>Relatório de Movimentações</h1>
+        <p>Total de registros: ${registros.length}</p>
+        <div class="filtros">${filtrosAtivos.map((f) => `<span>${f}</span>`).join('')}</div>
+        <table>
+          <thead>
+            <tr>
+              <th>Tipo</th>
+              <th>Produto / Etiqueta</th>
+              <th>Valor Unit.</th>
+              <th>Destino</th>
+              <th>Responsável</th>
+              <th>Data</th>
+            </tr>
+          </thead>
+          <tbody>${linhas || '<tr><td colspan="6">Nenhum registro para os filtros selecionados.</td></tr>'}</tbody>
+        </table>
+        <div class="rodape">Gerado em ${formatDataHora(new Date())}</div>
+      </body>
+      </html>
+    `
+
+    const printWindow = window.open('', '_blank', 'width=1200,height=900')
+    if (!printWindow) return
+
+    printWindow.document.write(html)
+    printWindow.document.close()
+    printWindow.focus()
+    printWindow.print()
+  }
+
   const movimentacoesFiltradas = useMemo(() => {
     const responsavelBusca = filtroResponsavel.trim().toLowerCase()
 
@@ -138,6 +213,7 @@ export function MovimentacoesPage() {
         actions={
           <>
             <Button variant="secondary" size="sm" icon={<Download className="w-4 h-4" />} onClick={exportar}>CSV</Button>
+            <Button variant="secondary" size="sm" icon={<FileText className="w-4 h-4" />} onClick={gerarRelatorioPDF}>PDF</Button>
             <Link href="/movimentacoes/entrada"><Button size="sm" icon={<ArrowDownCircle className="w-4 h-4" />} variant="secondary">Entrada</Button></Link>
             <Link href="/movimentacoes/saida"><Button size="sm" icon={<ArrowUpCircle className="w-4 h-4" />}>Saída</Button></Link>
           </>
