@@ -38,7 +38,17 @@ export async function POST(request: NextRequest) {
 
     const funcionarioFolderId = await ensureFuncionarioFolder(funcionario.nome)
     const termoFolderId = await ensureTermoFolder(funcionarioFolderId, termo.id)
-    const pdf = await buildTermoPdf({ titulo: body.titulo, texto: body.conteudoHtml })
+    const pdf = await buildTermoPdf({
+      titulo: body.titulo,
+      texto: body.conteudoHtml,
+      empresa: body.empresa,
+      colaborador: funcionario.nome,
+      setores: Array.isArray(body.setores) ? body.setores : [],
+      dataEntrega: body.dataEntrega,
+      dataDevolucao: body.dataDevolucao,
+      observacoes: body.observacoes,
+      itens: Array.isArray(body.itens) ? body.itens : [],
+    })
     const original = await uploadPdf(termoFolderId, buildFileName('original', termo.id, funcionario.nome), pdf)
 
     await prisma.termo.update({
@@ -58,7 +68,8 @@ export async function POST(request: NextRequest) {
     )
 
     return NextResponse.json({ termoId: termo.id, tokenAssinatura: token }, { status: 201 })
-  } catch {
-    return NextResponse.json({ error: 'Erro ao criar termo' }, { status: 500 })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Erro ao criar termo'
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }
