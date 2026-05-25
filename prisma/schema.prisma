@@ -104,6 +104,7 @@ model Funcionario {
   setorId   String   @map("setor_id")
   setor     Setor    @relation(fields: [setorId], references: [id])
   ativo     Boolean  @default(true)
+  email     String?
   criadoEm  DateTime @default(now()) @map("criado_em")
   termos     Termo[]
 

@@ -7,7 +7,7 @@ import { Button, Modal, Input, Select, Table, Badge } from '@/components/ui'
 import { Plus, Edit2, Trash2, Check, X } from 'lucide-react'
 
 interface Setor { id: string; nome: string }
-interface Funcionario { id: string; nome: string; setorId: string; setor: Setor; ativo: boolean; criadoEm: string }
+interface Funcionario { id: string; nome: string; email?: string | null; setorId: string; setor: Setor; ativo: boolean; criadoEm: string }
 
 export default function AdminFuncionariosPage() {
   const { data: session } = useSession()
@@ -20,7 +20,7 @@ export default function AdminFuncionariosPage() {
   const [deletandoId, setDeletandoId] = useState<string | null>(null)
   const [salvando, setSalvando] = useState(false)
   const [erro, setErro] = useState('')
-  const [form, setForm] = useState({ nome: '', setorId: '', ativo: true })
+  const [form, setForm] = useState({ nome: '', email: '', setorId: '', ativo: true })
 
   useEffect(() => {
     if (session && session.user.perfil !== 'admin') router.push('/dashboard')
@@ -34,14 +34,14 @@ export default function AdminFuncionariosPage() {
   const abrirNovo = () => {
     setEditando(null)
     setErro('')
-    setForm({ nome: '', setorId: '', ativo: true })
+    setForm({ nome: '', email: '', setorId: '', ativo: true })
     setModal(true)
   }
 
   const abrirEditar = (f: Funcionario) => {
     setEditando(f)
     setErro('')
-    setForm({ nome: f.nome, setorId: f.setorId, ativo: f.ativo })
+    setForm({ nome: f.nome, email: f.email ?? '', setorId: f.setorId, ativo: f.ativo })
     setModal(true)
   }
 
@@ -53,7 +53,7 @@ export default function AdminFuncionariosPage() {
     const res = await fetch(editando ? `/api/funcionarios/${editando.id}` : '/api/funcionarios', {
       method: editando ? 'PUT' : 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ nome: form.nome.trim(), setorId: form.setorId, ativo: form.ativo }),
+      body: JSON.stringify({ nome: form.nome.trim(), email: form.email.trim(), setorId: form.setorId, ativo: form.ativo }),
     })
 
     if (!res.ok) {
@@ -88,10 +88,11 @@ export default function AdminFuncionariosPage() {
           <Button icon={<Plus className="w-4 h-4" />} onClick={abrirNovo}>Novo Funcionário</Button>
         </div>
 
-        <Table headers={['Nome Completo', 'Setor', 'Status', 'Ações']} empty={funcionarios.length === 0}>
+        <Table headers={['Nome Completo', 'E-mail', 'Setor', 'Status', 'Ações']} empty={funcionarios.length === 0}>
           {funcionarios.map(f => (
             <tr key={f.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
               <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">{f.nome}</td>
+              <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">{f.email ?? '—'}</td>
               <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">{f.setor?.nome ?? '—'}</td>
               <td className="px-4 py-3">{f.ativo ? <Badge variant="success"><Check className="w-3 h-3 mr-1" />Ativo</Badge> : <Badge variant="danger"><X className="w-3 h-3 mr-1" />Inativo</Badge>}</td>
               <td className="px-4 py-3">
@@ -108,6 +109,7 @@ export default function AdminFuncionariosPage() {
           <div className="space-y-4">
             {erro && <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-sm text-red-600">{erro}</div>}
             <Input label="Nome Completo *" value={form.nome} onChange={e => setForm(v => ({ ...v, nome: e.target.value }))} placeholder="Nome completo do funcionário" />
+            <Input label="E-mail do funcionário" type="email" value={form.email} onChange={e => setForm(v => ({ ...v, email: e.target.value }))} placeholder="nome@empresa.com" />
             <Select label="Setor *" value={form.setorId} onChange={e => setForm(v => ({ ...v, setorId: e.target.value }))}>
               <option value="">Selecionar setor</option>
               {setores.map(s => <option key={s.id} value={s.id}>{s.nome}</option>)}

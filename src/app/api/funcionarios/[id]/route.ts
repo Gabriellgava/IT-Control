@@ -18,6 +18,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
         nome: body.nome.trim(),
         setorId: body.setorId,
         ativo: body.ativo ?? true,
+        email: body.email?.trim() || null,
       },
       include: { setor: true },
     })
