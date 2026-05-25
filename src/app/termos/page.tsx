@@ -139,7 +139,32 @@ export default function TermosPage() {
     try {
       setEnviando(true)
       setStatusEnvio('')
-      const conteudoHtml = `Termo gerado para ${responsavelAtivo.nome}.`
+      const itensHtml = responsavelAtivo.equipamentos
+        .map(
+          (equipamento) =>
+            `<tr><td style="padding:8px;border:1px solid #e5e7eb;">${equipamento.tipo}</td><td style="padding:8px;border:1px solid #e5e7eb;">${equipamento.etiqueta}</td></tr>`
+        )
+        .join('')
+
+      const conteudoHtml = `
+        <section style="font-family:Inter,Arial,sans-serif; color:#111827; line-height:1.6;">
+          <h1 style="margin:0 0 8px;font-size:24px;">Termo de Responsabilidade de Equipamentos de TI</h1>
+          <p style="margin:0 0 18px;font-size:14px;color:#4b5563;">${empresa || 'Empresa não informada'} • Emissão em ${formatarDataBR(dataEntrega)}</p>
+          <p style="margin:0 0 14px;">Pelo presente termo, a empresa <strong>${empresa || '____________________'}</strong> entrega ao colaborador <strong>${responsavelAtivo.nome}</strong> os equipamentos listados abaixo, comprometendo-se o colaborador a zelar pelo uso adequado, guarda e conservação dos itens recebidos.</p>
+          <table style="width:100%;border-collapse:collapse;margin:14px 0 16px;font-size:14px;">
+            <thead>
+              <tr style="background:#f3f4f6;">
+                <th style="text-align:left;padding:8px;border:1px solid #e5e7eb;">Tipo do equipamento</th>
+                <th style="text-align:left;padding:8px;border:1px solid #e5e7eb;">Etiqueta patrimonial</th>
+              </tr>
+            </thead>
+            <tbody>${itensHtml}</tbody>
+          </table>
+          <p style="margin:0 0 10px;"><strong>Responsabilidade:</strong> O colaborador declara estar ciente de que os equipamentos acima são de propriedade da empresa e se responsabiliza por uso profissional, conservação e devolução quando solicitado.</p>
+          <p style="margin:0 0 10px;">Data prevista de devolução: <strong>${formatarDataBR(dataDevolucao)}</strong></p>
+          ${observacoesTermo ? `<p style="margin:0 0 10px;"><strong>Observações:</strong> ${observacoesTermo}</p>` : ''}
+        </section>
+      `.trim()
       const criar = await fetch('/api/termos', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -169,7 +194,7 @@ export default function TermosPage() {
 
   return (
     <AppLayout>
-      <div className="space-y-6">
+      <div className="space-y-6 termos-page">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Termo de Responsabilidade</h1>
@@ -260,7 +285,7 @@ export default function TermosPage() {
           </div>
         </section>
 
-        <section className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-4 sm:p-6 print:border-none print:shadow-none">
+        <section className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-4 sm:p-6 print:border-none print:shadow-none termo-print-area">
           <div className="flex items-center gap-2 mb-4">
             <FileText className="w-5 h-5 text-blue-600" />
             <h2 className="text-lg font-bold text-gray-900 dark:text-white">Pré-visualização do termo</h2>
@@ -283,7 +308,7 @@ export default function TermosPage() {
               <ul>
                 {responsavelAtivo.equipamentos.map((equipamento) => (
                   <li key={equipamento.id}>
-                    {equipamento.tipo} • {equipamento.marca} {equipamento.modelo} • Etiqueta: {equipamento.etiqueta} • Setor: {equipamento.setor}
+                    {equipamento.tipo} • Etiqueta: {equipamento.etiqueta}
                   </li>
                 ))}
               </ul>
