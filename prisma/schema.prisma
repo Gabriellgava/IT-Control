@@ -58,6 +58,7 @@ model Usuario {
   accounts      Account[]
   sessions      Session[]
   movimentacoes Movimentacao[]
+  termosCriados Termo[]
 
   @@map("usuarios")
 }
@@ -104,6 +105,7 @@ model Funcionario {
   setor     Setor    @relation(fields: [setorId], references: [id])
   ativo     Boolean  @default(true)
   criadoEm  DateTime @default(now()) @map("criado_em")
+  termos     Termo[]
 
   @@unique([nome, setorId])
   @@map("funcionarios")
@@ -179,4 +181,61 @@ model Inventario {
   atualizadoEm DateTime @updatedAt @map("atualizado_em")
 
   @@map("inventario")
+}
+
+
+enum TermoStatus {
+  RASCUNHO
+  ENVIADO
+  ASSINADO
+  EXPIRADO
+  CANCELADO
+}
+
+model Termo {
+  id                 String             @id @default(cuid())
+  titulo             String
+  conteudoHtml       String             @map("conteudo_html")
+  status             TermoStatus        @default(RASCUNHO)
+  funcionarioId      String             @map("funcionario_id")
+  funcionario        Funcionario        @relation(fields: [funcionarioId], references: [id])
+  criadoPorId        String?            @map("criado_por_id")
+  criadoPor          Usuario?           @relation(fields: [criadoPorId], references: [id])
+  assinaturaTokenHash String?           @unique @map("assinatura_token_hash")
+  tokenExpiraEm      DateTime?          @map("token_expira_em")
+  enviadoEm          DateTime?          @map("enviado_em")
+  assinadoEm         DateTime?          @map("assinado_em")
+  assinanteNome      String?            @map("assinante_nome")
+  assinaturaTipo     String?            @map("assinatura_tipo")
+  assinaturaImagemDataUrl String?       @map("assinatura_imagem_data_url")
+  assinaturaTexto    String?            @map("assinatura_texto")
+  assinaturaIp       String?            @map("assinatura_ip")
+  assinaturaUserAgent String?           @map("assinatura_user_agent")
+  driveFolderId      String?            @map("drive_folder_id")
+  drivePdfOriginalFileId String?        @map("drive_pdf_original_file_id")
+  drivePdfOriginalLink String?          @map("drive_pdf_original_link")
+  drivePdfAssinadoFileId String?        @map("drive_pdf_assinado_file_id")
+  drivePdfAssinadoLink String?          @map("drive_pdf_assinado_link")
+  criadoEm           DateTime           @default(now()) @map("criado_em")
+  atualizadoEm       DateTime           @updatedAt @map("atualizado_em")
+  auditorias         TermoAuditoria[]
+
+  @@index([funcionarioId])
+  @@index([status])
+  @@map("termos")
+}
+
+model TermoAuditoria {
+  id          String   @id @default(cuid())
+  termoId     String   @map("termo_id")
+  termo       Termo    @relation(fields: [termoId], references: [id], onDelete: Cascade)
+  evento      String
+  detalhes    Json?
+  ip          String?
+  userAgent   String?  @map("user_agent")
+  atorId      String?  @map("ator_id")
+  criadoEm    DateTime @default(now()) @map("criado_em")
+
+  @@index([termoId, criadoEm])
+  @@map("termos_auditoria")
 }

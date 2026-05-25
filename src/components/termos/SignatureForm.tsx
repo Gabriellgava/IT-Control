@@ -1,0 +1,47 @@
+'use client'
+
+import SignatureCanvas from 'react-signature-canvas'
+import { useRef, useState } from 'react'
+import { Button, Input } from '@/components/ui'
+
+export function SignatureForm({ token }: { token: string }) {
+  const ref = useRef<SignatureCanvas | null>(null)
+  const [mode, setMode] = useState<'drawn' | 'typed'>('drawn')
+  const [typedName, setTypedName] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [message, setMessage] = useState('')
+
+  const submit = async () => {
+    setSaving(true)
+    setMessage('')
+    const payload = mode === 'drawn'
+      ? { signatureType: 'drawn', signatureDataUrl: ref.current?.toDataURL('image/png') }
+      : { signatureType: 'typed', typedName }
+
+    const res = await fetch(`/api/assinatura/${token}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+    const data = await res.json()
+    setMessage(res.ok ? 'Assinado com sucesso.' : data.error || 'Erro ao assinar')
+    setSaving(false)
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex gap-2">
+        <Button variant={mode === 'drawn' ? 'primary' : 'secondary'} onClick={() => setMode('drawn')}>Desenhar</Button>
+        <Button variant={mode === 'typed' ? 'primary' : 'secondary'} onClick={() => setMode('typed')}>Digitar nome</Button>
+      </div>
+
+      {mode === 'drawn' ? (
+        <div className="border rounded-lg p-2 bg-white">
+          <SignatureCanvas ref={ref} canvasProps={{ className: 'w-full h-44' }} />
+          <Button variant="secondary" onClick={() => ref.current?.clear()}>Limpar</Button>
+        </div>
+      ) : (
+        <Input label="Nome completo" value={typedName} onChange={(e) => setTypedName(e.target.value)} />
+      )}
+
+      <Button onClick={submit} disabled={saving || (mode === 'typed' && !typedName.trim())}>Confirmar assinatura</Button>
+      {message && <p className="text-sm">{message}</p>}
+    </div>
+  )
+}
