@@ -26,7 +26,24 @@ export default function AdminFuncionariosPage() {
     if (session && session.user.perfil !== 'admin') router.push('/dashboard')
   }, [session, router])
 
-  const buscar = () => fetch('/api/funcionarios').then(r => r.json()).then(d => { setFuncionarios(d); setLoading(false) })
+  const buscar = async () => {
+    try {
+      const res = await fetch('/api/funcionarios')
+      const d = await res.json()
+      if (!res.ok) {
+        setErro(d?.error || 'Erro ao carregar funcionários')
+        setFuncionarios([])
+        return
+      }
+      setFuncionarios(Array.isArray(d) ? d : [])
+      setErro('')
+    } catch {
+      setErro('Erro ao carregar funcionários')
+      setFuncionarios([])
+    } finally {
+      setLoading(false)
+    }
+  }
   const buscarSetores = () => fetch('/api/setores').then(r => r.json()).then(setSetores)
 
   useEffect(() => { buscar(); buscarSetores() }, [])
@@ -104,6 +121,7 @@ export default function AdminFuncionariosPage() {
             </tr>
           ))}
         </Table>
+        {erro && <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-sm text-red-600">{erro}</div>}
 
         <Modal open={modal} onClose={() => setModal(false)} title={editando ? 'Editar Funcionário' : 'Novo Funcionário'}>
           <div className="space-y-4">
