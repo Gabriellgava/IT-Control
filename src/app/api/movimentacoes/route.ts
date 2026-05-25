@@ -25,7 +25,8 @@ export async function GET(request: NextRequest) {
     const tipo = searchParams.get('tipo') || ''
     const subtipo = searchParams.get('subtipo') || ''
     const produtoId = searchParams.get('produtoId') || ''
-    const limite = parseInt(searchParams.get('limite') || '100')
+    const limiteParam = searchParams.get('limite')
+    const limite = limiteParam ? parseInt(limiteParam, 10) : null
 
     const movimentacoes = await prisma.movimentacao.findMany({
       where: {
@@ -43,7 +44,7 @@ export async function GET(request: NextRequest) {
         usuario: true,
       },
       orderBy: { data: 'desc' },
-      take: limite,
+      ...(limite && Number.isFinite(limite) && limite > 0 ? { take: limite } : {}),
     })
 
     return NextResponse.json(movimentacoes)
