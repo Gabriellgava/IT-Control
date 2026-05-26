@@ -17,7 +17,7 @@ export async function enviarEmailAssinatura(params: { to: string; nome: string; 
   await transporter.sendMail({
     from: process.env.SMTP_FROM,
     to: params.to,
-    subject: `Assinatura pendente: ${params.titulo}`,
-    html: `<p>Olá ${params.nome},</p><p>Assine o termo no link seguro:</p><p><a href="${params.link}">${params.link}</a></p>`,
+    subject: `Seu termo foi gerado: ${params.titulo}`,
+    html: `<p>Olá ${params.nome},</p><p>Seu termo foi gerado.</p><p>Acesse o link abaixo para visualizar e assinar:</p><p><a href="${params.link}">${params.link}</a></p>`,
   })
 }
