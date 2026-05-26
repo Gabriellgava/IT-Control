@@ -3,6 +3,7 @@
 import SignatureCanvas from 'react-signature-canvas'
 import { useRef, useState } from 'react'
 import { Button, Input } from '@/components/ui'
+import { fetchJsonOrThrow } from '@/lib/http/fetch-json'
 
 export function SignatureForm({ token }: { token: string }) {
   const ref = useRef<SignatureCanvas | null>(null)
@@ -19,10 +20,20 @@ export function SignatureForm({ token }: { token: string }) {
       ? { signatureType: 'drawn', signatureDataUrl: ref.current?.toDataURL('image/png'), acceptedTerms }
       : { signatureType: 'typed', typedName, acceptedTerms }
 
-    const res = await fetch(`/api/assinatura/${token}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
-    const data = await res.json()
-    setMessage(res.ok ? 'Assinado com sucesso.' : data.error || 'Erro ao assinar')
-    setSaving(false)
+    try {
+      await fetchJsonOrThrow<{ ok: boolean }>(`/api/assinatura/${token}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        context: 'signature-form-submit',
+      })
+      setMessage('Assinado com sucesso.')
+    } catch (error) {
+      console.error('[signature-form] erro ao assinar termo', { token, mode, error })
+      setMessage(error instanceof Error ? error.message : 'Erro ao assinar')
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (

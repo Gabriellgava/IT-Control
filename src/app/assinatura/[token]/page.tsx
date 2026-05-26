@@ -1,10 +1,18 @@
 import { SignatureForm } from '@/components/termos/SignatureForm'
+import { fetchJsonOrThrow, getAppBaseUrl } from '@/lib/http/fetch-json'
 
 async function getTermo(token: string) {
-  const base = process.env.NEXTAUTH_URL || 'http://localhost:3000'
-  const res = await fetch(`${base}/api/assinatura/${token}`, { cache: 'no-store' })
-  if (!res.ok) return null
-  return res.json()
+  const base = getAppBaseUrl()
+  const url = `${base}/api/assinatura/${token}`
+  try {
+    return await fetchJsonOrThrow<{ titulo: string; funcionario: string; conteudoHtml: string }>(url, {
+      cache: 'no-store',
+      context: 'assinatura-page-get-termo',
+    })
+  } catch (error) {
+    console.error('[assinatura-page] erro ao carregar termo', { token, url, error })
+    return null
+  }
 }
 
 export default async function AssinaturaPage({ params }: { params: { token: string } }) {

@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { Badge, Button, Input } from '@/components/ui'
 import { FileText, Printer, Search } from 'lucide-react'
+import { fetchJsonOrThrow } from '@/lib/http/fetch-json'
 
 interface InventarioItem {
   id: string
@@ -65,12 +66,13 @@ export default function TermosPage() {
     const carregar = async () => {
       try {
         setLoading(true)
-        const res = await fetch('/api/inventario')
-        if (!res.ok) throw new Error('Falha ao buscar itens de inventário')
-        const data = (await res.json()) as InventarioItem[]
+        const data = await fetchJsonOrThrow<InventarioItem[]>('/api/inventario', {
+          context: 'termos-carregar-inventario',
+        })
         setItens(data)
-        const resFuncionarios = await fetch('/api/funcionarios')
-        const dataFuncionarios = (await resFuncionarios.json()) as Funcionario[]
+        const dataFuncionarios = await fetchJsonOrThrow<Funcionario[]>('/api/funcionarios', {
+          context: 'termos-carregar-funcionarios',
+        })
         setFuncionarios(Array.isArray(dataFuncionarios) ? dataFuncionarios : [])
 
         const primeiroResponsavel = data[0]?.responsavel
@@ -183,23 +185,27 @@ export default function TermosPage() {
         observacoes: observacoesTermo,
         itens: itensPdf,
       }
-      const criar = await fetch('/api/termos', {
+      const criado = await fetchJsonOrThrow<{ termoId: string; tokenAssinatura: string }>('/api/termos', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(criarPayload),
+        context: 'termos-criar-termo',
       })
-      const criado = await criar.json()
-      if (!criar.ok) throw new Error(criado.error || 'Erro ao criar termo')
       const link = `${window.location.origin}/assinatura/${criado.tokenAssinatura}`
-      const envio = await fetch(`/api/termos/${criado.termoId}/enviar`, {
+      await fetchJsonOrThrow<{ ok: boolean }>(`/api/termos/${criado.termoId}/enviar`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: emailAssinatura.trim(), link }),
+        context: 'termos-enviar-email-assinatura',
       })
-      const enviado = await envio.json()
-      if (!envio.ok) throw new Error(enviado.error || 'Erro ao enviar e-mail')
       setStatusEnvio(`Link enviado para ${emailAssinatura.trim()}.`)
     } catch (e) {
+      console.error('[termos-page] falha no fluxo de assinatura', {
+        responsavel: responsavelAtivo?.nome,
+        funcionarioId: funcionarioAtivo?.id,
+        email: emailAssinatura,
+        error: e,
+      })
       setStatusEnvio(e instanceof Error ? e.message : 'Erro ao enviar')
     } finally {
       setEnviando(false)
