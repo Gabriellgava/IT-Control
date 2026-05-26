@@ -17,15 +17,87 @@ async function renderPdfFromHtml(html: string) {
   }
 }
 
-export async function GET(_: NextRequest, { params }: { params: { token: string } }) {
-  const termo = await prisma.termo.findUnique({ where: { token: params.token }, include: { funcionario: true } })
-  if (!termo) return NextResponse.json({ error: 'Link inválido' }, { status: 404 })
-
-  if (termo.status === 'PENDENTE') {
-    await prisma.termo.update({ where: { id: termo.id }, data: { status: 'VISUALIZADO' } })
+type RouteContext = {
+  params: {
+    token?: string
   }
+}
 
-  return NextResponse.json({ id: termo.id, titulo: termo.titulo, conteudoHtml: termo.conteudoHtml, funcionario: termo.funcionario.nome, status: termo.status })
+function logAssinatura(message: string, payload?: unknown) {
+  console.log(`[api/assinatura/[token]] ${message}`, payload ?? '')
+}
+
+function errorResponse(message: string, status: number, details?: string) {
+  return NextResponse.json(
+    {
+      ok: false,
+      error: message,
+      ...(details ? { details } : {})
+    },
+    { status }
+  )
+}
+
+export async function GET(_: NextRequest, { params }: RouteContext) {
+  try {
+    const token = params?.token?.trim()
+    logAssinatura('Token recebido no GET', { token })
+
+    if (!token) {
+      return errorResponse('Token inválido', 400)
+    }
+
+    const termo = await prisma.termo.findUnique({
+      where: { token },
+      include: { funcionario: true, criadoPor: true, auditorias: { take: 5, orderBy: { criadoEm: 'desc' } } }
+    })
+
+    logAssinatura('Resultado Prisma GET', {
+      encontrado: !!termo,
+      termoId: termo?.id,
+      status: termo?.status
+    })
+
+    if (!termo) {
+      return errorResponse('Link inválido', 404)
+    }
+
+    if (termo.status === 'PENDENTE') {
+      await prisma.termo.update({ where: { id: termo.id }, data: { status: 'VISUALIZADO' } })
+    }
+
+    return NextResponse.json({
+      ok: true,
+      data: {
+        id: termo.id,
+        titulo: termo.titulo,
+        conteudoHtml: termo.conteudoHtml,
+        status: termo.status === 'PENDENTE' ? 'VISUALIZADO' : termo.status,
+        funcionario: {
+          id: termo.funcionario.id,
+          nome: termo.funcionario.nome,
+          email: termo.funcionario.email
+        },
+        criadoPor: termo.criadoPor
+          ? {
+              id: termo.criadoPor.id,
+              nome: termo.criadoPor.nome,
+              email: termo.criadoPor.email
+            }
+          : null,
+        signedAt: termo.signedAt?.toISOString() ?? null,
+        updatedAt: termo.atualizadoEm.toISOString(),
+        auditTrailCount: termo.auditorias.length
+      }
+    })
+  } catch (error) {
+    console.error('[api/assinatura/[token]] Erro interno no GET', {
+      error,
+      stack: error instanceof Error ? error.stack : undefined
+    })
+
+    return errorResponse('Erro interno ao buscar assinatura', 500, error instanceof Error ? error.message : 'Erro desconhecido')
+  }
 }
 
 export async function POST(request: NextRequest, { params }: { params: { token: string } }) {
