@@ -274,11 +274,19 @@ export async function POST(request: NextRequest, { params }: { params: { token: 
     logAssinatura('POST prisma query termo.update assinatura', updateAssinaturaQuery)
     const updated = await prisma.termo.update(updateAssinaturaQuery)
     logAssinatura('POST resultado prisma termo.update assinatura', updated)
+    logAssinatura('POST assinatura persistida com status ASSINADO - iniciando integração Drive', {
+      termoId: termo.id,
+      status: updated.status,
+      signedAt,
+    })
 
     let driveFileId: string | null = null
 
     try {
       validateGoogleDriveEnv()
+      logAssinatura('POST upload drive - root folder configurada', {
+        rootFolderId: process.env.GOOGLE_DRIVE_TERMOS_ROOT_FOLDER_ID,
+      })
       logAssinatura('POST upload drive - iniciando geração do PDF', {
         termoId: termo.id,
         token,
@@ -305,15 +313,16 @@ export async function POST(request: NextRequest, { params }: { params: { token: 
 
       logAssinatura('POST upload drive - garantindo pasta do termo', {
         funcionarioFolderId,
-        termoCriadoEm: termo.criadoEm
+        termoDataAtual: signedAt
       })
-      const termoFolderId = await ensureTermoFolder(funcionarioFolderId, termo.criadoEm)
+      const termoFolderId = await ensureTermoFolder(funcionarioFolderId, signedAt)
 
       logAssinatura('POST upload drive - enviando PDF', {
         termoFolderId,
         fileName: `termo-assinado-${termo.id}.pdf`
       })
       const final = await uploadPdf(termoFolderId, `termo-assinado-${termo.id}.pdf`, pdf)
+      console.log('[DRIVE] upload concluído', { termoId: termo.id, folderId: termoFolderId, fileId: final.fileId })
       driveFileId = final.fileId
 
       const updateDriveQuery = {
