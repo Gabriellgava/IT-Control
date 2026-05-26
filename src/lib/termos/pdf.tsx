@@ -21,7 +21,7 @@ export interface BuildTermoPdfParams {
   texto: string
   empresa?: string
   colaborador?: string
-  colaboradorEmail?: string
+  colaboradorEmail?: string | null
   setores?: string[]
   dataEntrega?: string
   dataDevolucao?: string
