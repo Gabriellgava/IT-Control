@@ -2,7 +2,6 @@ import { Buffer } from 'node:buffer'
 import { createHash } from 'node:crypto'
 import {
   Document,
-  Font,
   Image,
   Page,
   StyleSheet,
@@ -33,7 +32,6 @@ export interface BuildTermoPdfParams {
   assinadoEm?: Date
 }
 
-Font.register({ family: 'Helvetica' })
 
 const styles = StyleSheet.create({
   page: { fontFamily: 'Helvetica', fontSize: 10, paddingTop: 28, paddingHorizontal: 28, paddingBottom: 48, color: '#111827' },
