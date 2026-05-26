@@ -1,6 +1,6 @@
 import { Buffer } from 'node:buffer'
-import chromium from '@sparticuz/chromium'
-import puppeteer from 'puppeteer-core'
+
+export const runtime = 'nodejs'
 
 const PDF_TAG = '[pdf/generate-termo-pdf]'
 
@@ -10,6 +10,12 @@ export async function generateTermoPdf(html: string): Promise<Buffer> {
   if (!html || typeof html !== 'string') {
     throw new Error('HTML inválido para geração de PDF')
   }
+
+  // require() evita o bundle ESM do puppeteer-core no build do Next.js (App Router/Vercel)
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const chromium = require('@sparticuz/chromium') as typeof import('@sparticuz/chromium')
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const puppeteer = require('puppeteer-core') as typeof import('puppeteer-core')
 
   const browser = await puppeteer.launch({
     args: chromium.args,
