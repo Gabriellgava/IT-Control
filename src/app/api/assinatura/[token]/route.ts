@@ -300,6 +300,8 @@ export async function POST(request: NextRequest, { params }: { params: { token: 
         empresa: 'IT Control',
         colaborador: termo.funcionario.nome,
         colaboradorEmail: termo.funcionario.email,
+        colaboradorCpf: (termo.funcionario as { cpf?: string | null }).cpf ?? null,
+        colaboradorCargo: (termo.funcionario as { cargo?: string | null }).cargo ?? null,
         assinaturaTexto: signerName,
         assinaturaImagemDataUrl: signatureImageDataUrl,
         assinadoEm: signedAt,
