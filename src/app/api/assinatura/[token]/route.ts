@@ -3,6 +3,8 @@ import { prisma } from '@/lib/prisma'
 import { ensureFuncionarioFolder, ensureTermoFolder, uploadPdf } from '@/lib/termos/drive'
 import { registrarAuditoria } from '@/lib/termos/auditoria'
 
+const ROUTE_TAG = '[api/assinatura/[token]]'
+
 const getSignedHtml = (termo: { titulo: string; conteudoHtml: string; signerName?: string | null; signedAt?: Date | null }) => `<!doctype html><html><head><meta charset="utf-8"/><style>body{font-family:Arial,sans-serif;padding:32px;color:#111} .sign{margin-top:32px;padding-top:16px;border-top:1px solid #ddd;} table{width:100%;border-collapse:collapse} th,td{border:1px solid #e5e7eb;padding:6px;text-align:left}</style></head><body><h1>${termo.titulo}</h1>${termo.conteudoHtml}<div class="sign"><strong>Assinado eletronicamente por:</strong> ${termo.signerName ?? '-'}<br/>Data: ${termo.signedAt?.toISOString() ?? '-'}</div></body></html>`
 
 async function renderPdfFromHtml(html: string) {
@@ -11,7 +13,13 @@ async function renderPdfFromHtml(html: string) {
   try {
     const page = await browser.newPage()
     await page.setContent(html, { waitUntil: 'networkidle0' })
-    return Buffer.from(await page.pdf({ format: 'A4', printBackground: true, margin: { top: '20mm', right: '15mm', bottom: '20mm', left: '15mm' } }))
+    return Buffer.from(
+      await page.pdf({
+        format: 'A4',
+        printBackground: true,
+        margin: { top: '20mm', right: '15mm', bottom: '20mm', left: '15mm' }
+      })
+    )
   } finally {
     await browser.close()
   }
@@ -23,105 +31,204 @@ type RouteContext = {
   }
 }
 
-function logAssinatura(message: string, payload?: unknown) {
-  console.log(`[api/assinatura/[token]] ${message}`, payload ?? '')
+function safeSerialize(value: unknown): unknown {
+  return JSON.parse(
+    JSON.stringify(value, (_, currentValue: unknown) => {
+      if (typeof currentValue === 'bigint') {
+        return currentValue.toString()
+      }
+
+      if (currentValue instanceof Date) {
+        return currentValue.toISOString()
+      }
+
+      if (Buffer.isBuffer(currentValue)) {
+        return {
+          type: 'Buffer',
+          length: currentValue.length,
+          base64: currentValue.toString('base64')
+        }
+      }
+
+      if (
+        typeof currentValue === 'object' &&
+        currentValue !== null &&
+        typeof (currentValue as { toFixed?: unknown }).toFixed === 'function' &&
+        (currentValue as { constructor?: { name?: string } }).constructor?.name === 'Decimal'
+      ) {
+        return (currentValue as { toString: () => string }).toString()
+      }
+
+      return currentValue
+    })
+  )
 }
 
-function errorResponse(message: string, status: number, details?: string) {
+function logAssinatura(message: string, payload?: unknown) {
+  if (payload === undefined) {
+    console.log(`${ROUTE_TAG} ${message}`)
+    return
+  }
+
+  console.log(`${ROUTE_TAG} ${message}`, safeSerialize(payload))
+}
+
+function getErrorDetails(error: unknown) {
+  if (error instanceof Error) {
+    return {
+      message: error.message,
+      cause: safeSerialize(error.cause),
+      stack: error.stack
+    }
+  }
+
+  return {
+    message: 'Erro desconhecido',
+    cause: safeSerialize(error),
+    stack: undefined
+  }
+}
+
+function internalErrorResponse(error: unknown) {
+  const details = getErrorDetails(error)
+
+  logAssinatura('Erro interno da API', details)
+
   return NextResponse.json(
     {
-      ok: false,
-      error: message,
-      ...(details ? { details } : {})
+      error: true,
+      message: details.message,
+      stack: process.env.NODE_ENV === 'development' ? details.stack : undefined,
+      cause: details.cause
     },
-    { status }
+    { status: 500 }
   )
 }
 
 export async function GET(_: NextRequest, { params }: RouteContext) {
   try {
     const token = params?.token?.trim()
-    logAssinatura('Token recebido no GET', { token })
+    logAssinatura('GET token recebido', { token, params })
 
     if (!token) {
-      return errorResponse('Token inválido', 400)
+      return NextResponse.json({ error: true, message: 'Token inválido' }, { status: 400 })
     }
 
-    const termo = await prisma.termo.findUnique({
+    const termoQuery = {
       where: { token },
-      include: { funcionario: true, criadoPor: true, auditorias: { take: 5, orderBy: { criadoEm: 'desc' } } }
-    })
+      include: {
+        funcionario: true,
+        criadoPor: true,
+        auditorias: { take: 5, orderBy: { criadoEm: 'desc' as const } }
+      }
+    }
 
-    logAssinatura('Resultado Prisma GET', {
-      encontrado: !!termo,
-      termoId: termo?.id,
-      status: termo?.status
-    })
+    logAssinatura('GET prisma query termo.findUnique', termoQuery)
+    const termo = await prisma.termo.findUnique(termoQuery)
+    logAssinatura('GET resultado prisma termo.findUnique', termo)
 
     if (!termo) {
-      return errorResponse('Link inválido', 404)
+      return NextResponse.json({ error: true, message: 'Link inválido' }, { status: 404 })
     }
 
     if (termo.status === 'PENDENTE') {
-      await prisma.termo.update({ where: { id: termo.id }, data: { status: 'VISUALIZADO' } })
+      const updateQuery = { where: { id: termo.id }, data: { status: 'VISUALIZADO' as const } }
+      logAssinatura('GET prisma query termo.update status VISUALIZADO', updateQuery)
+      const termoAtualizado = await prisma.termo.update(updateQuery)
+      logAssinatura('GET resultado prisma termo.update', termoAtualizado)
     }
 
-    return NextResponse.json({
-      ok: true,
-      data: {
-        id: termo.id,
-        titulo: termo.titulo,
-        conteudoHtml: termo.conteudoHtml,
-        status: termo.status === 'PENDENTE' ? 'VISUALIZADO' : termo.status,
-        funcionario: {
-          id: termo.funcionario.id,
-          nome: termo.funcionario.nome,
-          email: termo.funcionario.email
-        },
-        criadoPor: termo.criadoPor
-          ? {
-              id: termo.criadoPor.id,
-              nome: termo.criadoPor.nome,
-              email: termo.criadoPor.email
-            }
-          : null,
-        signedAt: termo.signedAt?.toISOString() ?? null,
-        updatedAt: termo.atualizadoEm.toISOString(),
-        auditTrailCount: termo.auditorias.length
-      }
-    })
+    return NextResponse.json(
+      safeSerialize({
+        ok: true,
+        data: {
+          id: termo.id,
+          titulo: termo.titulo,
+          conteudoHtml: termo.conteudoHtml,
+          status: termo.status === 'PENDENTE' ? 'VISUALIZADO' : termo.status,
+          funcionario: {
+            id: termo.funcionario.id,
+            nome: termo.funcionario.nome,
+            email: termo.funcionario.email
+          },
+          criadoPor: termo.criadoPor
+            ? {
+                id: termo.criadoPor.id,
+                nome: termo.criadoPor.nome,
+                email: termo.criadoPor.email
+              }
+            : null,
+          signedAt: termo.signedAt,
+          updatedAt: termo.atualizadoEm,
+          auditTrailCount: termo.auditorias.length
+        }
+      })
+    )
   } catch (error) {
-    console.error('[api/assinatura/[token]] Erro interno no GET', {
-      error,
-      stack: error instanceof Error ? error.stack : undefined
-    })
-
-    return errorResponse('Erro interno ao buscar assinatura', 500, error instanceof Error ? error.message : 'Erro desconhecido')
+    return internalErrorResponse(error)
   }
 }
 
 export async function POST(request: NextRequest, { params }: { params: { token: string } }) {
-  const termo = await prisma.termo.findUnique({ where: { token: params.token }, include: { funcionario: true } })
-  if (!termo) return NextResponse.json({ error: 'Link inválido' }, { status: 404 })
-  if (termo.status === 'ASSINADO') return NextResponse.json({ error: 'Termo já assinado' }, { status: 409 })
+  try {
+    const token = params?.token?.trim()
+    logAssinatura('POST token recebido', { token, params })
 
-  const body = await request.json()
-  if (!body.acceptedTerms) return NextResponse.json({ error: 'Aceite obrigatório' }, { status: 400 })
+    if (!token) {
+      return NextResponse.json({ error: true, message: 'Token inválido' }, { status: 400 })
+    }
 
-  const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown'
-  const userAgent = request.headers.get('user-agent') ?? 'unknown'
-  const signerName = body.typedName?.trim() || termo.funcionario.nome
-  const signedAt = new Date()
+    const termoQuery = { where: { token }, include: { funcionario: true } }
+    logAssinatura('POST prisma query termo.findUnique', termoQuery)
+    const termo = await prisma.termo.findUnique(termoQuery)
+    logAssinatura('POST resultado prisma termo.findUnique', termo)
 
-  const updated = await prisma.termo.update({ where: { id: termo.id }, data: { status: 'ASSINADO', signerName, signerIp: ip, signerUserAgent: userAgent, signatureImageDataUrl: body.signatureDataUrl ?? null, acceptedTerms: true, signedAt } })
+    if (!termo) return NextResponse.json({ error: true, message: 'Link inválido' }, { status: 404 })
+    if (termo.status === 'ASSINADO') return NextResponse.json({ error: true, message: 'Termo já assinado' }, { status: 409 })
 
-  const funcionarioFolderId = await ensureFuncionarioFolder(termo.funcionario.nome)
-  const termoFolderId = await ensureTermoFolder(funcionarioFolderId, termo.criadoEm)
-  const pdf = await renderPdfFromHtml(getSignedHtml(updated))
-  const final = await uploadPdf(termoFolderId, `termo-assinado-${termo.id}.pdf`, pdf)
+    const body = await request.json()
+    logAssinatura('POST body recebido', body)
 
-  await prisma.termo.update({ where: { id: termo.id }, data: { driveFolderId: termoFolderId, driveFileId: final.fileId, driveFileLink: final.link ?? undefined } })
+    if (!body.acceptedTerms) return NextResponse.json({ error: true, message: 'Aceite obrigatório' }, { status: 400 })
 
-  await registrarAuditoria(termo.id, 'TERMO_ASSINADO', { finalFileId: final.fileId }, { ip, userAgent })
-  return NextResponse.json({ ok: true })
+    const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown'
+    const userAgent = request.headers.get('user-agent') ?? 'unknown'
+    const signerName = body.typedName?.trim() || termo.funcionario.nome
+    const signedAt = new Date()
+
+    const updateAssinaturaQuery = {
+      where: { id: termo.id },
+      data: {
+        status: 'ASSINADO' as const,
+        signerName,
+        signerIp: ip,
+        signerUserAgent: userAgent,
+        signatureImageDataUrl: body.signatureDataUrl ?? null,
+        acceptedTerms: true,
+        signedAt
+      }
+    }
+    logAssinatura('POST prisma query termo.update assinatura', updateAssinaturaQuery)
+    const updated = await prisma.termo.update(updateAssinaturaQuery)
+    logAssinatura('POST resultado prisma termo.update assinatura', updated)
+
+    const funcionarioFolderId = await ensureFuncionarioFolder(termo.funcionario.nome)
+    const termoFolderId = await ensureTermoFolder(funcionarioFolderId, termo.criadoEm)
+    const pdf = await renderPdfFromHtml(getSignedHtml(updated))
+    const final = await uploadPdf(termoFolderId, `termo-assinado-${termo.id}.pdf`, pdf)
+
+    const updateDriveQuery = {
+      where: { id: termo.id },
+      data: { driveFolderId: termoFolderId, driveFileId: final.fileId, driveFileLink: final.link ?? undefined }
+    }
+    logAssinatura('POST prisma query termo.update drive', updateDriveQuery)
+    const updatedDrive = await prisma.termo.update(updateDriveQuery)
+    logAssinatura('POST resultado prisma termo.update drive', updatedDrive)
+
+    await registrarAuditoria(termo.id, 'TERMO_ASSINADO', { finalFileId: final.fileId }, { ip, userAgent })
+
+    return NextResponse.json(safeSerialize({ ok: true, termoId: termo.id, driveFileId: final.fileId }))
+  } catch (error) {
+    return internalErrorResponse(error)
+  }
 }
