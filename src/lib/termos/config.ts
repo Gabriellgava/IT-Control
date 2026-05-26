@@ -1,7 +1,6 @@
 import { createHash, createPrivateKey } from 'node:crypto'
 
 type GoogleDriveConfig = {
-  projectId: string
   clientEmail: string
   privateKey: string
   rootFolderId: string
@@ -16,14 +15,7 @@ function required(name: string, value?: string) {
 }
 
 function parsePrivateKey(raw: string) {
-  const value = raw.trim()
-
-  // A chave deve vir em formato PEM multilinha real (Vercel), sem "\\n".
-  if (value.includes('\\n') || value.includes('\\r')) {
-    throw new Error(
-      'GOOGLE_PRIVATE_KEY inválida: detectado conteúdo escapado (\\n/\\r). Configure a chave em formato PEM multilinha real na Vercel.'
-    )
-  }
+  const value = raw.replace(/\\n/g, '\n').trim()
 
   if (!value.startsWith('-----BEGIN PRIVATE KEY-----') || !value.endsWith('-----END PRIVATE KEY-----')) {
     throw new Error('GOOGLE_PRIVATE_KEY inválida: formato PEM esperado (BEGIN/END PRIVATE KEY).')
@@ -49,7 +41,6 @@ function debugConfig(cfg: GoogleDriveConfig) {
   const hasPemFooter = cfg.privateKey.includes('END PRIVATE KEY')
 
   console.info('[google-drive][debug] Config carregada', {
-    projectId: cfg.projectId,
     clientEmail: cfg.clientEmail,
     rootFolderId: cfg.rootFolderId,
     privateKeyLength: cfg.privateKey.length,
@@ -62,7 +53,6 @@ function debugConfig(cfg: GoogleDriveConfig) {
 
 export function getGoogleDriveConfig(): GoogleDriveConfig {
   const cfg: GoogleDriveConfig = {
-    projectId: required('GOOGLE_PROJECT_ID', process.env.GOOGLE_PROJECT_ID),
     clientEmail: required('GOOGLE_CLIENT_EMAIL', process.env.GOOGLE_CLIENT_EMAIL),
     privateKey: parsePrivateKey(required('GOOGLE_PRIVATE_KEY', process.env.GOOGLE_PRIVATE_KEY)),
     rootFolderId: required('GOOGLE_DRIVE_TERMOS_ROOT_FOLDER_ID', process.env.GOOGLE_DRIVE_TERMOS_ROOT_FOLDER_ID),

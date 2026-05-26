@@ -78,6 +78,20 @@ function getErrorDetails(error: unknown) {
   }
 }
 
+function validateGoogleDriveEnv() {
+  if (!process.env.GOOGLE_CLIENT_EMAIL) {
+    throw new Error('GOOGLE_CLIENT_EMAIL não configurado')
+  }
+
+  if (!process.env.GOOGLE_PRIVATE_KEY) {
+    throw new Error('GOOGLE_PRIVATE_KEY não configurado')
+  }
+
+  if (!process.env.GOOGLE_DRIVE_TERMOS_ROOT_FOLDER_ID) {
+    throw new Error('GOOGLE_DRIVE_TERMOS_ROOT_FOLDER_ID não configurado')
+  }
+}
+
 function internalErrorResponse(error: unknown) {
   const details = getErrorDetails(error)
 
@@ -261,33 +275,62 @@ export async function POST(request: NextRequest, { params }: { params: { token: 
     const updated = await prisma.termo.update(updateAssinaturaQuery)
     logAssinatura('POST resultado prisma termo.update assinatura', updated)
 
-    const funcionarioFolderId = await ensureFuncionarioFolder(termo.funcionario.nome)
-    const termoFolderId = await ensureTermoFolder(funcionarioFolderId, termo.criadoEm)
-    const pdf = await buildTermoPdf({
-      termoId: termo.id,
-      titulo: updated.titulo,
-      texto: updated.conteudoHtml,
-      empresa: 'IT Control',
-      colaborador: termo.funcionario.nome,
-      colaboradorEmail: termo.funcionario.email,
-      assinaturaTexto: signerName,
-      assinaturaImagemDataUrl: signatureImageDataUrl,
-      assinadoEm: signedAt,
-      assinadorIp: ip
-    })
-    const final = await uploadPdf(termoFolderId, `termo-assinado-${termo.id}.pdf`, pdf)
+    let driveFileId: string | null = null
 
-    const updateDriveQuery = {
-      where: { id: termo.id },
-      data: { driveFolderId: termoFolderId, driveFileId: final.fileId, driveFileLink: final.link ?? undefined }
+    try {
+      validateGoogleDriveEnv()
+      logAssinatura('POST upload drive - iniciando geração do PDF', {
+        termoId: termo.id,
+        token,
+        colaborador: termo.funcionario.nome
+      })
+
+      const pdf = await buildTermoPdf({
+        termoId: termo.id,
+        titulo: updated.titulo,
+        texto: updated.conteudoHtml,
+        empresa: 'IT Control',
+        colaborador: termo.funcionario.nome,
+        colaboradorEmail: termo.funcionario.email,
+        assinaturaTexto: signerName,
+        assinaturaImagemDataUrl: signatureImageDataUrl,
+        assinadoEm: signedAt,
+        assinadorIp: ip
+      })
+
+      logAssinatura('POST upload drive - PDF gerado', { termoId: termo.id, pdfBytes: pdf.length })
+
+      logAssinatura('POST upload drive - garantindo pasta do funcionário', { funcionario: termo.funcionario.nome })
+      const funcionarioFolderId = await ensureFuncionarioFolder(termo.funcionario.nome)
+
+      logAssinatura('POST upload drive - garantindo pasta do termo', {
+        funcionarioFolderId,
+        termoCriadoEm: termo.criadoEm
+      })
+      const termoFolderId = await ensureTermoFolder(funcionarioFolderId, termo.criadoEm)
+
+      logAssinatura('POST upload drive - enviando PDF', {
+        termoFolderId,
+        fileName: `termo-assinado-${termo.id}.pdf`
+      })
+      const final = await uploadPdf(termoFolderId, `termo-assinado-${termo.id}.pdf`, pdf)
+      driveFileId = final.fileId
+
+      const updateDriveQuery = {
+        where: { id: termo.id },
+        data: { driveFolderId: termoFolderId, driveFileId: final.fileId, driveFileLink: final.link ?? undefined }
+      }
+      logAssinatura('POST prisma query termo.update drive', updateDriveQuery)
+      const updatedDrive = await prisma.termo.update(updateDriveQuery)
+      logAssinatura('POST resultado prisma termo.update drive', updatedDrive)
+
+      await registrarAuditoria(termo.id, 'TERMO_ASSINADO', { finalFileId: final.fileId }, { ip, userAgent })
+    } catch (driveError) {
+      const details = getErrorDetails(driveError)
+      console.error(`${ROUTE_TAG} Falha no fluxo do Google Drive após assinatura concluída`, details)
     }
-    logAssinatura('POST prisma query termo.update drive', updateDriveQuery)
-    const updatedDrive = await prisma.termo.update(updateDriveQuery)
-    logAssinatura('POST resultado prisma termo.update drive', updatedDrive)
 
-    await registrarAuditoria(termo.id, 'TERMO_ASSINADO', { finalFileId: final.fileId }, { ip, userAgent })
-
-    return NextResponse.json(safeSerialize({ ok: true, termoId: termo.id, driveFileId: final.fileId }))
+    return NextResponse.json(safeSerialize({ ok: true, termoId: termo.id, driveFileId }))
   } catch (error) {
     return internalErrorResponse(error)
   }
