@@ -9,14 +9,15 @@ export function SignatureForm({ token }: { token: string }) {
   const [mode, setMode] = useState<'drawn' | 'typed'>('drawn')
   const [typedName, setTypedName] = useState('')
   const [saving, setSaving] = useState(false)
+  const [acceptedTerms, setAcceptedTerms] = useState(false)
   const [message, setMessage] = useState('')
 
   const submit = async () => {
     setSaving(true)
     setMessage('')
     const payload = mode === 'drawn'
-      ? { signatureType: 'drawn', signatureDataUrl: ref.current?.toDataURL('image/png') }
-      : { signatureType: 'typed', typedName }
+      ? { signatureType: 'drawn', signatureDataUrl: ref.current?.toDataURL('image/png'), acceptedTerms }
+      : { signatureType: 'typed', typedName, acceptedTerms }
 
     const res = await fetch(`/api/assinatura/${token}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
     const data = await res.json()
@@ -40,7 +41,8 @@ export function SignatureForm({ token }: { token: string }) {
         <Input label="Nome completo" value={typedName} onChange={(e) => setTypedName(e.target.value)} />
       )}
 
-      <Button onClick={submit} disabled={saving || (mode === 'typed' && !typedName.trim())}>Confirmar assinatura</Button>
+      <label className='flex items-center gap-2 text-sm'><input type='checkbox' checked={acceptedTerms} onChange={(e)=>setAcceptedTerms(e.target.checked)} /> Declaro que li e aceito o termo.</label>
+      <Button onClick={submit} disabled={saving || !acceptedTerms || (mode === 'typed' && !typedName.trim())}>Confirmar assinatura</Button>
       {message && <p className="text-sm">{message}</p>}
     </div>
   )

@@ -186,10 +186,9 @@ model Inventario {
 
 
 enum TermoStatus {
-  RASCUNHO
-  ENVIADO
+  PENDENTE
+  VISUALIZADO
   ASSINADO
-  EXPIRADO
   CANCELADO
 }
 
@@ -197,26 +196,21 @@ model Termo {
   id                 String             @id @default(cuid())
   titulo             String
   conteudoHtml       String             @map("conteudo_html")
-  status             TermoStatus        @default(RASCUNHO)
+  status             TermoStatus        @default(PENDENTE)
   funcionarioId      String             @map("funcionario_id")
   funcionario        Funcionario        @relation(fields: [funcionarioId], references: [id])
   criadoPorId        String?            @map("criado_por_id")
   criadoPor          Usuario?           @relation(fields: [criadoPorId], references: [id])
-  assinaturaTokenHash String?           @unique @map("assinatura_token_hash")
-  tokenExpiraEm      DateTime?          @map("token_expira_em")
-  enviadoEm          DateTime?          @map("enviado_em")
-  assinadoEm         DateTime?          @map("assinado_em")
-  assinanteNome      String?            @map("assinante_nome")
-  assinaturaTipo     String?            @map("assinatura_tipo")
-  assinaturaImagemDataUrl String?       @map("assinatura_imagem_data_url")
-  assinaturaTexto    String?            @map("assinatura_texto")
-  assinaturaIp       String?            @map("assinatura_ip")
-  assinaturaUserAgent String?           @map("assinatura_user_agent")
-  driveFolderId      String?            @map("drive_folder_id")
-  drivePdfOriginalFileId String?        @map("drive_pdf_original_file_id")
-  drivePdfOriginalLink String?          @map("drive_pdf_original_link")
-  drivePdfAssinadoFileId String?        @map("drive_pdf_assinado_file_id")
-  drivePdfAssinadoLink String?          @map("drive_pdf_assinado_link")
+  token              String             @unique
+  signedAt            DateTime?          @map("signed_at")
+  signerIp            String?            @map("signer_ip")
+  signerUserAgent     String?            @map("signer_user_agent")
+  signerName          String?            @map("signer_name")
+  signatureImageDataUrl String?          @map("signature_image_data_url")
+  acceptedTerms       Boolean            @default(false) @map("accepted_terms")
+  driveFolderId       String?            @map("drive_folder_id")
+  driveFileId         String?            @map("drive_file_id")
+  driveFileLink       String?            @map("drive_file_link")
   criadoEm           DateTime           @default(now()) @map("criado_em")
   atualizadoEm       DateTime           @updatedAt @map("atualizado_em")
   auditorias         TermoAuditoria[]
