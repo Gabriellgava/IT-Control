@@ -5,6 +5,16 @@ function required(name: string, value?: string) {
   return value
 }
 
+function normalizePrivateKey(raw: string) {
+  const trimmed = raw.trim()
+  const unquoted =
+    (trimmed.startsWith('"') && trimmed.endsWith('"')) || (trimmed.startsWith("'") && trimmed.endsWith("'"))
+      ? trimmed.slice(1, -1)
+      : trimmed
+
+  return unquoted.replace(/\\n/g, '\n').replace(/\\r/g, '\r')
+}
+
 export function getGoogleDriveConfig() {
   const projectId = required('GOOGLE_PROJECT_ID', process.env.GOOGLE_PROJECT_ID)
   const clientEmail = required(
@@ -20,7 +30,7 @@ export function getGoogleDriveConfig() {
   return {
     projectId,
     clientEmail,
-    privateKey: privateKeyRaw.replace(/\\n/g, '\n'),
+    privateKey: normalizePrivateKey(privateKeyRaw),
     rootFolderId,
   }
 }
