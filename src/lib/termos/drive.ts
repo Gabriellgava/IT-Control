@@ -54,8 +54,18 @@ export async function ensureFuncionarioFolder(nome: string) {
   return ensureFolderByName(cfg.rootFolderId, nome)
 }
 
-export async function ensureTermoFolder(funcionarioFolderId: string, termoId: string) {
-  return ensureFolderByName(funcionarioFolderId, `termo-${termoId}`)
+function formatFolderDate(date: Date) {
+  return new Intl.DateTimeFormat('pt-BR', {
+    timeZone: 'UTC',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  }).format(date)
+}
+
+export async function ensureTermoFolder(funcionarioFolderId: string, termoDate: Date) {
+  const folderName = `Termo de Ativos - ${formatFolderDate(termoDate)}`
+  return ensureFolderByName(funcionarioFolderId, folderName)
 }
 
 export async function uploadPdf(folderId: string, fileName: string, data: Buffer) {

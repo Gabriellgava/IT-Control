@@ -44,7 +44,7 @@ export async function POST(request: NextRequest, { params }: { params: { token: 
   const updated = await prisma.termo.update({ where: { id: termo.id }, data: { status: 'ASSINADO', signerName, signerIp: ip, signerUserAgent: userAgent, signatureImageDataUrl: body.signatureDataUrl ?? null, acceptedTerms: true, signedAt } })
 
   const funcionarioFolderId = await ensureFuncionarioFolder(termo.funcionario.nome)
-  const termoFolderId = await ensureTermoFolder(funcionarioFolderId, termo.id)
+  const termoFolderId = await ensureTermoFolder(funcionarioFolderId, termo.criadoEm)
   const pdf = await renderPdfFromHtml(getSignedHtml(updated))
   const final = await uploadPdf(termoFolderId, `termo-assinado-${termo.id}.pdf`, pdf)
 
