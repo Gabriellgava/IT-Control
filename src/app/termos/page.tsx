@@ -142,7 +142,7 @@ export default function TermosPage() {
       const itensHtml = responsavelAtivo.equipamentos
         .map(
           (equipamento) =>
-            `<tr><td style="padding:8px;border:1px solid #e5e7eb;">${equipamento.tipo}</td><td style="padding:8px;border:1px solid #e5e7eb;">${equipamento.etiqueta}</td></tr>`
+            `<tr><td style="padding:8px;border:1px solid #e5e7eb;">${equipamento.tipo}</td><td style="padding:8px;border:1px solid #e5e7eb;">${equipamento.marca} ${equipamento.modelo}</td><td style="padding:8px;border:1px solid #e5e7eb;">${equipamento.etiqueta}</td></tr>`
         )
         .join('')
 
@@ -155,6 +155,7 @@ export default function TermosPage() {
             <thead>
               <tr style="background:#f3f4f6;">
                 <th style="text-align:left;padding:8px;border:1px solid #e5e7eb;">Tipo do equipamento</th>
+                <th style="text-align:left;padding:8px;border:1px solid #e5e7eb;">Descrição</th>
                 <th style="text-align:left;padding:8px;border:1px solid #e5e7eb;">Etiqueta patrimonial</th>
               </tr>
             </thead>
@@ -165,10 +166,27 @@ export default function TermosPage() {
           ${observacoesTermo ? `<p style="margin:0 0 10px;"><strong>Observações:</strong> ${observacoesTermo}</p>` : ''}
         </section>
       `.trim()
+      const itensPdf = responsavelAtivo.equipamentos.map((equipamento) => ({
+        descricao: `${equipamento.marca} ${equipamento.modelo}`.trim(),
+        tipo: equipamento.tipo,
+        etiqueta: equipamento.etiqueta,
+      }))
+      const criarPayload = {
+        titulo: 'Termo de Responsabilidade de Ativos de TI',
+        conteudoHtml,
+        funcionarioId: funcionarioAtivo.id,
+        validadeHoras: 72,
+        empresa,
+        setores: responsavelAtivo.setores,
+        dataEntrega: formatarDataBR(dataEntrega),
+        dataDevolucao: formatarDataBR(dataDevolucao),
+        observacoes: observacoesTermo,
+        itens: itensPdf,
+      }
       const criar = await fetch('/api/termos', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ titulo: 'Termo de Responsabilidade de Ativos de TI', conteudoHtml, funcionarioId: funcionarioAtivo.id, validadeHoras: 72 }),
+        body: JSON.stringify(criarPayload),
       })
       const criado = await criar.json()
       if (!criar.ok) throw new Error(criado.error || 'Erro ao criar termo')
@@ -308,7 +326,7 @@ export default function TermosPage() {
               <ul>
                 {responsavelAtivo.equipamentos.map((equipamento) => (
                   <li key={equipamento.id}>
-                    {equipamento.tipo} • Etiqueta: {equipamento.etiqueta}
+                    {equipamento.tipo} • {equipamento.marca} {equipamento.modelo} • Etiqueta: {equipamento.etiqueta}
                   </li>
                 ))}
               </ul>
