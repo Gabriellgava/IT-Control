@@ -23,8 +23,8 @@
     "react-dom": "^18",
     "react-signature-canvas": "^1.1.0-alpha.2",
     "recharts": "^2.10.3",
-    "@sparticuz/chromium": "^126.0.0",
-    "puppeteer-core": "^23.11.1"
+    "@sparticuz/chromium": "^123.0.1",
+    "puppeteer-core": "^22.0.0"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
