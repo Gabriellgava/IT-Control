@@ -1,16 +1,6 @@
-import { Buffer } from 'node:buffer'
 import { createHash } from 'node:crypto'
-import {
-  Document,
-  Image,
-  Page,
-  StyleSheet,
-  Text,
-  View,
-  renderToBuffer
-} from '@react-pdf/renderer'
-import React from 'react'
 import { normalizarTexto } from '@/lib/texto'
+import { generateTermoPdf } from '@/lib/pdf/generate-termo-pdf'
 
 type TermoItem = { descricao: string; tipo: string; etiqueta: string }
 
@@ -32,107 +22,75 @@ export interface BuildTermoPdfParams {
   assinadoEm?: Date
 }
 
-
-const styles = StyleSheet.create({
-  page: { fontFamily: 'Helvetica', fontSize: 10, paddingTop: 28, paddingHorizontal: 28, paddingBottom: 48, color: '#111827' },
-  header: { marginBottom: 12, borderBottomWidth: 1, borderBottomColor: '#D1D5DB', paddingBottom: 8 },
-  company: { fontSize: 12, color: '#374151' },
-  title: { fontSize: 16, marginTop: 4, fontWeight: 700 as any },
-  section: { marginBottom: 10 },
-  sectionTitle: { fontSize: 11, marginBottom: 6, fontWeight: 700 as any, color: '#111827' },
-  row: { flexDirection: 'row', marginBottom: 3 },
-  label: { width: 130, color: '#6B7280' },
-  value: { flex: 1 },
-  paragraph: { lineHeight: 1.35, textAlign: 'justify' },
-  table: { borderWidth: 1, borderColor: '#D1D5DB', marginTop: 4 },
-  tableHeader: { flexDirection: 'row', backgroundColor: '#F3F4F6', borderBottomWidth: 1, borderBottomColor: '#D1D5DB' },
-  tableRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: '#E5E7EB' },
-  colDesc: { flex: 5, padding: 6 },
-  colType: { flex: 2, padding: 6, borderLeftWidth: 1, borderLeftColor: '#E5E7EB' },
-  colTag: { flex: 2, padding: 6, borderLeftWidth: 1, borderLeftColor: '#E5E7EB' },
-  signatureBox: { borderWidth: 1, borderColor: '#D1D5DB', borderRadius: 4, padding: 8, marginTop: 8 },
-  signatureImage: { width: 180, height: 54, objectFit: 'contain' },
-  footer: { position: 'absolute', bottom: 18, left: 28, right: 28, fontSize: 8, color: '#6B7280', borderTopWidth: 1, borderTopColor: '#E5E7EB', paddingTop: 6 }
-})
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;')
+}
 
 function stripHtml(value: string) {
-  return normalizarTexto(value.replace(/<style[\s\S]*?<\/style>/gi, ' ').replace(/<script[\s\S]*?<\/script>/gi, ' ').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' '))
+  return normalizarTexto(value.replace(/<style[\s\S]*?<\/style>/gi, ' ').replace(/<script[\s\S]*?<\/script>/gi, ' '))
 }
 
 function extractTableItems(html: string): TermoItem[] {
   const rows = [...html.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/gi)]
-  const parsed = rows
+  return rows
     .map((row) => {
-      const cells = [...row[1].matchAll(/<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi)].map((cell) => stripHtml(cell[1]))
+      const cells = [...row[1].matchAll(/<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi)].map((cell) => normalizarTexto(cell[1].replace(/<[^>]+>/g, ' ')))
       if (cells.length < 3) return null
       return { descricao: cells[0], tipo: cells[1], etiqueta: cells[2] }
     })
     .filter((item): item is TermoItem => Boolean(item && item.descricao && item.tipo && item.etiqueta))
-  return parsed.slice(0, 100)
+    .slice(0, 300)
+}
+
+function buildTermoHtml(params: BuildTermoPdfParams, payloadHash: string, signedAt: Date, items: TermoItem[]) {
+  const assinaturaImagem = params.assinaturaImagemDataUrl
+    ? `<img src="${params.assinaturaImagemDataUrl}" style="max-width:220px;max-height:70px;object-fit:contain;margin-top:8px;" />`
+    : ''
+
+  const rows = items
+    .map((item) => `<tr><td>${escapeHtml(normalizarTexto(item.descricao))}</td><td>${escapeHtml(normalizarTexto(item.tipo))}</td><td>${escapeHtml(normalizarTexto(item.etiqueta))}</td></tr>`)
+    .join('')
+
+  return `<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8" /><style>
+*{box-sizing:border-box} body{font-family:Arial,sans-serif;color:#111827;font-size:12px;line-height:1.4;margin:0}
+.wrap{padding:20px 12px 25px 12px} h1{font-size:20px;margin:4px 0 12px} h2{font-size:14px;margin:16px 0 8px}
+.meta div{margin-bottom:4px} .termo{white-space:normal} table{width:100%;border-collapse:collapse;table-layout:fixed;page-break-inside:auto}
+th,td{border:1px solid #d1d5db;padding:6px;vertical-align:top;word-break:break-word} th{background:#f3f4f6;text-align:left}
+tr{page-break-inside:avoid;page-break-after:auto} .signature{border:1px solid #d1d5db;border-radius:4px;padding:8px}
+.footer{margin-top:12px;font-size:10px;color:#6b7280;border-top:1px solid #e5e7eb;padding-top:8px}
+</style></head>
+<body><main class="wrap">
+<div>${escapeHtml(params.empresa || 'IT Control')}</div><h1>${escapeHtml(normalizarTexto(params.titulo))}</h1>
+<section class="meta"><h2>Dados do colaborador</h2>
+<div><strong>Nome:</strong> ${escapeHtml(normalizarTexto(params.colaborador || '-'))}</div>
+<div><strong>E-mail:</strong> ${escapeHtml(normalizarTexto(params.colaboradorEmail || '-'))}</div>
+<div><strong>Setor(es):</strong> ${escapeHtml(normalizarTexto(params.setores?.join(', ') || '-'))}</div>
+<div><strong>Data de entrega:</strong> ${escapeHtml(normalizarTexto(params.dataEntrega || '-'))}</div>
+<div><strong>Data devolução:</strong> ${escapeHtml(normalizarTexto(params.dataDevolucao || '-'))}</div></section>
+<section><h2>Termo</h2><div class="termo">${stripHtml(params.texto)}</div></section>
+<section><h2>Tabela de equipamentos</h2><table><thead><tr><th style="width:56%">Descrição</th><th style="width:22%">Tipo</th><th style="width:22%">Etiqueta</th></tr></thead><tbody>${rows}</tbody></table></section>
+<section><h2>Assinatura eletrônica</h2><div class="signature"><div><strong>Assinado por:</strong> ${escapeHtml(normalizarTexto(params.assinaturaTexto || '-'))}</div>
+<div><strong>Data/hora (UTC):</strong> ${signedAt.toISOString()}</div><div><strong>IP:</strong> ${escapeHtml(normalizarTexto(params.assinadorIp || '-'))}</div>${assinaturaImagem}</div></section>
+${params.observacoes ? `<div style="margin-top:8px;"><strong>Observações:</strong> ${escapeHtml(normalizarTexto(params.observacoes))}</div>` : ''}
+<div class="footer">Documento para auditoria • ID: ${escapeHtml(params.termoId)} • Hash SHA-256: ${payloadHash.slice(0, 32)}... • Gerado em ${new Date().toISOString()}</div>
+</main></body></html>`
 }
 
 export async function buildTermoPdf(params: BuildTermoPdfParams) {
   const signedAt = params.assinadoEm ?? new Date()
-  const cleanText = stripHtml(params.texto)
+  const cleanText = normalizarTexto(stripHtml(params.texto).replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' '))
   const fallbackItems = extractTableItems(params.texto)
-  const items = (params.itens?.length ? params.itens : fallbackItems).slice(0, 40)
+  const items = (params.itens?.length ? params.itens : fallbackItems)
   const payloadHash = createHash('sha256')
     .update(JSON.stringify({ termoId: params.termoId, signedAt: signedAt.toISOString(), signer: params.assinaturaTexto ?? '', texto: cleanText }))
     .digest('hex')
 
-  const doc = (
-    <Document title={params.titulo} author={params.empresa || 'IT Control'} language="pt-BR">
-      <Page size="A4" style={styles.page}>
-        <View style={styles.header}>
-          <Text style={styles.company}>{params.empresa || 'IT Control'}</Text>
-          <Text style={styles.title}>{normalizarTexto(params.titulo)}</Text>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Dados do colaborador</Text>
-          <View style={styles.row}><Text style={styles.label}>Nome</Text><Text style={styles.value}>{normalizarTexto(params.colaborador || '-')}</Text></View>
-          <View style={styles.row}><Text style={styles.label}>E-mail</Text><Text style={styles.value}>{normalizarTexto(params.colaboradorEmail || '-')}</Text></View>
-          <View style={styles.row}><Text style={styles.label}>Setor(es)</Text><Text style={styles.value}>{normalizarTexto(params.setores?.join(', ') || '-')}</Text></View>
-          <View style={styles.row}><Text style={styles.label}>Data de entrega</Text><Text style={styles.value}>{normalizarTexto(params.dataEntrega || '-')}</Text></View>
-          <View style={styles.row}><Text style={styles.label}>Data devolução</Text><Text style={styles.value}>{normalizarTexto(params.dataDevolucao || '-')}</Text></View>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Termo</Text>
-          <Text style={styles.paragraph}>{cleanText}</Text>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Tabela de equipamentos</Text>
-          <View style={styles.table}>
-            <View style={styles.tableHeader}><Text style={styles.colDesc}>Descrição</Text><Text style={styles.colType}>Tipo</Text><Text style={styles.colTag}>Etiqueta</Text></View>
-            {items.map((item, index) => (
-              <View key={`${item.etiqueta}-${index}`} style={styles.tableRow}>
-                <Text style={styles.colDesc}>{normalizarTexto(item.descricao)}</Text>
-                <Text style={styles.colType}>{normalizarTexto(item.tipo)}</Text>
-                <Text style={styles.colTag}>{normalizarTexto(item.etiqueta)}</Text>
-              </View>
-            ))}
-          </View>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Assinatura eletrônica</Text>
-          <View style={styles.signatureBox}>
-            <Text>Assinado por: {normalizarTexto(params.assinaturaTexto || '-')}</Text>
-            <Text>Data/hora (UTC): {signedAt.toISOString()}</Text>
-            <Text>IP: {normalizarTexto(params.assinadorIp || '-')}</Text>
-            {params.assinaturaImagemDataUrl ? <Image src={params.assinaturaImagemDataUrl} style={styles.signatureImage} /> : null}
-          </View>
-          {params.observacoes ? <Text style={{ marginTop: 6 }}>Observações: {normalizarTexto(params.observacoes)}</Text> : null}
-        </View>
-
-        <Text style={styles.footer} fixed>
-          Documento para auditoria • ID: {params.termoId} • Hash SHA-256: {payloadHash.slice(0, 32)}... • Gerado em {new Date().toISOString()}
-        </Text>
-      </Page>
-    </Document>
-  )
-
-  return Buffer.from(await renderToBuffer(doc))
+  const html = buildTermoHtml(params, payloadHash, signedAt, items)
+  return generateTermoPdf(html)
 }
