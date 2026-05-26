@@ -32,8 +32,11 @@ type RouteContext = {
 }
 
 function safeSerialize(value: unknown): unknown {
-  return JSON.parse(
-    JSON.stringify(value, (_, currentValue: unknown) => {
+  if (value === undefined) {
+    return undefined
+  }
+
+  const serialized = JSON.stringify(value, (_, currentValue: unknown) => {
       if (typeof currentValue === 'bigint') {
         return currentValue.toString()
       }
@@ -61,7 +64,12 @@ function safeSerialize(value: unknown): unknown {
 
       return currentValue
     })
-  )
+
+  if (!serialized) {
+    return undefined
+  }
+
+  return JSON.parse(serialized)
 }
 
 function logAssinatura(message: string, payload?: unknown) {
@@ -187,13 +195,51 @@ export async function POST(request: NextRequest, { params }: { params: { token: 
     if (termo.status === 'ASSINADO') return NextResponse.json({ error: true, message: 'Termo já assinado' }, { status: 409 })
 
     const body = await request.json()
-    logAssinatura('POST body recebido', body)
+    logAssinatura('POST payload completo recebido', body)
 
-    if (!body.acceptedTerms) return NextResponse.json({ error: true, message: 'Aceite obrigatório' }, { status: 400 })
+    if (!body || typeof body !== 'object') {
+      return NextResponse.json(
+        { error: true, message: 'Body inválido' },
+        { status: 400 }
+      )
+    }
+
+    const acceptedTerms = body.acceptedTerms === true
+    const rawTypedName = typeof body.typedName === 'string' ? body.typedName : ''
+    const signerName = rawTypedName.trim() || termo.funcionario.nome
+    const signatureDataUrl = typeof body.signatureDataUrl === 'string' ? body.signatureDataUrl.trim() : ''
+    const signatureType = typeof body.signatureType === 'string' ? body.signatureType.trim().toLowerCase() : ''
+    const isTypedSignature = signatureType === 'typed'
+    const isDrawnSignature = signatureType === 'drawn'
+
+    logAssinatura('POST signerName resolvido', { signerName })
+    logAssinatura('POST assinatura recebida', {
+      signatureType,
+      hasSignatureDataUrl: Boolean(signatureDataUrl),
+      signaturePreview: signatureDataUrl ? `${signatureDataUrl.slice(0, 30)}...` : null
+    })
+
+    if (!acceptedTerms) {
+      return NextResponse.json({ error: true, message: 'Aceite obrigatório' }, { status: 400 })
+    }
+
+    if (!signerName) {
+      return NextResponse.json({ error: true, message: 'Nome do assinante é obrigatório' }, { status: 400 })
+    }
+
+    if (!isTypedSignature && !isDrawnSignature) {
+      return NextResponse.json({ error: true, message: 'Tipo de assinatura inválido' }, { status: 400 })
+    }
+
+    if (isDrawnSignature) {
+      const base64Pattern = /^data:image\/[a-zA-Z0-9.+-]+;base64,[A-Za-z0-9+/=\s]+$/
+      if (!signatureDataUrl || !base64Pattern.test(signatureDataUrl)) {
+        return NextResponse.json({ error: true, message: 'Assinatura base64 inválida' }, { status: 400 })
+      }
+    }
 
     const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown'
     const userAgent = request.headers.get('user-agent') ?? 'unknown'
-    const signerName = body.typedName?.trim() || termo.funcionario.nome
     const signedAt = new Date()
 
     const updateAssinaturaQuery = {
@@ -203,8 +249,8 @@ export async function POST(request: NextRequest, { params }: { params: { token: 
         signerName,
         signerIp: ip,
         signerUserAgent: userAgent,
-        signatureImageDataUrl: body.signatureDataUrl ?? null,
-        acceptedTerms: true,
+        signatureImageDataUrl: isDrawnSignature ? signatureDataUrl : null,
+        acceptedTerms,
         signedAt
       }
     }
