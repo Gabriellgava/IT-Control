@@ -1,18 +1,24 @@
 import { google } from 'googleapis'
 import { getGoogleDriveConfig } from '@/lib/termos/config'
 
-function getDrive() {
-  const cfg = getGoogleDriveConfig()
-  const auth = new google.auth.GoogleAuth({
-    credentials: {
-      project_id: cfg.projectId,
-      client_email: cfg.clientEmail,
-      private_key: cfg.privateKey,
-    },
-    scopes: ['https://www.googleapis.com/auth/drive'],
-  })
+const cfg = getGoogleDriveConfig()
 
-  return { drive: google.drive({ version: 'v3', auth }), cfg }
+const auth = new google.auth.GoogleAuth({
+  credentials: {
+    client_email: cfg.clientEmail,
+    private_key: cfg.privateKey,
+  },
+  scopes: ['https://www.googleapis.com/auth/drive'],
+})
+
+export const drive = google.drive({
+  version: 'v3',
+  auth,
+})
+
+function debug(message: string, data?: Record<string, unknown>) {
+  if (process.env.DEBUG_GOOGLE_DRIVE !== 'true') return
+  console.info(`[google-drive][debug] ${message}`, data ?? {})
 }
 
 function sanitizeDriveName(value: string) {
@@ -20,9 +26,10 @@ function sanitizeDriveName(value: string) {
 }
 
 async function ensureFolderByName(parentId: string, folderName: string) {
-  const { drive } = getDrive()
   const safeName = sanitizeDriveName(folderName).replace(/'/g, "\\'")
   const q = `'${parentId}' in parents and mimeType='application/vnd.google-apps.folder' and name='${safeName}' and trashed=false`
+
+  debug('Buscando pasta', { parentId, folderName: safeName })
 
   const existing = await drive.files.list({ q, fields: 'files(id,name)', pageSize: 1 })
   if (existing.data.files?.[0]?.id) return existing.data.files[0].id
@@ -44,7 +51,6 @@ async function ensureFolderByName(parentId: string, folderName: string) {
 }
 
 export async function ensureFuncionarioFolder(nome: string) {
-  const { cfg } = getDrive()
   return ensureFolderByName(cfg.rootFolderId, nome)
 }
 
@@ -53,7 +59,7 @@ export async function ensureTermoFolder(funcionarioFolderId: string, termoId: st
 }
 
 export async function uploadPdf(folderId: string, fileName: string, data: Buffer) {
-  const { drive } = getDrive()
+  debug('Enviando PDF', { folderId, fileName })
 
   const file = await drive.files.create({
     requestBody: { name: sanitizeDriveName(fileName), parents: [folderId] },
