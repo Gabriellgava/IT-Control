@@ -94,7 +94,7 @@ function validateGoogleDriveEnv() {
   }
 }
 
-function internalErrorResponse(error: unknown) {
+function internalErrorResponse(error: unknown, step = 'unknown') {
   const details = getErrorDetails(error)
 
   logAssinatura('Erro interno da API', details)
@@ -104,7 +104,8 @@ function internalErrorResponse(error: unknown) {
       error: true,
       message: details.message,
       stack: process.env.NODE_ENV === 'development' ? details.stack : undefined,
-      cause: details.cause
+      cause: details.cause,
+      step
     },
     { status: 500 }
   )
@@ -170,7 +171,7 @@ export async function GET(_: NextRequest, { params }: RouteContext) {
       })
     )
   } catch (error) {
-    return internalErrorResponse(error)
+    return internalErrorResponse(error, 'post-signature')
   }
 }
 
@@ -321,9 +322,9 @@ export async function POST(request: NextRequest, { params }: { params: { token: 
 
       logAssinatura('POST upload Google Drive iniciado', {
         termoFolderId,
-        fileName: `termo-assinado-${termo.id}.pdf`
+        fileName: 'termo-responsabilidade.pdf'
       })
-      const final = await uploadPdf(termoFolderId, `termo-assinado-${termo.id}.pdf`, pdf)
+      const final = await uploadPdf(termoFolderId, 'termo-responsabilidade.pdf', pdf)
       console.log('[DRIVE] upload Google Drive concluído', { termoId: termo.id, folderId: termoFolderId, fileId: final.fileId })
       driveFileId = final.fileId
 
@@ -343,6 +344,6 @@ export async function POST(request: NextRequest, { params }: { params: { token: 
 
     return NextResponse.json(safeSerialize({ ok: true, termoId: termo.id, driveFileId }))
   } catch (error) {
-    return internalErrorResponse(error)
+    return internalErrorResponse(error, 'post-signature')
   }
 }

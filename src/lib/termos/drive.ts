@@ -29,7 +29,7 @@ async function ensureFolderByName(parentId: string, folderName: string) {
   const safeName = sanitizeDriveName(folderName).replace(/'/g, "\\'")
   const q = `'${parentId}' in parents and mimeType='application/vnd.google-apps.folder' and name='${safeName}' and trashed=false`
 
-  console.log('[DRIVE] procurando pasta funcionário', { parentId, folderName: safeName })
+  console.log('[drive] verificando pasta colaborador', { parentId, folderName: safeName })
   console.log('[DRIVE] findFolder antes', { parentId, folderName: safeName, query: q })
   debug('Buscando pasta', { parentId, folderName: safeName })
 
@@ -43,7 +43,7 @@ async function ensureFolderByName(parentId: string, folderName: string) {
   console.log('[DRIVE] findFolder depois', { total: existing.data.files?.length ?? 0, parentId, folderName: safeName })
 
   if (existing.data.files?.[0]?.id) {
-    console.log('[DRIVE] pasta encontrada', { id: existing.data.files[0].id, parentId, folderName: safeName })
+    console.log('[drive] pasta colaborador encontrada/criada', { id: existing.data.files[0].id, parentId, folderName: safeName })
     return existing.data.files[0].id
   }
 
@@ -57,7 +57,7 @@ async function ensureFolderByName(parentId: string, folderName: string) {
     fields: 'id',
     supportsAllDrives: true,
   })
-  console.log('[DRIVE] createFolder depois', { parentId, folderName: safeName, id: created.data.id })
+  console.log('[drive] pasta colaborador encontrada/criada', { parentId, folderName: safeName, id: created.data.id })
 
   if (!created.data.id) {
     throw new Error(`Falha ao criar pasta '${safeName}' no Google Drive`)
@@ -81,12 +81,12 @@ function formatFolderDate(date: Date) {
 
 export async function ensureTermoFolder(funcionarioFolderId: string, termoDate: Date) {
   const folderName = `Termo de Ativos - ${formatFolderDate(termoDate)}`
-  console.log('[DRIVE] criando pasta termo', { funcionarioFolderId, folderName })
+  console.log('[drive] verificando subpasta termo', { funcionarioFolderId, folderName })
   return ensureFolderByName(funcionarioFolderId, folderName)
 }
 
 export async function uploadPdf(folderId: string, fileName: string, data: Buffer) {
-  console.log('[DRIVE] enviando PDF', { folderId, fileName, bytes: data.length })
+  console.log('[drive] upload iniciado', { folderId, fileName, bytes: data.length })
   console.log('[DRIVE] uploadFile antes', { folderId, fileName })
   debug('Enviando PDF', { folderId, fileName })
 
@@ -96,7 +96,7 @@ export async function uploadPdf(folderId: string, fileName: string, data: Buffer
     fields: 'id, webViewLink, webContentLink',
     supportsAllDrives: true,
   })
-  console.log('[DRIVE] uploadFile depois', { folderId, fileName, fileId: file.data.id })
+  console.log('[drive] upload concluído', { folderId, fileName, fileId: file.data.id })
 
   if (!file.data.id) {
     throw new Error('Falha ao enviar PDF para o Google Drive')
