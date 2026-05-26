@@ -1,12 +1,16 @@
 import { Buffer } from 'node:buffer'
-import chromium from '@sparticuz/chromium'
-import puppeteer from 'puppeteer-core'
 
 const PDF_TAG = '[pdf/generate-termo-pdf]'
 
 export async function generateTermoPdf(html: string): Promise<Buffer> {
   console.log(`${PDF_TAG} início geração PDF`, { htmlLength: html.length })
 
+  const [{ default: chromium }, puppeteerModule] = await Promise.all([
+    import('@sparticuz/chromium'),
+    import('puppeteer-core')
+  ])
+
+  const puppeteer = puppeteerModule.default
   let browser: Awaited<ReturnType<typeof puppeteer.launch>> | null = null
 
   try {
@@ -43,8 +47,6 @@ export async function generateTermoPdf(html: string): Promise<Buffer> {
 
     return buffer
   } finally {
-    if (browser) {
-      await browser.close()
-    }
+    if (browser) await browser.close()
   }
 }
