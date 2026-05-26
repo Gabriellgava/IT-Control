@@ -1,36 +1,52 @@
-const chromium = require('@sparticuz/chromium')
-const puppeteer = require('puppeteer-core')
+import chromium from '@sparticuz/chromium'
+import puppeteer from 'puppeteer-core'
 
 export async function generateTermoPdf(html: string): Promise<Buffer> {
   console.log('[pdf/generate-termo-pdf] início geração PDF')
 
-  const browser = await puppeteer.launch({
-    args: chromium.args,
-    defaultViewport: chromium.defaultViewport,
-    executablePath: await chromium.executablePath(),
-    headless: chromium.headless,
-  })
+  let browser: Awaited<ReturnType<typeof puppeteer.launch>> | null = null
 
-  const page = await browser.newPage()
+  try {
+    const executablePath = await chromium.executablePath()
 
-  await page.setContent(html, {
-    waitUntil: 'networkidle0',
-  })
+    browser = await puppeteer.launch({
+      args: chromium.args,
+      defaultViewport: chromium.defaultViewport,
+      executablePath,
+      headless: chromium.headless,
+    })
 
-  const pdf = await page.pdf({
-    format: 'A4',
-    printBackground: true,
-    margin: {
-      top: '20px',
-      right: '20px',
-      bottom: '20px',
-      left: '20px',
-    },
-  })
+    console.log('[pdf/generate-termo-pdf] browser iniciado', {
+      executablePath,
+      headless: chromium.headless,
+    })
 
-  await browser.close()
+    const page = await browser.newPage()
 
-  console.log('[pdf/generate-termo-pdf] PDF gerado com sucesso')
+    await page.setContent(html, {
+      waitUntil: 'networkidle0',
+    })
 
-  return Buffer.from(pdf)
+    console.log('[pdf/generate-termo-pdf] página carregada')
+
+    const pdf = await page.pdf({
+      format: 'A4',
+      printBackground: true,
+      margin: {
+        top: '20px',
+        right: '20px',
+        bottom: '20px',
+        left: '20px',
+      },
+    })
+
+    console.log('[pdf/generate-termo-pdf] PDF gerado')
+
+    return Buffer.from(pdf)
+  } finally {
+    if (browser) {
+      await browser.close()
+      console.log('[pdf/generate-termo-pdf] browser fechado')
+    }
+  }
 }

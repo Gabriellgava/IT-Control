@@ -319,12 +319,12 @@ export async function POST(request: NextRequest, { params }: { params: { token: 
       })
       const termoFolderId = await ensureTermoFolder(funcionarioFolderId, signedAt)
 
-      logAssinatura('POST upload drive - enviando PDF', {
+      logAssinatura('POST upload Google Drive iniciado', {
         termoFolderId,
         fileName: `termo-assinado-${termo.id}.pdf`
       })
       const final = await uploadPdf(termoFolderId, `termo-assinado-${termo.id}.pdf`, pdf)
-      console.log('[DRIVE] upload concluído', { termoId: termo.id, folderId: termoFolderId, fileId: final.fileId })
+      console.log('[DRIVE] upload Google Drive concluído', { termoId: termo.id, folderId: termoFolderId, fileId: final.fileId })
       driveFileId = final.fileId
 
       const updateDriveQuery = {
