@@ -4,6 +4,8 @@ import { ensureFuncionarioFolder, ensureTermoFolder, uploadPdf } from '@/lib/ter
 import { registrarAuditoria } from '@/lib/termos/auditoria'
 import { buildTermoPdf } from '@/lib/termos/pdf'
 
+export const runtime = 'nodejs'
+
 const ROUTE_TAG = '[api/assinatura/[token]]'
 
 type RouteContext = {
