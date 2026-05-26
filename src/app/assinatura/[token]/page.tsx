@@ -15,7 +15,7 @@ type AssinaturaPageState =
         funcionario: {
           id: string
           nome: string
-          email: string
+          email: string | null
         }
         signedAt: Date | null
         signatureImageDataUrl: string | null
@@ -118,7 +118,7 @@ export default async function AssinaturaPage({ params }: { params: { token: stri
           <strong>Colaborador:</strong> {termo.funcionario.nome}
         </p>
         <p>
-          <strong>E-mail:</strong> {termo.funcionario.email}
+          <strong>E-mail:</strong> {termo.funcionario.email ?? 'Não informado'}
         </p>
         <p>
           <strong>Status:</strong> {termo.status}
