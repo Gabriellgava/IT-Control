@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { PDFDocument, StandardFonts, rgb } from 'pdf-lib'
+import { PDFDocument, PDFFont, StandardFonts, rgb } from 'pdf-lib'
 import { normalizarTexto } from '@/lib/texto'
 import { cleanAssetDescription } from '@/lib/termos/asset-description'
 
@@ -39,6 +39,59 @@ function extractTableItems(html: string): TermoItem[] {
     .slice(0, 300)
 }
 
+/**
+ * Quebra texto por largura máxima usando métricas reais da fonte no pdf-lib.
+ * Isso evita uso de APIs inexistentes e mantém compatibilidade com Vercel.
+ */
+const wrapText = (text: string, font: PDFFont, fontSize: number, maxWidth: number): string[] => {
+  const paragraphs = text.split(/\r?\n/)
+  const lines: string[] = []
+
+  for (const paragraph of paragraphs) {
+    const words = paragraph.trim().split(/\s+/).filter(Boolean)
+
+    if (words.length === 0) {
+      lines.push('')
+      continue
+    }
+
+    let currentLine = words[0]
+
+    for (let i = 1; i < words.length; i += 1) {
+      const candidate = `${currentLine} ${words[i]}`
+      const candidateWidth = font.widthOfTextAtSize(candidate, fontSize)
+
+      if (candidateWidth <= maxWidth) {
+        currentLine = candidate
+        continue
+      }
+
+      lines.push(currentLine)
+
+      // Se uma única palavra ultrapassar o limite, quebramos por caractere.
+      if (font.widthOfTextAtSize(words[i], fontSize) > maxWidth) {
+        let chunk = ''
+        for (const char of words[i]) {
+          const chunkCandidate = `${chunk}${char}`
+          if (font.widthOfTextAtSize(chunkCandidate, fontSize) <= maxWidth) {
+            chunk = chunkCandidate
+          } else {
+            if (chunk) lines.push(chunk)
+            chunk = char
+          }
+        }
+        currentLine = chunk
+      } else {
+        currentLine = words[i]
+      }
+    }
+
+    lines.push(currentLine)
+  }
+
+  return lines
+}
+
 const PAGE = { width: 595, height: 842, margin: 40 }
 
 export async function buildTermoPdf(params: BuildTermoPdfParams) {
@@ -58,9 +111,13 @@ export async function buildTermoPdf(params: BuildTermoPdfParams) {
 
   const write = (text: string, size = 10, isBold = false) => {
     const targetFont = isBold ? bold : font
-    const lines = targetFont.splitTextIntoLines(text, PAGE.width - PAGE.margin * 2)
+    const lines = wrapText(text, targetFont, size, PAGE.width - PAGE.margin * 2)
+
     for (const line of lines) {
-      if (y < 80) { page = doc.addPage([PAGE.width, PAGE.height]); y = PAGE.height - PAGE.margin }
+      if (y < 80) {
+        page = doc.addPage([PAGE.width, PAGE.height])
+        y = PAGE.height - PAGE.margin
+      }
       page.drawText(line, { x: PAGE.margin, y, size, font: targetFont, color: rgb(0.08, 0.1, 0.15) })
       y -= size + 3
     }
