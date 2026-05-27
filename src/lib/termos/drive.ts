@@ -1,3 +1,4 @@
+import { Readable } from 'stream'
 import { google } from 'googleapis'
 import { getGoogleDriveConfig } from '@/lib/termos/config'
 
@@ -85,18 +86,26 @@ export async function ensureTermoFolder(funcionarioFolderId: string, termoDate: 
   return ensureFolderByName(funcionarioFolderId, folderName)
 }
 
-export async function uploadPdf(folderId: string, fileName: string, data: Buffer) {
+export async function uploadPdf(folderId: string, fileName: string, data: Buffer | Uint8Array) {
   console.log('[drive] upload iniciado', { folderId, fileName, bytes: data.length })
   console.log('[DRIVE] uploadFile antes', { folderId, fileName })
   debug('Enviando PDF', { folderId, fileName })
 
+  const pdfBuffer = Buffer.isBuffer(data) ? data : Buffer.from(data)
+  const stream = Readable.from(pdfBuffer)
+
   const file = await drive.files.create({
     requestBody: { name: sanitizeDriveName(fileName), parents: [folderId] },
-    media: { mimeType: 'application/pdf', body: Buffer.from(data) },
+    media: { mimeType: 'application/pdf', body: stream },
     fields: 'id, webViewLink, webContentLink',
     supportsAllDrives: true,
   })
-  console.log('[drive] upload concluído', { folderId, fileName, fileId: file.data.id })
+  console.log('[drive] upload concluído', {
+    folderId,
+    fileName,
+    fileId: file.data.id,
+    webViewLink: file.data.webViewLink ?? null,
+  })
 
   if (!file.data.id) {
     throw new Error('Falha ao enviar PDF para o Google Drive')
