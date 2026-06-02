@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { ensureFuncionarioFolder, ensureTermoFolder, uploadPdf } from '@/lib/termos/drive'
+import { ensureFuncionarioFolder, ensureTermoFolder, getDriveStorageConfig, uploadPdf } from '@/lib/termos/drive'
 import { registrarAuditoria } from '@/lib/termos/auditoria'
 import { buildTermoPdf } from '@/lib/termos/pdf'
 
@@ -89,9 +89,6 @@ function validateGoogleDriveEnv() {
     throw new Error('GOOGLE_PRIVATE_KEY não configurado')
   }
 
-  if (!process.env.GOOGLE_DRIVE_TERMOS_ROOT_FOLDER_ID) {
-    throw new Error('GOOGLE_DRIVE_TERMOS_ROOT_FOLDER_ID não configurado')
-  }
 }
 
 function internalErrorResponse(error: unknown, step = 'unknown') {
@@ -284,12 +281,15 @@ export async function POST(request: NextRequest, { params }: { params: { token: 
     })
 
     let driveFileId: string | null = null
+    let driveFileLink: string | null = null
 
     try {
       validateGoogleDriveEnv()
-      logAssinatura('POST upload drive - root folder configurada', {
-        rootFolderId: process.env.GOOGLE_DRIVE_TERMOS_ROOT_FOLDER_ID,
-      })
+      const driveConfig = getDriveStorageConfig()
+      console.log('[DRIVE] shared drive id', driveConfig.sharedDriveId)
+      console.log('[DRIVE] root folder id', driveConfig.rootFolderId)
+      console.log('[DRIVE] usando shared drive', driveConfig)
+      logAssinatura('POST upload drive - shared drive configurado', driveConfig)
       logAssinatura('POST upload drive - iniciando geração do PDF', {
         termoId: termo.id,
         token,
@@ -311,38 +311,46 @@ export async function POST(request: NextRequest, { params }: { params: { token: 
 
       logAssinatura('POST upload drive - PDF gerado', { termoId: termo.id, pdfBytes: pdf.length })
 
+      console.log('[DRIVE] criando pasta colaborador', { funcionario: termo.funcionario.nome })
       logAssinatura('POST upload drive - garantindo pasta do funcionário', { funcionario: termo.funcionario.nome })
       const funcionarioFolderId = await ensureFuncionarioFolder(termo.funcionario.nome)
 
+      console.log('[DRIVE] criando pasta termo', { funcionarioFolderId, termoDataAtual: signedAt })
       logAssinatura('POST upload drive - garantindo pasta do termo', {
         funcionarioFolderId,
         termoDataAtual: signedAt
       })
       const termoFolderId = await ensureTermoFolder(funcionarioFolderId, signedAt)
 
+      console.log('[DRIVE] upload pdf iniciado', { termoFolderId, fileName: 'termo-responsabilidade.pdf' })
       logAssinatura('POST upload Google Drive iniciado', {
         termoFolderId,
         fileName: 'termo-responsabilidade.pdf'
       })
       const final = await uploadPdf(termoFolderId, 'termo-responsabilidade.pdf', pdf)
-      console.log('[DRIVE] upload Google Drive concluído', { termoId: termo.id, folderId: termoFolderId, fileId: final.fileId })
-      driveFileId = final.fileId
+      const finalFileId = final.fileId ?? null
+      const finalFileLink = final.link ?? null
+      console.log('[DRIVE] upload pdf concluído', { termoId: termo.id, folderId: termoFolderId, fileId: finalFileId })
+      console.log('[DRIVE] fileId', finalFileId)
+      console.log('[DRIVE] webViewLink', finalFileLink)
+      driveFileId = finalFileId
+      driveFileLink = finalFileLink
 
       const updateDriveQuery = {
         where: { id: termo.id },
-        data: { driveFolderId: termoFolderId, driveFileId: final.fileId, driveFileLink: final.link ?? undefined }
+        data: { driveFolderId: termoFolderId, driveFileId: finalFileId, driveFileLink: finalFileLink }
       }
       logAssinatura('POST prisma query termo.update drive', updateDriveQuery)
       const updatedDrive = await prisma.termo.update(updateDriveQuery)
       logAssinatura('POST resultado prisma termo.update drive', updatedDrive)
 
-      await registrarAuditoria(termo.id, 'TERMO_ASSINADO', { finalFileId: final.fileId }, { ip, userAgent })
+      await registrarAuditoria(termo.id, 'TERMO_ASSINADO', { finalFileId, finalFileLink }, { ip, userAgent })
     } catch (driveError) {
       const details = getErrorDetails(driveError)
       console.error(`${ROUTE_TAG} Falha no fluxo do Google Drive após assinatura concluída`, details)
     }
 
-    return NextResponse.json(safeSerialize({ ok: true, termoId: termo.id, driveFileId }))
+    return NextResponse.json(safeSerialize({ ok: true, termoId: termo.id, driveFileId, driveFileLink }))
   } catch (error) {
     return internalErrorResponse(error, 'post-signature')
   }

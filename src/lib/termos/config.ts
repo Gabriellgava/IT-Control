@@ -3,8 +3,12 @@ import { createHash, createPrivateKey } from 'node:crypto'
 type GoogleDriveConfig = {
   clientEmail: string
   privateKey: string
+  sharedDriveId: string
   rootFolderId: string
 }
+
+const SHARED_DRIVE_ID = '0AEcWwKcSvCUbUk9PVA'
+const TERMOS_ROOT_FOLDER_ID = '1pzEKyp0mvmTVtBHaHggHwmwonARpQPLC'
 
 function required(name: string, value?: string) {
   if (!value?.trim()) {
@@ -42,6 +46,7 @@ function debugConfig(cfg: GoogleDriveConfig) {
 
   console.info('[google-drive][debug] Config carregada', {
     clientEmail: cfg.clientEmail,
+    sharedDriveId: cfg.sharedDriveId,
     rootFolderId: cfg.rootFolderId,
     privateKeyLength: cfg.privateKey.length,
     privateKeyFingerprint: fingerprint,
@@ -55,7 +60,8 @@ export function getGoogleDriveConfig(): GoogleDriveConfig {
   const cfg: GoogleDriveConfig = {
     clientEmail: required('GOOGLE_CLIENT_EMAIL', process.env.GOOGLE_CLIENT_EMAIL),
     privateKey: parsePrivateKey(required('GOOGLE_PRIVATE_KEY', process.env.GOOGLE_PRIVATE_KEY)),
-    rootFolderId: required('GOOGLE_DRIVE_TERMOS_ROOT_FOLDER_ID', process.env.GOOGLE_DRIVE_TERMOS_ROOT_FOLDER_ID),
+    sharedDriveId: SHARED_DRIVE_ID,
+    rootFolderId: TERMOS_ROOT_FOLDER_ID,
   }
 
   validatePrivateKey(cfg.privateKey, cfg.clientEmail)
