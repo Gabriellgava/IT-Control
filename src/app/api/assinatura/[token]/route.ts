@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { ensureFuncionarioFolder, ensureTermoFolder, uploadPdf } from '@/lib/termos/drive'
+import { ensureFuncionarioFolder, ensureTermoFolder, getDriveStorageConfig, uploadPdf } from '@/lib/termos/drive'
 import { registrarAuditoria } from '@/lib/termos/auditoria'
 import { buildTermoPdf } from '@/lib/termos/pdf'
 
@@ -89,9 +89,6 @@ function validateGoogleDriveEnv() {
     throw new Error('GOOGLE_PRIVATE_KEY não configurado')
   }
 
-  if (!process.env.GOOGLE_DRIVE_TERMOS_ROOT_FOLDER_ID) {
-    throw new Error('GOOGLE_DRIVE_TERMOS_ROOT_FOLDER_ID não configurado')
-  }
 }
 
 function internalErrorResponse(error: unknown, step = 'unknown') {
@@ -287,9 +284,11 @@ export async function POST(request: NextRequest, { params }: { params: { token: 
 
     try {
       validateGoogleDriveEnv()
-      logAssinatura('POST upload drive - root folder configurada', {
-        rootFolderId: process.env.GOOGLE_DRIVE_TERMOS_ROOT_FOLDER_ID,
-      })
+      const driveConfig = getDriveStorageConfig()
+      console.log('[DRIVE] shared drive id', driveConfig.sharedDriveId)
+      console.log('[DRIVE] root folder id', driveConfig.rootFolderId)
+      console.log('[DRIVE] usando shared drive', driveConfig)
+      logAssinatura('POST upload drive - shared drive configurado', driveConfig)
       logAssinatura('POST upload drive - iniciando geração do PDF', {
         termoId: termo.id,
         token,
@@ -311,21 +310,26 @@ export async function POST(request: NextRequest, { params }: { params: { token: 
 
       logAssinatura('POST upload drive - PDF gerado', { termoId: termo.id, pdfBytes: pdf.length })
 
+      console.log('[DRIVE] criando pasta colaborador', { funcionario: termo.funcionario.nome })
       logAssinatura('POST upload drive - garantindo pasta do funcionário', { funcionario: termo.funcionario.nome })
       const funcionarioFolderId = await ensureFuncionarioFolder(termo.funcionario.nome)
 
+      console.log('[DRIVE] criando pasta termo', { funcionarioFolderId, termoDataAtual: signedAt })
       logAssinatura('POST upload drive - garantindo pasta do termo', {
         funcionarioFolderId,
         termoDataAtual: signedAt
       })
       const termoFolderId = await ensureTermoFolder(funcionarioFolderId, signedAt)
 
+      console.log('[DRIVE] upload pdf iniciado', { termoFolderId, fileName: 'termo-responsabilidade.pdf' })
       logAssinatura('POST upload Google Drive iniciado', {
         termoFolderId,
         fileName: 'termo-responsabilidade.pdf'
       })
       const final = await uploadPdf(termoFolderId, 'termo-responsabilidade.pdf', pdf)
-      console.log('[DRIVE] upload Google Drive concluído', { termoId: termo.id, folderId: termoFolderId, fileId: final.fileId })
+      console.log('[DRIVE] upload pdf concluído', { termoId: termo.id, folderId: termoFolderId, fileId: final.fileId })
+      console.log('[DRIVE] fileId', final.fileId)
+      console.log('[DRIVE] webViewLink', final.link ?? null)
       driveFileId = final.fileId
 
       const updateDriveQuery = {
