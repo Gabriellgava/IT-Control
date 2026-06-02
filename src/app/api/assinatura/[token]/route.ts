@@ -181,7 +181,7 @@ export async function POST(request: NextRequest, { params }: { params: { token: 
       return NextResponse.json({ error: true, message: 'Token inválido' }, { status: 400 })
     }
 
-    const termoQuery = { where: { token }, include: { funcionario: true } }
+    const termoQuery = { where: { token }, include: { funcionario: { include: { setor: true } } } }
     logAssinatura('POST prisma query termo.findUnique', termoQuery)
     const termo = await prisma.termo.findUnique(termoQuery)
     logAssinatura('POST resultado prisma termo.findUnique', termo)
@@ -300,9 +300,9 @@ export async function POST(request: NextRequest, { params }: { params: { token: 
         termoId: termo.id,
         titulo: updated.titulo,
         texto: updated.conteudoHtml,
-        empresa: 'IT Control',
         colaborador: termo.funcionario.nome,
         colaboradorEmail: termo.funcionario.email,
+        setores: termo.funcionario.setor?.nome ? [termo.funcionario.setor.nome] : undefined,
         assinaturaTexto: signerName,
         assinaturaImagemDataUrl: signatureImageDataUrl,
         assinadoEm: signedAt,
