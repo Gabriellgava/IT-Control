@@ -30,6 +30,11 @@ function escapeDriveQueryValue(value: string) {
   return value.replace(/\\/g, '\\\\').replace(/'/g, "\\'")
 }
 
+type DriveUploadResult = {
+  fileId: string | null
+  link: string | null
+}
+
 function logSharedDriveUsage() {
   console.log('[DRIVE] shared drive id', cfg.sharedDriveId)
   console.log('[DRIVE] root folder id', cfg.rootFolderId)
@@ -154,7 +159,7 @@ export async function ensureTermoFolder(funcionarioFolderId: string, termoDate: 
   return ensureFolderByName(funcionarioFolderId, folderName, 'termo')
 }
 
-export async function uploadPdf(folderId: string, fileName: string, data: Buffer | Uint8Array) {
+export async function uploadPdf(folderId: string, fileName: string, data: Buffer | Uint8Array): Promise<DriveUploadResult> {
   console.log('[DRIVE] upload pdf iniciado', {
     sharedDriveId: cfg.sharedDriveId,
     folderId,
@@ -178,20 +183,22 @@ export async function uploadPdf(folderId: string, fileName: string, data: Buffer
   }
 
   const uploadedFile = await validateFileInSharedDrive(file.data.id, 'upload pdf')
+  const uploadedFileId = uploadedFile.id ?? file.data.id ?? null
+  const webViewLink = uploadedFile.webViewLink ?? null
   const link = uploadedFile.webViewLink || uploadedFile.webContentLink || null
 
   console.log('[DRIVE] upload pdf concluído', {
     sharedDriveId: uploadedFile.driveId,
     folderId,
     fileName,
-    fileId: uploadedFile.id,
-    webViewLink: uploadedFile.webViewLink ?? null,
+    fileId: uploadedFileId,
+    webViewLink,
   })
-  console.log('[DRIVE] fileId', uploadedFile.id)
-  console.log('[DRIVE] webViewLink', uploadedFile.webViewLink ?? null)
+  console.log('[DRIVE] fileId', uploadedFileId)
+  console.log('[DRIVE] webViewLink', webViewLink)
 
   return {
-    fileId: uploadedFile.id,
+    fileId: uploadedFileId,
     link,
   }
 }

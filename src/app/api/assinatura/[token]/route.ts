@@ -281,6 +281,7 @@ export async function POST(request: NextRequest, { params }: { params: { token: 
     })
 
     let driveFileId: string | null = null
+    let driveFileLink: string | null = null
 
     try {
       validateGoogleDriveEnv()
@@ -327,26 +328,29 @@ export async function POST(request: NextRequest, { params }: { params: { token: 
         fileName: 'termo-responsabilidade.pdf'
       })
       const final = await uploadPdf(termoFolderId, 'termo-responsabilidade.pdf', pdf)
-      console.log('[DRIVE] upload pdf concluído', { termoId: termo.id, folderId: termoFolderId, fileId: final.fileId })
-      console.log('[DRIVE] fileId', final.fileId)
-      console.log('[DRIVE] webViewLink', final.link ?? null)
-      driveFileId = final.fileId
+      const finalFileId = final.fileId ?? null
+      const finalFileLink = final.link ?? null
+      console.log('[DRIVE] upload pdf concluído', { termoId: termo.id, folderId: termoFolderId, fileId: finalFileId })
+      console.log('[DRIVE] fileId', finalFileId)
+      console.log('[DRIVE] webViewLink', finalFileLink)
+      driveFileId = finalFileId
+      driveFileLink = finalFileLink
 
       const updateDriveQuery = {
         where: { id: termo.id },
-        data: { driveFolderId: termoFolderId, driveFileId: final.fileId, driveFileLink: final.link ?? undefined }
+        data: { driveFolderId: termoFolderId, driveFileId: finalFileId, driveFileLink: finalFileLink }
       }
       logAssinatura('POST prisma query termo.update drive', updateDriveQuery)
       const updatedDrive = await prisma.termo.update(updateDriveQuery)
       logAssinatura('POST resultado prisma termo.update drive', updatedDrive)
 
-      await registrarAuditoria(termo.id, 'TERMO_ASSINADO', { finalFileId: final.fileId }, { ip, userAgent })
+      await registrarAuditoria(termo.id, 'TERMO_ASSINADO', { finalFileId, finalFileLink }, { ip, userAgent })
     } catch (driveError) {
       const details = getErrorDetails(driveError)
       console.error(`${ROUTE_TAG} Falha no fluxo do Google Drive após assinatura concluída`, details)
     }
 
-    return NextResponse.json(safeSerialize({ ok: true, termoId: termo.id, driveFileId }))
+    return NextResponse.json(safeSerialize({ ok: true, termoId: termo.id, driveFileId, driveFileLink }))
   } catch (error) {
     return internalErrorResponse(error, 'post-signature')
   }
