@@ -54,6 +54,8 @@ export default function TermosPage() {
   const [responsavelSelecionado, setResponsavelSelecionado] = useState('')
 
   const [empresa, setEmpresa] = useState('Minha Empresa LTDA')
+  const [cnpjEmpresa, setCnpjEmpresa] = useState('')
+  const [enderecoEmpresa, setEnderecoEmpresa] = useState('')
   const [dataEntrega, setDataEntrega] = useState(hojeISO)
   const [dataDevolucao, setDataDevolucao] = useState('')
   const [observacoesTermo, setObservacoesTermo] = useState('')
@@ -144,7 +146,7 @@ export default function TermosPage() {
       const itensHtml = responsavelAtivo.equipamentos
         .map(
           (equipamento) =>
-            `<tr><td style="padding:8px;border:1px solid #e5e7eb;">${equipamento.tipo}</td><td style="padding:8px;border:1px solid #e5e7eb;">${equipamento.marca} ${equipamento.modelo}</td><td style="padding:8px;border:1px solid #e5e7eb;">${equipamento.etiqueta}</td></tr>`
+            `<tr><td style="padding:8px;border:1px solid #e5e7eb;">${equipamento.etiqueta}</td><td style="padding:8px;border:1px solid #e5e7eb;">${equipamento.tipo}</td><td style="padding:8px;border:1px solid #e5e7eb;">${equipamento.marca} ${equipamento.modelo}</td><td style="padding:8px;border:1px solid #e5e7eb;">${equipamento.marca}</td><td style="padding:8px;border:1px solid #e5e7eb;">${equipamento.modelo}</td></tr>`
         )
         .join('')
 
@@ -156,9 +158,11 @@ export default function TermosPage() {
           <table style="width:100%;border-collapse:collapse;margin:14px 0 16px;font-size:14px;">
             <thead>
               <tr style="background:#f3f4f6;">
-                <th style="text-align:left;padding:8px;border:1px solid #e5e7eb;">Tipo do equipamento</th>
+                <th style="text-align:left;padding:8px;border:1px solid #e5e7eb;">Patrimônio</th>
+                <th style="text-align:left;padding:8px;border:1px solid #e5e7eb;">Tipo</th>
                 <th style="text-align:left;padding:8px;border:1px solid #e5e7eb;">Descrição</th>
-                <th style="text-align:left;padding:8px;border:1px solid #e5e7eb;">Etiqueta patrimonial</th>
+                <th style="text-align:left;padding:8px;border:1px solid #e5e7eb;">Marca</th>
+                <th style="text-align:left;padding:8px;border:1px solid #e5e7eb;">Modelo</th>
               </tr>
             </thead>
             <tbody>${itensHtml}</tbody>
@@ -172,6 +176,8 @@ export default function TermosPage() {
         descricao: `${equipamento.marca} ${equipamento.modelo}`.trim(),
         tipo: equipamento.tipo,
         etiqueta: equipamento.etiqueta,
+        marca: equipamento.marca,
+        modelo: equipamento.modelo,
       }))
       const criarPayload = {
         titulo: 'Termo de Responsabilidade de Ativos de TI',
@@ -179,6 +185,8 @@ export default function TermosPage() {
         funcionarioId: funcionarioAtivo.id,
         validadeHoras: 72,
         empresa,
+        cnpjEmpresa,
+        enderecoEmpresa,
         setores: responsavelAtivo.setores,
         dataEntrega: formatarDataBR(dataEntrega),
         dataDevolucao: formatarDataBR(dataDevolucao),
@@ -286,6 +294,8 @@ export default function TermosPage() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <Input label="Empresa" value={empresa} onChange={(e) => setEmpresa(e.target.value)} />
+              <Input label="CNPJ da empresa" value={cnpjEmpresa} onChange={(e) => setCnpjEmpresa(e.target.value)} placeholder="00.000.000/0000-00" />
+              <Input label="Endereço da empresa" value={enderecoEmpresa} onChange={(e) => setEnderecoEmpresa(e.target.value)} placeholder="Rua, número, cidade/UF" />
               <Input label="Data de entrega" type="date" value={dataEntrega} onChange={(e) => setDataEntrega(e.target.value)} />
               <Input label="Data prevista de devolução" type="date" value={dataDevolucao} onChange={(e) => setDataDevolucao(e.target.value)} />
             </div>
