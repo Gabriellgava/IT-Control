@@ -210,7 +210,7 @@ export async function POST(request: NextRequest, { params }: { params: { token: 
     const mode = typeof body.mode === 'string' ? body.mode.trim().toLowerCase() : ''
     const signatureMode = mode || (typeof body.signatureType === 'string' ? body.signatureType.trim().toLowerCase() : '')
     const isTypedSignature = signatureMode === 'typed'
-    const isDrawSignature = signatureMode === 'draw'
+    const isDrawSignature = signatureMode === 'drawn'
 
     logAssinatura('POST mode recebido', { mode: signatureMode })
     logAssinatura('POST signerName resolvido', { signerName })
