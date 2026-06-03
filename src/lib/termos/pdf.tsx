@@ -197,6 +197,14 @@ const formatDateTimeBR = (date: Date) =>
     timeZone: 'America/Sao_Paulo',
   }).format(date)
 
+const formatDateLongBR = (date: Date) =>
+  new Intl.DateTimeFormat('pt-BR', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'America/Sao_Paulo',
+}).format(date)
+
 export async function buildTermoPdf(params: BuildTermoPdfParams) {
   console.log('[pdf] iniciando geração')
   const signedAt = params.assinadoEm ?? new Date()
@@ -339,7 +347,7 @@ export async function buildTermoPdf(params: BuildTermoPdfParams) {
 
   const drawSignatureBlock = async () => {
     sectionTitle('Assinaturas')
-    writeParagraph(`Cidade e data: ____________________________________, ${dataEmissao}.`, { size: 10 })
+    writeParagraph(`Itatiba, ${formatDateLongBR(signedAt)}.`, { size: 10 })
     y -= 22
     ensureSpace(150)
 
@@ -355,7 +363,7 @@ export async function buildTermoPdf(params: BuildTermoPdfParams) {
     drawTextLine('Representante da Empresa', leftX + columnWidth / 2 - font.widthOfTextAtSize('Representante da Empresa', 8.5) / 2, lineY - 30, 8.5, font, COLORS.muted)
     drawTextLine('ASSINATURA DO COLABORADOR', rightX + columnWidth / 2 - bold.widthOfTextAtSize('ASSINATURA DO COLABORADOR', 9) / 2, lineY - 16, 9, bold, COLORS.primary)
 
-    const signatureY = lineY + 12
+    const signatureY = lineY -20
     if (params.assinaturaImagemDataUrl?.startsWith('data:image/')) {
       const base64 = params.assinaturaImagemDataUrl.split(',')[1] ?? ''
       const bytes = Buffer.from(base64, 'base64')
@@ -416,8 +424,7 @@ export async function buildTermoPdf(params: BuildTermoPdfParams) {
     if (params.observacoes || metadata.observacoes) writeParagraph(params.observacoes || metadata.observacoes || '-', { size: 10 })
   }
 
-  await drawSignatureBlock()
-  console.log('[pdf] assinatura renderizada')
+
 
   writeParagraph(`Auditoria: ID ${params.termoId} | Hash ${payloadHash.slice(0, 32)}... | Gerado em ${new Date().toISOString()} | IP ${normalizarTexto(params.assinadorIp || '-')}`, {
     size: 7.8,

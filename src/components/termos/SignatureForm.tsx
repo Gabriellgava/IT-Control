@@ -17,7 +17,7 @@ export function SignatureForm({ token }: { token: string }) {
     setSaving(true)
     setMessage('')
     const payload = mode === 'drawn'
-      ? { signatureType: 'drawn', signatureDataUrl: ref.current?.toDataURL('image/png'), acceptedTerms }
+      ? { signatureType: 'drawn', signatureImageDataUrl: ref.current?.toDataURL('image/png'), acceptedTerms }
       : { signatureType: 'typed', typedName, acceptedTerms }
 
     try {
