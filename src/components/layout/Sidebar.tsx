@@ -146,6 +146,10 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
                   <Users className="w-3.5 h-3.5 flex-shrink-0" />
                   Usuários
                 </Link>
+                <Link href="/admin/empresas" onClick={onClose} className={subCls(path === '/admin/empresas')}>
+                  <Building2 className="w-3.5 h-3.5 flex-shrink-0" />
+                  Empresas
+                </Link>
                 <Link href="/admin/historico" onClick={onClose} className={subCls(path === '/admin/historico')}>
                   <History className="w-3.5 h-3.5 flex-shrink-0" />
                   Histórico
