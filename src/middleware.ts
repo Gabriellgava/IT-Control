@@ -6,8 +6,17 @@ export default withAuth({
       const pathname = req.nextUrl.pathname
 
       if (pathname.startsWith('/api/auth')) return true
+
+      // liberar assinatura pública
+      if (pathname.startsWith('/api/assinatura')) {
+        return true
+      }
+
       if (!token || token.bloqueado) return false
-      if (pathname.startsWith('/api/admin')) return token.perfil === 'admin'
+
+      if (pathname.startsWith('/api/admin')) {
+        return token.perfil === 'admin'
+      }
 
       return true
     },
