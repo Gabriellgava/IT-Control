@@ -424,8 +424,9 @@ export async function buildTermoPdf(params: BuildTermoPdfParams) {
     if (params.observacoes || metadata.observacoes) writeParagraph(params.observacoes || metadata.observacoes || '-', { size: 10 })
   }
 
-
-
+  console.log('[pdf] desenhando bloco de assinaturas')
+  await drawSignatureBlock()
+  console.log('[pdf] bloco de assinaturas desenhado')
   writeParagraph(`Auditoria: ID ${params.termoId} | Hash ${payloadHash.slice(0, 32)}... | Gerado em ${new Date().toISOString()} | IP ${normalizarTexto(params.assinadorIp || '-')}`, {
     size: 7.8,
     color: COLORS.muted,
