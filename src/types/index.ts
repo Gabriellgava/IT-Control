@@ -87,6 +87,19 @@ export interface Movimentacao {
   criadoEm: string
 }
 
+export interface Empresa {
+  id: string
+  razaoSocial: string
+  nomeFantasia?: string | null
+  cnpj: string
+  endereco?: string | null
+  telefone?: string | null
+  email?: string | null
+  logoUrl?: string | null
+  criadoEm: string
+  atualizadoEm: string
+}
+
 export interface DashboardStats {
   totalProdutos: number
   totalUnidades: number
