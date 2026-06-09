@@ -21,6 +21,7 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
     if (path.startsWith('/produtos')) setExpanded(e => ({ ...e, produtos: true }))
     if (path.startsWith('/movimentacoes')) setExpanded(e => ({ ...e, movimentacoes: true }))
     if (path.startsWith('/admin')) setExpanded(e => ({ ...e, admin: true }))
+    if (path.startsWith('/admin/empresas')) setExpanded(e => ({ ...e, empresas: true }))
   }, [path])
 
   const toggle = (key: string) => setExpanded(e => ({ ...e, [key]: !e[key] }))
@@ -146,10 +147,25 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
                   <Users className="w-3.5 h-3.5 flex-shrink-0" />
                   Usuários
                 </Link>
-                <Link href="/admin/empresas" onClick={onClose} className={subCls(path === '/admin/empresas')}>
-                  <Building2 className="w-3.5 h-3.5 flex-shrink-0" />
-                  Empresas
-                </Link>
+                <div>
+                  <button onClick={() => toggle('empresas')} className={subCls(path.startsWith('/admin/empresas'))}>
+                    <Building2 className="w-3.5 h-3.5 flex-shrink-0" />
+                    <span className="flex-1 text-left">Empresas</span>
+                    <ChevronDown className={`w-3 h-3 transition-transform ${expanded.empresas ? 'rotate-180' : ''}`} />
+                  </button>
+                  {expanded.empresas && (
+                    <div className="mt-0.5 space-y-0.5 pl-4">
+                      <Link href="/admin/empresas" onClick={onClose} className={subCls(path === '/admin/empresas')}>
+                        <Building2 className="w-3 h-3 flex-shrink-0" />
+                        Configurar Empresa
+                      </Link>
+                      <Link href="/admin/empresas/lista" onClick={onClose} className={subCls(path === '/admin/empresas/lista')}>
+                        <List className="w-3 h-3 flex-shrink-0" />
+                        Consultar Empresas
+                      </Link>
+                    </div>
+                  )}
+                </div>
                 <Link href="/admin/historico" onClick={onClose} className={subCls(path === '/admin/historico')}>
                   <History className="w-3.5 h-3.5 flex-shrink-0" />
                   Histórico
