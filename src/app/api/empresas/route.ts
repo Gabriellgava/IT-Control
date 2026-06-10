@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
         cnpj: body.cnpj.trim(),
         endereco: body.endereco?.trim() || null,
         telefone: body.telefone?.trim() || null,
-        email: body.email?.trim() || null,
+        emailCorporativo: body.emailCorporativo?.trim() || null,
         logoUrl: body.logoUrl || null,
       },
     })
