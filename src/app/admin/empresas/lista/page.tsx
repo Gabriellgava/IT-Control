@@ -21,8 +21,27 @@ export default function EmpresasListaPage() {
   })
   const [erro, setErro] = useState('')
   const [loading, setLoading] = useState(false)
+  const [loadingBusca, setLoadingBusca] = useState(true)
 
-  const buscar = () => fetch('/api/empresas').then(r => r.json()).then(setEmpresas)
+  const buscar = async () => {
+    setLoadingBusca(true)
+    try {
+      const res = await fetch('/api/empresas')
+      const data = await res.json()
+      if (!res.ok) {
+        console.error('Erro ao buscar empresas:', data.error)
+        setErro(data.error || 'Erro ao buscar empresas')
+        return
+      }
+      console.log('Empresas encontradas:', data)
+      setEmpresas(data)
+    } catch (error) {
+      console.error('Erro ao buscar empresas:', error)
+      setErro('Erro ao buscar empresas')
+    } finally {
+      setLoadingBusca(false)
+    }
+  }
   useEffect(() => { buscar() }, [])
 
   const abrirNovo = () => { 
@@ -32,15 +51,15 @@ export default function EmpresasListaPage() {
     setModal(true)
   }
 
-  const abrirEditar = (e: Empresa) => { 
+  const abrirEditar = (e: Empresa) => {
     setEditando(e)
-    setForm({ 
-      razaoSocial: e.razaoSocial, 
-      nomeFantasia: e.nomeFantasia || '', 
-      cnpj: e.cnpj, 
-      endereco: e.endereco || '', 
-      telefone: e.telefone || '', 
-      email: e.email || '',
+    setForm({
+      razaoSocial: e.razaoSocial,
+      nomeFantasia: e.nomeFantasia || '',
+      cnpj: e.cnpj,
+      endereco: e.endereco || '',
+      telefone: e.telefone || '',
+      email: e.emailCorporativo || '',
       logoUrl: e.logoUrl || ''
     })
     setErro('')
@@ -104,61 +123,72 @@ export default function EmpresasListaPage() {
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Empresas</h1>
             <p className="text-sm text-gray-500 mt-1">{empresas.length} empresa{empresas.length !== 1 ? 's' : ''} cadastrada{empresas.length !== 1 ? 's' : ''}</p>
           </div>
-          <Button size="sm" icon={<Plus className="w-4 h-4" />} onClick={abrirNovo}>Nova Empresa</Button>
         </div>
 
-        <Table headers={['Empresa', 'CNPJ', 'Contato', 'Endereço', 'Ações']} empty={empresas.length === 0}>
-          {empresas.map(e => (
-            <tr key={e.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
-              <td className="px-4 py-3">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center">
-                    <Building2 className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                  </div>
-                  <div>
-                    <span className="text-sm font-semibold text-gray-900 dark:text-white block">{e.nomeFantasia || e.razaoSocial}</span>
-                    <span className="text-xs text-gray-500 dark:text-gray-400">{e.razaoSocial}</span>
-                  </div>
-                </div>
-              </td>
-              <td className="px-4 py-3">
-                <Badge variant="default">{e.cnpj}</Badge>
-              </td>
-              <td className="px-4 py-3">
-                <div className="space-y-1">
-                  {e.email && (
-                    <div className="flex items-center gap-1.5 text-xs text-gray-600 dark:text-gray-400">
-                      <Mail className="w-3 h-3" />
-                      {e.email}
+        {loadingBusca ? (
+          <div className="flex items-center justify-center py-12">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          </div>
+        ) : erro ? (
+          <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-sm text-red-600 dark:text-red-400">
+            {erro}
+          </div>
+        ) : (
+          <Table headers={['Empresa', 'CNPJ', 'Contato', 'Endereço', 'Ações']} empty={empresas.length === 0}>
+            {empresas.map(e => (
+              <tr key={e.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
+                <td className="px-4 py-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center">
+                      <Building2 className="w-5 h-5 text-blue-600 dark:text-blue-400" />
                     </div>
-                  )}
-                  {e.telefone && (
-                    <div className="flex items-center gap-1.5 text-xs text-gray-600 dark:text-gray-400">
-                      <Phone className="w-3 h-3" />
-                      {e.telefone}
+                    <div>
+                      <span className="text-sm font-semibold text-gray-900 dark:text-white block">{e.nomeFantasia || e.razaoSocial}</span>
+                      <span className="text-xs text-gray-500 dark:text-gray-400">{e.razaoSocial}</span>
                     </div>
-                  )}
-                </div>
-              </td>
-              <td className="px-4 py-3">
-                {e.endereco ? (
-                  <div className="flex items-center gap-1.5 text-xs text-gray-600 dark:text-gray-400">
-                    <MapPin className="w-3 h-3" />
-                    <span className="truncate max-w-[200px]">{e.endereco}</span>
                   </div>
-                ) : (
-                  <span className="text-xs text-gray-400">-</span>
-                )}
-              </td>
-              <td className="px-4 py-3">
-                <div className="flex gap-1">
-                  <button onClick={() => abrirEditar(e)} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-400 hover:text-blue-600 transition-colors"><Edit2 className="w-4 h-4" /></button>
-                  <button onClick={() => setDeletandoId(e.id)} className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-600 transition-colors"><Trash2 className="w-4 h-4" /></button>
-                </div>
-              </td>
-            </tr>
-          ))}
-        </Table>
+                </td>
+                <td className="px-4 py-3">
+                  <Badge variant="default">{e.cnpj}</Badge>
+                </td>
+                <td className="px-4 py-3">
+                  <div className="space-y-1">
+                    {e.emailCorporativo && (
+                      <div className="flex items-center gap-1.5 text-xs text-gray-600 dark:text-gray-400">
+                        <Mail className="w-3 h-3" />
+                        {e.emailCorporativo}
+                      </div>
+                    )}
+                    {e.telefone && (
+                      <div className="flex items-center gap-1.5 text-xs text-gray-600 dark:text-gray-400">
+                        <Phone className="w-3 h-3" />
+                        {e.telefone}
+                      </div>
+                    )}
+                  </div>
+                </td>
+                <td className="px-4 py-3">
+                  {(e.rua || e.endereco) ? (
+                    <div className="flex items-center gap-1.5 text-xs text-gray-600 dark:text-gray-400">
+                      <MapPin className="w-3 h-3" />
+                      <span className="truncate max-w-[200px]">
+                        {e.rua ? `${e.rua}, ${e.numero || ''}${e.bairro ? ` - ${e.bairro}` : ''}${e.cidade ? `, ${e.cidade}` : ''}${e.estado ? ` - ${e.estado}` : ''}` : e.endereco}
+                      </span>
+                    </div>
+                  ) : (
+                    <span className="text-xs text-gray-400">-</span>
+                  )}
+                </td>
+                <td className="px-4 py-3">
+                  <div className="flex gap-1">
+                    <button onClick={() => abrirEditar(e)} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-400 hover:text-blue-600 transition-colors"><Edit2 className="w-4 h-4" /></button>
+                    <button onClick={() => setDeletandoId(e.id)} className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-600 transition-colors"><Trash2 className="w-4 h-4" /></button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </Table>
+        )}
 
         <Modal open={modal} onClose={() => setModal(false)} title={editando ? 'Editar Empresa' : 'Nova Empresa'}>
           <div className="space-y-4">

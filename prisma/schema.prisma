@@ -184,17 +184,35 @@ model Inventario {
 }
 
 model Empresa {
-  id             String   @id @default(cuid())
-  razaoSocial    String   @map("razao_social")
-  nomeFantasia   String?  @map("nome_fantasia")
-  cnpj           String   @unique
-  endereco       String?
-  telefone       String?
-  email          String?
-  logoUrl        String?  @map("logo_url")
+  id                      String   @id @default(cuid())
+  razaoSocial             String   @map("razao_social")
+  nomeFantasia            String?  @map("nome_fantasia")
+  cnpj                    String   @unique
+  inscricaoEstadual       String?  @map("inscricao_estadual")
+  emailCorporativo        String?  @map("email_corporativo")
+  telefone                String?
+  website                 String?
+  endereco                String?
+  cep                     String?
+  rua                     String?
+  numero                  String?
+  complemento             String?
+  bairro                  String?
+  cidade                  String?
+  estado                  String?
+  representanteNome       String?  @map("representante_nome")
+  representanteCargo      String?  @map("representante_cargo")
+  representanteEmail      String?  @map("representante_email")
+  representanteTelefone   String?  @map("representante_telefone")
+  logoUrl                 String?  @map("logo_url")
+  assinaturaUrl           String?  @map("assinatura_url")
+  usarLogoNoPdf           Boolean  @default(true) @map("usar_logo_no_pdf")
+  exibirCargoRepresentante Boolean @default(true) @map("exibir_cargo_representante")
+  assinaturaAutomatica    Boolean  @default(false) @map("assinatura_automatica")
+  mostrarEnderecoNoTermo  Boolean  @default(true) @map("mostrar_endereco_no_termo")
 
-  criadoEm       DateTime @default(now()) @map("criado_em")
-  atualizadoEm   DateTime @updatedAt @map("atualizado_em")
+  criadoEm                DateTime @default(now()) @map("criado_em")
+  atualizadoEm            DateTime @updatedAt @map("atualizado_em")
 
   @@map("empresas")
 }

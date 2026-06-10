@@ -26,7 +26,7 @@ import {
   ChevronLeft,
 } from "lucide-react";
 
-import { empresaSchema, EmpresaFormInput, EmpresaFormData, ESTADOS_BR } from "./types";
+import { empresaSchema, EmpresaFormInput, EmpresaFormData, EmpresaFormDataWithUrls, ESTADOS_BR } from "./types";
 import { SectionCard } from "src/components/admin/empresa/SectionCard";
 import { FormField, inputClass } from "src/components/admin/empresa/FormField";
 import { UploadCard } from "src/components/admin/empresa/UploadCard";
@@ -151,34 +151,14 @@ export default function EmpresasPage() {
   useEffect(() => {
     async function fetchEmpresa() {
       try {
-        // Em produção: const res = await fetch("/api/admin/empresa");
-        // Simulando delay de carregamento
-        await new Promise((r) => setTimeout(r, 800));
-        // Dados de demonstração — substitua pela chamada real à API
-        const mockData: Partial<EmpresaFormInput> = {
-          nomeFantasia: "IT Control",
-          razaoSocial: "IT Control Tecnologia Ltda.",
-          cnpj: "12.345.678/0001-90",
-          emailCorporativo: "contato@itcontrol.com.br",
-          telefone: "(11) 98765-4321",
-          cep: "01310-100",
-          rua: "Avenida Paulista",
-          numero: "1000",
-          bairro: "Bela Vista",
-          cidade: "São Paulo",
-          estado: "SP",
-          representanteNome: "Maria da Silva",
-          representanteCargo: "Diretora de TI",
-          representanteEmail: "maria@itcontrol.com.br",
-          representanteTelefone: "(11) 91234-5678",
-          usarLogoNoPdf: true,
-          exibirCargoRepresentante: true,
-          assinaturaAutomatica: false,
-          mostrarEnderecoNoTermo: true,
-        };
-        reset(mockData as EmpresaFormData);
+        const res = await fetch("/api/admin/empresa");
+        const data = await res.json();
+        
+        if (res.ok && data) {
+          reset(data as EmpresaFormData);
+        }
       } catch {
-        setToast({ type: "error", message: "Erro ao carregar dados da empresa." });
+        // Se não houver dados, não mostra erro - é normal para primeira vez
       } finally {
         setIsLoading(false);
       }
@@ -211,19 +191,31 @@ export default function EmpresasPage() {
   const onSubmit = async (data: EmpresaFormData) => {
     setIsSaving(true);
     try {
-      // Montar FormData para enviar arquivos junto
-      const formData = new FormData();
-      Object.entries(data).forEach(([key, value]) => {
-        formData.append(key, String(value));
-      });
-      if (logoFile.file) formData.append("logo", logoFile.file);
-      if (assinaturaFile.file) formData.append("assinatura", assinaturaFile.file);
+      // Adicionar logoUrl e assinaturaUrl ao data se houver preview
+      const dataToSend: EmpresaFormDataWithUrls = {
+        ...data,
+        logoUrl: logoFile.preview || undefined,
+        assinaturaUrl: assinaturaFile.preview || undefined,
+      };
 
-      // Em produção:
-      // await fetch("/api/admin/empresa", { method: "PUT", body: formData });
-      await new Promise((r) => setTimeout(r, 1200)); // Simula chamada
+      const res = await fetch("/api/admin/empresa", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(dataToSend)
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || "Erro ao salvar");
+      }
+
       setToast({ type: "success", message: "Dados da empresa salvos com sucesso!" });
-    } catch {
+      // Redirecionar para a tela de consulta após salvar
+      setTimeout(() => {
+        window.location.href = '/admin/empresas/lista';
+      }, 1000);
+    } catch (error) {
+      console.error(error);
       setToast({ type: "error", message: "Erro ao salvar. Tente novamente." });
     } finally {
       setIsSaving(false);

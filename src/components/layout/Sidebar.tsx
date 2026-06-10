@@ -157,7 +157,7 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
                     <div className="mt-0.5 space-y-0.5 pl-4">
                       <Link href="/admin/empresas" onClick={onClose} className={subCls(path === '/admin/empresas')}>
                         <Building2 className="w-3 h-3 flex-shrink-0" />
-                        Configurar Empresa
+                        Cadastrar Empresa
                       </Link>
                       <Link href="/admin/empresas/lista" onClick={onClose} className={subCls(path === '/admin/empresas/lista')}>
                         <List className="w-3 h-3 flex-shrink-0" />
