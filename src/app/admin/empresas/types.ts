@@ -77,6 +77,12 @@ export interface Empresa extends EmpresaFormData {
   updatedAt: Date;
 }
 
+// ── Tipo extendido para incluir logoUrl e assinaturaUrl no form ──
+export interface EmpresaFormDataWithUrls extends EmpresaFormData {
+  logoUrl?: string | null;
+  assinaturaUrl?: string | null;
+}
+
 // ── Estado de upload de arquivo ──────────────────────────────
 export interface FileUploadState {
   file: File | null;

@@ -92,10 +92,28 @@ export interface Empresa {
   razaoSocial: string
   nomeFantasia?: string | null
   cnpj: string
-  endereco?: string | null
+  inscricaoEstadual?: string | null
+  emailCorporativo?: string | null
   telefone?: string | null
-  email?: string | null
+  website?: string | null
+  endereco?: string | null
+  cep?: string | null
+  rua?: string | null
+  numero?: string | null
+  complemento?: string | null
+  bairro?: string | null
+  cidade?: string | null
+  estado?: string | null
+  representanteNome?: string | null
+  representanteCargo?: string | null
+  representanteEmail?: string | null
+  representanteTelefone?: string | null
   logoUrl?: string | null
+  assinaturaUrl?: string | null
+  usarLogoNoPdf?: boolean
+  exibirCargoRepresentante?: boolean
+  assinaturaAutomatica?: boolean
+  mostrarEnderecoNoTermo?: boolean
   criadoEm: string
   atualizadoEm: string
 }

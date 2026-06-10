@@ -21,7 +21,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
         cnpj: body.cnpj.trim(),
         endereco: body.endereco?.trim() || null,
         telefone: body.telefone?.trim() || null,
-        email: body.email?.trim() || null,
+        emailCorporativo: body.emailCorporativo?.trim() || null,
         logoUrl: body.logoUrl || null,
       },
     })

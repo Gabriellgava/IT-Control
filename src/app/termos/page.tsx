@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
 import { AppLayout } from '@/components/layout/AppLayout'
-import { Badge, Button, Input } from '@/components/ui'
+import { Badge, Button, Input, Select } from '@/components/ui'
 import { FileText, Printer, Search } from 'lucide-react'
 import { fetchJsonOrThrow } from '@/lib/http/fetch-json'
 
@@ -29,6 +29,15 @@ interface Funcionario {
   id: string
   nome: string
   email?: string | null
+}
+
+interface Empresa {
+  id: string
+  razaoSocial: string
+  nomeFantasia?: string | null
+  cnpj: string
+  endereco?: string | null
+  logoUrl?: string | null
 }
 
 const RESPONSABILIDADES_PADRAO = [
@@ -57,6 +66,9 @@ export default function TermosPage() {
   const [cnpjEmpresa, setCnpjEmpresa] = useState('')
   const [enderecoEmpresa, setEnderecoEmpresa] = useState('')
   const [dataEntrega, setDataEntrega] = useState(hojeISO)
+  const [empresas, setEmpresas] = useState<Empresa[]>([])
+  const [empresaSelecionada, setEmpresaSelecionada] = useState('')
+  const [carregandoEmpresas, setCarregandoEmpresas] = useState(true)
   const [dataDevolucao, setDataDevolucao] = useState('')
   const [observacoesTermo, setObservacoesTermo] = useState('')
   const [funcionarios, setFuncionarios] = useState<Funcionario[]>([])
@@ -88,6 +100,40 @@ export default function TermosPage() {
 
     carregar()
   }, [])
+
+  useEffect(() => {
+    const carregarEmpresas = async () => {
+      try {
+        setCarregandoEmpresas(true)
+        const data = await fetchJsonOrThrow<Empresa[]>('/api/empresas', {
+          context: 'termos-carregar-empresas',
+        })
+        setEmpresas(Array.isArray(data) ? data : [])
+      } catch {
+        console.error('Não foi possível carregar as empresas.')
+      } finally {
+        setCarregandoEmpresas(false)
+      }
+    }
+
+    carregarEmpresas()
+  }, [])
+
+  const handleEmpresaChange = (empresaId: string) => {
+    setEmpresaSelecionada(empresaId)
+    if (empresaId) {
+      const empresa = empresas.find((e) => e.id === empresaId)
+      if (empresa) {
+        setEmpresa(empresa.razaoSocial)
+        setCnpjEmpresa(empresa.cnpj)
+        setEnderecoEmpresa(empresa.endereco || '')
+      }
+    } else {
+      setEmpresa('')
+      setCnpjEmpresa('')
+      setEnderecoEmpresa('')
+    }
+  }
 
   const responsaveisAgrupados = useMemo<ResponsavelAgrupado[]>(() => {
     const mapa = new Map<string, ResponsavelAgrupado>()
@@ -150,11 +196,17 @@ export default function TermosPage() {
         )
         .join('')
 
+      const empresaSelecionadaData = empresas.find((e) => e.id === empresaSelecionada)
+      const logoHtml = empresaSelecionadaData?.logoUrl
+        ? `<div style="margin-bottom:16px;"><img src="${empresaSelecionadaData.logoUrl}" alt="Logo da empresa" style="height:64px;object-fit:contain;" /></div>`
+        : ''
+
       const conteudoHtml = `
         <section style="font-family:Inter,Arial,sans-serif; color:#111827; line-height:1.6;">
+          ${logoHtml}
           <h1 style="margin:0 0 8px;font-size:24px;">Termo de Responsabilidade de Equipamentos de TI</h1>
           <p style="margin:0 0 18px;font-size:14px;color:#4b5563;">${empresa || 'Empresa não informada'} • Emissão em ${formatarDataBR(dataEntrega)}</p>
-          <p style="margin:0 0 14px;">Pelo presente termo, a empresa <strong>${empresa || '____________________'}</strong> entrega ao colaborador <strong>${responsavelAtivo.nome}</strong> os equipamentos listados abaixo, comprometendo-se o colaborador a zelar pelo uso adequado, guarda e conservação dos itens recebidos.</p>
+          <p style="margin:0 0 14px;">Pelo presente termo, a empresa <strong>${empresa || '____________________'}</strong>, inscrita no CNPJ sob o nº <strong>${cnpjEmpresa || '____________________'}</strong>, com sede à <strong>${enderecoEmpresa || '____________________'}</strong>, entrega ao colaborador <strong>${responsavelAtivo.nome}</strong> os equipamentos listados abaixo, comprometendo-se o colaborador a zelar pelo uso adequado, guarda e conservação dos itens recebidos.</p>
           <table style="width:100%;border-collapse:collapse;margin:14px 0 16px;font-size:14px;">
             <thead>
               <tr style="background:#f3f4f6;">
@@ -261,7 +313,7 @@ export default function TermosPage() {
             {loading ? (
               <p className="text-sm text-gray-500">Carregando inventário...</p>
             ) : (
-              <div className="space-y-2 max-h-[360px] overflow-auto pr-1">
+              <div className="space-y-2 max-h-[500px] overflow-auto pr-1">
                 {responsaveisFiltrados.length === 0 && <p className="text-sm text-gray-500">Nenhuma pessoa encontrada.</p>}
                 {responsaveisFiltrados.map((resp) => {
                   const ativo = resp.nome === responsavelSelecionado
@@ -275,7 +327,7 @@ export default function TermosPage() {
                           : 'border-gray-200 dark:border-gray-800 hover:border-blue-300'
                       }`}
                     >
-                      <p className="text-sm font-semibold text-gray-900 dark:text-white">{resp.nome}</p>
+                      <p className="text-sm font-semibold text-gray-900 dark:text-white break-words w-full">{resp.nome}</p>
                       <p className="text-xs text-gray-500">{resp.totalEquipamentos} equipamento(s) vinculado(s)</p>
                       <div className="mt-2 flex gap-2 flex-wrap">
                         {resp.setores.map((setor) => (
@@ -293,9 +345,42 @@ export default function TermosPage() {
             <h2 className="text-sm font-semibold text-gray-900 dark:text-white">2) Dados do termo</h2>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <Input label="Empresa" value={empresa} onChange={(e) => setEmpresa(e.target.value)} />
-              <Input label="CNPJ da empresa" value={cnpjEmpresa} onChange={(e) => setCnpjEmpresa(e.target.value)} placeholder="00.000.000/0000-00" />
-              <Input label="Endereço da empresa" value={enderecoEmpresa} onChange={(e) => setEnderecoEmpresa(e.target.value)} placeholder="Rua, número, cidade/UF" />
+              <div className="md:col-span-2">
+                <Select
+                  label="Empresa"
+                  value={empresaSelecionada}
+                  onChange={(e) => handleEmpresaChange(e.target.value)}
+                  disabled={carregandoEmpresas}
+                >
+                  <option value="">Selecione uma empresa cadastrada</option>
+                  {empresas.map((emp) => (
+                    <option key={emp.id} value={emp.id}>
+                      {emp.razaoSocial} - {emp.cnpj}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+              <Input
+                label="Empresa"
+                value={empresa}
+                onChange={(e) => setEmpresa(e.target.value)}
+                disabled={!!empresaSelecionada}
+                placeholder={empresaSelecionada ? 'Preenchido automaticamente' : 'Nome da empresa'}
+              />
+              <Input
+                label="CNPJ da empresa"
+                value={cnpjEmpresa}
+                onChange={(e) => setCnpjEmpresa(e.target.value)}
+                disabled={!!empresaSelecionada}
+                placeholder={empresaSelecionada ? 'Preenchido automaticamente' : '00.000.000/0000-00'}
+              />
+              <Input
+                label="Endereço da empresa"
+                value={enderecoEmpresa}
+                onChange={(e) => setEnderecoEmpresa(e.target.value)}
+                disabled={!!empresaSelecionada}
+                placeholder={empresaSelecionada ? 'Preenchido automaticamente' : 'Rua, número, cidade/UF'}
+              />
               <Input label="Data de entrega" type="date" value={dataEntrega} onChange={(e) => setDataEntrega(e.target.value)} />
               <Input label="Data prevista de devolução" type="date" value={dataDevolucao} onChange={(e) => setDataDevolucao(e.target.value)} />
             </div>
@@ -329,11 +414,20 @@ export default function TermosPage() {
             <p className="text-sm text-gray-500">Selecione uma pessoa para montar o termo.</p>
           ) : (
             <article className="prose prose-sm max-w-none text-gray-900 dark:text-gray-100 prose-headings:text-gray-900 dark:prose-headings:text-gray-100 prose-strong:text-gray-900 dark:prose-strong:text-gray-100 prose-li:text-gray-800 dark:prose-li:text-gray-200">
+              {empresaSelecionada && empresas.find((e) => e.id === empresaSelecionada)?.logoUrl && (
+                <div className="mb-4">
+                  <img
+                    src={empresas.find((e) => e.id === empresaSelecionada)?.logoUrl || undefined}
+                    alt="Logo da empresa"
+                    className="h-16 object-contain"
+                  />
+                </div>
+              )}
               <p>
                 <strong>TERMO DE RESPONSABILIDADE DE ATIVOS DE TI</strong>
               </p>
               <p>
-                Pelo presente termo, a empresa <strong>{empresa || '____________________'}</strong> entrega ao colaborador{' '}
+                Pelo presente termo, a empresa <strong>{empresa || '____________________'}</strong>, inscrita no CNPJ sob o nº <strong>{cnpjEmpresa || '____________________'}</strong>, com sede à <strong>{enderecoEmpresa || '____________________'}</strong>, entrega ao colaborador{' '}
                 <strong>{responsavelAtivo.nome}</strong>, vinculado ao(s) setor(es) <strong>{responsavelAtivo.setores.join(', ')}</strong>, os equipamentos abaixo especificados,
                 para uso profissional.
               </p>
