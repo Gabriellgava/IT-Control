@@ -296,6 +296,9 @@ export async function POST(request: NextRequest, { params }: { params: { token: 
         colaborador: termo.funcionario.nome
       })
 
+      // Busca dados da empresa cadastrada para uso no PDF
+      const empresa = await prisma.empresa.findFirst().catch(() => null)
+
       const pdf = await buildTermoPdf({
         termoId: termo.id,
         titulo: updated.titulo,
@@ -306,7 +309,28 @@ export async function POST(request: NextRequest, { params }: { params: { token: 
         assinaturaTexto: signerName,
         assinaturaImagemDataUrl: signatureImageDataUrl,
         assinadoEm: signedAt,
-        assinadorIp: ip
+        assinadorIp: ip,
+        // Dados da empresa do banco (prioridade sobre valores inline do HTML)
+        empresaData: empresa ? {
+          nomeFantasia:             empresa.nomeFantasia,
+          razaoSocial:              empresa.razaoSocial,
+          cnpj:                     empresa.cnpj,
+          rua:                      empresa.rua,
+          numero:                   empresa.numero,
+          complemento:              empresa.complemento,
+          bairro:                   empresa.bairro,
+          cidade:                   empresa.cidade,
+          estado:                   empresa.estado,
+          cep:                      empresa.cep,
+          representanteNome:        empresa.representanteNome,
+          representanteCargo:       empresa.representanteCargo,
+          logoUrl:                  empresa.logoUrl,
+          assinaturaUrl:            empresa.assinaturaUrl,
+          usarLogoNoPdf:            empresa.usarLogoNoPdf,
+          exibirCargoRepresentante: empresa.exibirCargoRepresentante,
+          assinaturaAutomatica:     empresa.assinaturaAutomatica,
+          mostrarEnderecoNoTermo:   empresa.mostrarEnderecoNoTermo,
+        } : null,
       })
 
       logAssinatura('POST upload drive - PDF gerado', { termoId: termo.id, pdfBytes: pdf.length })

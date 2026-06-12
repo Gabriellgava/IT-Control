@@ -7,6 +7,23 @@ export async function GET() {
   try {
     const empresas = await prisma.empresa.findMany({
       orderBy: { razaoSocial: 'asc' },
+      select: {
+        id: true,
+        razaoSocial: true,
+        nomeFantasia: true,
+        cnpj: true,
+        endereco: true,
+        telefone: true,
+        emailCorporativo: true,
+        logoUrl: true,
+        rua: true,
+        numero: true,
+        complemento: true,
+        bairro: true,
+        cidade: true,
+        estado: true,
+        cep: true,
+      },
     })
     return NextResponse.json(empresas)
   } catch (error) {
