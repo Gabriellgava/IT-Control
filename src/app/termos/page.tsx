@@ -38,6 +38,13 @@ interface Empresa {
   cnpj: string
   endereco?: string | null
   logoUrl?: string | null
+  rua?: string | null
+  numero?: string | null
+  complemento?: string | null
+  bairro?: string | null
+  cidade?: string | null
+  estado?: string | null
+  cep?: string | null
 }
 
 const RESPONSABILIDADES_PADRAO = [
@@ -126,7 +133,17 @@ export default function TermosPage() {
       if (empresa) {
         setEmpresa(empresa.razaoSocial)
         setCnpjEmpresa(empresa.cnpj)
-        setEnderecoEmpresa(empresa.endereco || '')
+        
+        // Monta endereço completo a partir dos campos individuais
+        const parts: string[] = []
+        if (empresa.rua) parts.push(empresa.numero ? `${empresa.rua}, ${empresa.numero}` : empresa.rua)
+        if (empresa.complemento) parts.push(empresa.complemento)
+        if (empresa.bairro) parts.push(empresa.bairro)
+        if (empresa.cidade) parts.push(empresa.estado ? `${empresa.cidade}-${empresa.estado}` : empresa.cidade)
+        if (empresa.cep) parts.push(empresa.cep)
+        
+        const enderecoCompleto = parts.length > 0 ? parts.join(', ') : (empresa.endereco || '')
+        setEnderecoEmpresa(enderecoCompleto)
       }
     } else {
       setEmpresa('')
