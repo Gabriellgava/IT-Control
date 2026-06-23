@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { Button, Input, Textarea } from '@/components/ui'
 import { User, Trash2, Tag } from 'lucide-react'
+import { DocumentoUpload } from './DocumentoUpload'
 import type { Produto, Fornecedor, Funcionario } from '@/types'
 
 interface InventarioItem {
@@ -41,6 +42,7 @@ export function MovimentacaoForm({ tipo }: { tipo: 'ENTRADA' | 'SAIDA' }) {
   const [filtroAtivo, setFiltroAtivo] = useState<'ETIQUETA' | 'PRODUTO' | 'CATEGORIA'>('ETIQUETA')
   const [buscaAtivo, setBuscaAtivo] = useState('')
   const [ativosSelecionados, setAtivosSelecionados] = useState<AtivoSaida[]>([])
+  const [notaFiscalFile, setNotaFiscalFile] = useState<File | null>(null)
   const [form, setForm] = useState({
     produtoId: '',
     etiqueta: '',
@@ -152,37 +154,69 @@ export function MovimentacaoForm({ tipo }: { tipo: 'ENTRADA' | 'SAIDA' }) {
   const salvar = async () => {
     if (!validar()) return
     setLoading(true)
-    const res = await fetch('/api/movimentacoes', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        tipo,
-        subtipo: tipo === 'SAIDA' ? subtipo : (modoEntrada === 'DEVOLUCAO' ? 'DEVOLUCAO' : undefined),
-        produtoId: form.produtoId,
-        etiqueta: tipo === 'ENTRADA' && modoEntrada === 'DEVOLUCAO' && modoDevolucao === 'TODOS'
-          ? ''
-          : form.etiqueta.trim(),
-        etiquetas: tipo === 'SAIDA' ? etiquetasSaida : undefined,
-        dataCompra: tipo === 'ENTRADA' ? form.data : undefined,
-        data: form.data,
-        fornecedorId: form.fornecedorId || null,
-        setorId: subtipo === 'USUARIO' ? funcionarioSelecionado?.setorId || null : form.setorId || null,
-        funcionarioId: form.funcionarioId || null,
-        funcionarioRecebe: funcionarioSelecionado?.nome || null,
-        funcionarioDevolve: form.funcionarioDevolve.trim() || null,
-        valorUnitario: form.valorUnitario,
-        usuarioId: session?.user.id,
-        responsavel: tipo === 'SAIDA' && subtipo === 'USUARIO'
-          ? funcionarioSelecionado?.nome || null
-          : tipo === 'ENTRADA' && modoEntrada === 'DEVOLUCAO'
-            ? form.funcionarioDevolve.trim()
+    
+    // Preparar dados da movimentação
+    const movimentacaoData = {
+      tipo,
+      subtipo: tipo === 'SAIDA' ? subtipo : (modoEntrada === 'DEVOLUCAO' ? 'DEVOLUCAO' : undefined),
+      produtoId: form.produtoId,
+      etiqueta: tipo === 'ENTRADA' && modoEntrada === 'DEVOLUCAO' && modoDevolucao === 'TODOS'
+        ? ''
+        : form.etiqueta.trim(),
+      etiquetas: tipo === 'SAIDA' ? etiquetasSaida : undefined,
+      dataCompra: tipo === 'ENTRADA' ? form.data : undefined,
+      data: form.data,
+      fornecedorId: form.fornecedorId || null,
+      setorId: subtipo === 'USUARIO' ? funcionarioSelecionado?.setorId || null : form.setorId || null,
+      funcionarioId: form.funcionarioId || null,
+      funcionarioRecebe: funcionarioSelecionado?.nome || null,
+      funcionarioDevolve: form.funcionarioDevolve.trim() || null,
+      valorUnitario: form.valorUnitario,
+      usuarioId: session?.user.id,
+      responsavel: tipo === 'SAIDA' && subtipo === 'USUARIO'
+        ? funcionarioSelecionado?.nome || null
+        : tipo === 'ENTRADA' && modoEntrada === 'DEVOLUCAO'
+          ? form.funcionarioDevolve.trim()
           : (session?.user.name ?? session?.user.email),
-        observacoes: tipo === 'ENTRADA' && modoEntrada === 'DEVOLUCAO'
-          ? `Devolução de itens de: ${form.funcionarioDevolve.trim()}${form.observacoes ? ' | ' + form.observacoes : ''}`
-          : tipo === 'SAIDA' && subtipo === 'USUARIO' && funcionarioSelecionado?.nome
+      observacoes: tipo === 'ENTRADA' && modoEntrada === 'DEVOLUCAO'
+        ? `Devolução de itens de: ${form.funcionarioDevolve.trim()}${form.observacoes ? ' | ' + form.observacoes : ''}`
+        : tipo === 'SAIDA' && subtipo === 'USUARIO' && funcionarioSelecionado?.nome
           ? `Registrado por: ${session?.user.name ?? session?.user.email}${form.observacoes ? ' | ' + form.observacoes : ''}`
           : form.observacoes,
-      }),
+    }
+
+    // Se houver arquivo, usar FormData
+    if (notaFiscalFile) {
+      const formData = new FormData()
+      formData.append('notaFiscal', notaFiscalFile)
+      
+      // Adicionar dados como JSON string em um campo
+      Object.entries(movimentacaoData).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) {
+          formData.append(key, typeof value === 'string' ? value : JSON.stringify(value))
+        }
+      })
+
+      await enviarMovimentacao(formData)
+      return
+    }
+    
+    // Sem arquivo, usar JSON
+    await enviarMovimentacao(movimentacaoData)
+  }
+
+  const enviarMovimentacao = async (dados: FormData | Record<string, any>) => {
+    const isFormData = dados instanceof FormData
+    
+    const res = await fetch('/api/movimentacoes', {
+      method: 'POST',
+      ...(isFormData 
+        ? { body: dados }
+        : {
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(dados),
+          }
+      ),
     })
     const data = await res.json()
     if (!res.ok) {
@@ -331,6 +365,13 @@ export function MovimentacaoForm({ tipo }: { tipo: 'ENTRADA' | 'SAIDA' }) {
                 {fornecedores.map(f => <option key={f.id} value={f.id}>{f.nome}</option>)}
               </select>
             </div>
+            <DocumentoUpload
+              titulo="Nota Fiscal (Opcional)"
+              descricao="Upload da nota fiscal da entrada do item"
+              aceitarTipos=".pdf,.png,.jpg,.jpeg"
+              maxSizeMB={10}
+              onFileChange={setNotaFiscalFile}
+            />
           </>
         )}
 
