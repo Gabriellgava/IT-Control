@@ -1,0 +1,26 @@
+Projeto IT-Control
+
+Stack:
+
+- Next.js App Router
+- TypeScript
+- Prisma ORM
+- PostgreSQL
+- NextAuth
+- Tailwind CSS
+
+Arquitetura:
+
+Frontend
+→ API Routes
+→ Prisma
+→ PostgreSQL
+
+Regras:
+
+- Seguir padrões já existentes.
+- Não criar arquiteturas paralelas.
+- Reutilizar código existente.
+- Priorizar consistência sobre inovação.
+- Verificar impacto antes de alterar módulos centrais.
+- Reutilizar componentes, hooks e utilitários existentes.

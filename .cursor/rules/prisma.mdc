@@ -1,0 +1,22 @@
+# Prisma Rules
+
+Este projeto utiliza Prisma ORM com PostgreSQL.
+
+Regras obrigatórias:
+
+- Toda alteração estrutural deve gerar migration.
+- Nunca alterar schema sem avaliar impacto nas APIs.
+- Utilizar relacionamentos existentes.
+- Evitar consultas N+1.
+- Utilizar include apenas quando necessário.
+- Utilizar select para reduzir tráfego de dados.
+- Preservar compatibilidade com dados existentes.
+
+Antes de alterar models:
+
+- Identificar APIs impactadas.
+- Identificar páginas impactadas.
+- Identificar relatórios impactados.
+- Identificar migrations necessárias.
+
+Sempre priorizar integridade dos dados.

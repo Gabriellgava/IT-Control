@@ -72,7 +72,10 @@ export interface BuildTermoPdfParams {
 
 // ─── Constantes de layout ─────────────────────────────────────────────────────
 
-const PAGE = { width: 595, height: 842, marginX: 50, marginTop: 44, marginBottom: 20 }
+const PAGE = { width: 595, height: 842, marginX: 35, marginTop: 40, marginBottom: 40 }
+
+// Column layout for bilingual PDF
+const columnGap = 28
 
 // Paleta inspirada no PDF modelo (branco, preto, cinza escuro — corporativo limpo)
 const C = {
@@ -262,6 +265,7 @@ export async function buildTermoPdf(params: BuildTermoPdfParams) {
   const pages: PDFPage[] = [page]
 
   const contentWidth = PAGE.width - PAGE.marginX * 2
+  const columnWidth = (contentWidth - columnGap) / 2
   const bottomLimit  = PAGE.marginBottom + 25
 
   console.log('[pdf] documento criado')
@@ -300,14 +304,14 @@ export async function buildTermoPdf(params: BuildTermoPdfParams) {
   }
 
   // ─────────────────────────────────────────────────────────────────────────
-  // 1. CABEÇALHO — estilo similar ao PDF modelo (logo à esq., dados à dir.)
+  // 1. CABEÇALHO — original layout with logo left, company data right
   // ─────────────────────────────────────────────────────────────────────────
 
   const drawHeader = async () => {
-    const headerTop    = y
-    const logoAreaW    = 120
-    const textAreaX    = PAGE.marginX + logoAreaW + 14
-    const textAreaW    = contentWidth - logoAreaW - 14
+    const headerTop = y
+    const logoAreaW = 120
+    const textAreaX = PAGE.marginX + logoAreaW + 14
+    const textAreaW = contentWidth - logoAreaW - 14
 
     // Tenta carregar logo da empresa
     let logoEmbedded = false
@@ -318,12 +322,12 @@ export async function buildTermoPdf(params: BuildTermoPdfParams) {
           const arrayBuffer = await res.arrayBuffer()
           const bytes = Buffer.from(arrayBuffer)
           const isJpeg = ed.logoUrl.toLowerCase().endsWith('.jpg') || ed.logoUrl.toLowerCase().endsWith('.jpeg')
-          const image  = isJpeg ? await doc.embedJpg(bytes) : await doc.embedPng(bytes)
-          const maxH   = 48
-          const maxW   = logoAreaW - 8
-          const scale  = Math.min(maxW / image.width, maxH / image.height, 1)
-          const iw     = image.width * scale
-          const ih     = image.height * scale
+          const image = isJpeg ? await doc.embedJpg(bytes) : await doc.embedPng(bytes)
+          const maxH = 48
+          const maxW = logoAreaW - 8
+          const scale = Math.min(maxW / image.width, maxH / image.height, 1)
+          const iw = image.width * scale
+          const ih = image.height * scale
           page.drawImage(image, { x: PAGE.marginX + 4, y: headerTop - ih - 4, width: iw, height: ih })
           logoEmbedded = true
         }
@@ -362,7 +366,7 @@ export async function buildTermoPdf(params: BuildTermoPdfParams) {
     const headerBottom = Math.min(headerTop - 56, hy - 6)
     page.drawLine({
       start: { x: PAGE.marginX, y: headerBottom },
-      end:   { x: PAGE.width - PAGE.marginX, y: headerBottom },
+      end: { x: PAGE.width - PAGE.marginX, y: headerBottom },
       thickness: 1.2,
       color: C.tableHdr,
     })
@@ -371,57 +375,124 @@ export async function buildTermoPdf(params: BuildTermoPdfParams) {
   }
 
   // ─────────────────────────────────────────────────────────────────────────
-  // 2. TÍTULO DO DOCUMENTO
+  // 2. TÍTULO DO DOCUMENTO — two-column layout (PT left, EN right)
   // ─────────────────────────────────────────────────────────────────────────
 
   const drawDocTitle = () => {
     y -= 12
-    writeParagraph('TERMO DE RESPONSABILIDADE E CESSão DE EQUIPAMENTOS', {
-      size: 14, bold: true, align: 'center', color: C.black, lineGap: 6,
+    const titleSize = 10
+    const titleGap = 2
+    const leftX = PAGE.marginX
+    const rightX = PAGE.marginX + columnWidth + columnGap
+
+    const ptTitle = [
+      'TERMO DE RESPONSABILIDADE',
+      'E CESSÃO DE EQUIPAMENTOS'
+    ]
+
+    const enTitle = [
+      'EQUIPMENT RESPONSIBILITY',
+      'AND ASSIGNMENT TERM'
+    ]
+
+    const ptStartX = leftX + (columnWidth - bold.widthOfTextAtSize('TERMO DE RESPONSABILIDADE', titleSize)) / 2
+    const enStartX = rightX + (columnWidth - bold.widthOfTextAtSize('EQUIPMENT RESPONSIBILITY', titleSize)) / 2
+
+    const titleY = y
+
+    // PT
+    ptTitle.forEach((line, index) => {
+      drawText(
+        line,
+        ptStartX,
+        titleY - (index * (titleSize + titleGap)),
+        titleSize,
+        bold,
+        C.black
+      )
     })
-    y -= 6
+
+    // EN
+    enTitle.forEach((line, index) => {
+      drawText(
+        line,
+        enStartX,
+        titleY - (index * (titleSize + titleGap)),
+        titleSize,
+        bold,
+        C.black
+      )
+    })
+
+    y -= 32
   }
 
   // ─────────────────────────────────────────────────────────────────────────
-  // 3. PARÁGRAFO INTRODUTÓRIO
+  // 3. PARÁGRAFO INTRODUTÓRIO — two-column layout (PT-BR left, EN right)
   // ─────────────────────────────────────────────────────────────────────────
 
   const drawIntroduction = () => {
     const repPart = repNome ? `, representada por ${repNome}${exibirCargo && repCargo ? `, ${repCargo}` : ''}` : ''
-    writeParagraph(
-      `Pelo presente termo, a empresa ${razaoSocial}, inscrita no CNPJ ${cnpjEmpresa}${mostrarEndereco && enderecoEmpresa && enderecoEmpresa !== 'Endereco nao informado' ? `, com sede em ${enderecoEmpresa}` : ''}${repPart}, doravante denominada CEDENTE, cede ao colaborador abaixo qualificado os equipamentos relacionados neste termo para utilização exclusiva no desempenho de suas atividades profissionais.`,
-      { size: 10, lineGap: 5.5 }
-    )
-    y -= 8
+    const introPt = `Pelo presente termo, a empresa ${razaoSocial}, inscrita no CNPJ ${cnpjEmpresa}${mostrarEndereco && enderecoEmpresa && enderecoEmpresa !== 'Endereco nao informado' ? `, com sede em ${enderecoEmpresa}` : ''}${repPart}, doravante denominada CEDENTE, cede ao colaborador abaixo qualificado os equipamentos relacionados neste termo para utilização exclusiva no desempenho de suas atividades profissionais.`
+    const introEn = `By this agreement, the company ${razaoSocial}, registered under CNPJ ${cnpjEmpresa}${mostrarEndereco && enderecoEmpresa && enderecoEmpresa !== 'Endereco nao informado' ? `, headquartered at ${enderecoEmpresa}` : ''}${repPart ? `, represented by ${repNome}${exibirCargo && repCargo ? `, ${repCargo}` : ''}` : ''}, hereinafter referred to as GRANTOR, assigns to the employee qualified below the equipment listed in this term for exclusive use in the performance of their professional activities.`
+
+    const leftX = PAGE.marginX
+    const rightX = PAGE.marginX + columnWidth + columnGap
+    const startY = y
+
+    // Portuguese column (left)
+    let leftY = startY
+    writeParagraph(introPt, { size: 10, lineGap: 5.5, x: leftX, width: columnWidth })
+    leftY = y
+
+    // Reset y to start point for English column
+    y = startY
+
+    // English column (right)
+    let rightY = startY
+    writeParagraph(introEn, { size: 10, lineGap: 5.5, x: rightX, width: columnWidth })
+    rightY = y
+
+    // Draw vertical divider only within the bilingual section
+    const separatorTop = startY
+    const separatorBottom = Math.min(leftY, rightY) + 5
+    page.drawLine({
+      start: { x: PAGE.marginX + columnWidth + columnGap / 2, y: separatorTop },
+      end: { x: PAGE.marginX + columnWidth + columnGap / 2, y: separatorBottom },
+      thickness: 0.5,
+      color: C.borderLight
+    })
+
+    y = Math.min(leftY, rightY) - 8
   }
 
   // ─────────────────────────────────────────────────────────────────────────
-  // 4. CABEÇALHO DE SEÇÃO
+  // 4. CABEÇALHO DE SEÇÃO — slash format (PT / EN)
   // ─────────────────────────────────────────────────────────────────────────
 
-  const sectionTitle = (title: string) => {
+  const sectionTitle = (titlePt: string, titleEn: string) => {
     y -= 4
     ensureSpace(28)
     // Barra lateral preta + título em negrito — estilo do PDF modelo
     page.drawRectangle({ x: PAGE.marginX, y: y - 16, width: 4, height: 22, color: C.tableHdr })
     page.drawRectangle({ x: PAGE.marginX + 4, y: y - 16, width: contentWidth - 4, height: 22, color: C.infoBox, borderColor: C.borderLight, borderWidth: 0.5 })
-    drawText(title.toUpperCase(), PAGE.marginX + 14, y - 8, 9.5, bold, C.black)
+    drawText(`${titlePt.toUpperCase()} / ${titleEn.toUpperCase()}`, PAGE.marginX + 14, y - 8, 8.5, bold, C.black)
     y -= 26
   }
 
   // ─────────────────────────────────────────────────────────────────────────
-  // 5. DADOS DO COLABORADOR — bloco visual inspirado no PDF modelo
+  // 5. DADOS DO COLABORADOR — single column with merged labels
   // ─────────────────────────────────────────────────────────────────────────
 
   const drawCollaboratorBlock = () => {
     const rows: Array<[string, string]> = [
-      ['Nome:',           normalizarTexto(params.colaborador || '-')],
-      ['E-mail:',         normalizarTexto(params.colaboradorEmail || '-')],
-      ['Setor:',          normalizarTexto(setores?.join(', ') || '-')],
-      ['Data de emissao:', dataEmissao],
+      ['Nome / Name:',           normalizarTexto(params.colaborador || '-')],
+      ['E-mail / Email:',        normalizarTexto(params.colaboradorEmail || '-')],
+      ['Setor / Department:',    normalizarTexto(setores?.join(', ') || '-')],
+      ['Data de emissão / Issue Date:', dataEmissao],
     ]
 
-    const labelW  = 110
+    const labelW  = 140
     const valueW  = contentWidth - labelW
     const rowH    = 24
     const totalH  = rows.length * rowH
@@ -460,21 +531,17 @@ export async function buildTermoPdf(params: BuildTermoPdfParams) {
   }
 
   // ─────────────────────────────────────────────────────────────────────────
-  // 6. TABELA DE EQUIPAMENTOS — estilo do PDF modelo
-  //    Colunas: Patrimônio | Tipo | Marca | Modelo
+  // 6. TABELA DE EQUIPAMENTOS — single column with bilingual headers
   // ─────────────────────────────────────────────────────────────────────────
 
   const drawEquipmentTable = () => {
-    // Removido: Descrição, Código interno, Categoria, Informações técnicas
-    // Exibido: Patrimônio | Tipo | Marca 
-    const headers = ['Patrimonio', 'Tipo', 'Marca']
-    const widths = [90, 130, contentWidth - 220]  // soma = contentWidth
-    const hdrH    = 26
-    const rowPad  = 7
+    const headers = ['Patrimônio / Asset ID', 'Tipo / Type', 'Marca / Brand']
+    const widths = [90, 130, contentWidth - 220]
+    const hdrH = 26
+    const rowPad = 7
 
     const drawTableHeader = () => {
       ensureSpace(hdrH + 8)
-      // Cabeçalho com fundo escuro (igual ao PDF modelo)
       page.drawRectangle({ x: PAGE.marginX, y: y - hdrH + 4, width: contentWidth, height: hdrH, color: C.tableHdr })
       let x = PAGE.marginX
       headers.forEach((hdr, idx) => {
@@ -496,10 +563,9 @@ export async function buildTermoPdf(params: BuildTermoPdfParams) {
     }
 
     items.forEach((item, rowIdx) => {
-      // Usa: etiqueta=patrimônio, tipo, marca
-      const cells    = [item.etiqueta, item.tipo, item.marca ?? '-']
-      const wrapped  = cells.map((v, i) => wrapText(v || '-', font, 8.5, widths[i] - rowPad * 2))
-      const rowH     = Math.max(24, Math.max(...wrapped.map((l) => l.length)) * 11 + 10)
+      const cells = [item.etiqueta, item.tipo, item.marca ?? '-']
+      const wrapped = cells.map((v, i) => wrapText(v || '-', font, 8.5, widths[i] - rowPad * 2))
+      const rowH = Math.max(24, Math.max(...wrapped.map((l) => l.length)) * 11 + 10)
 
       if (y - rowH < bottomLimit) { addPage(); drawTableHeader() }
 
@@ -520,72 +586,118 @@ export async function buildTermoPdf(params: BuildTermoPdfParams) {
   }
 
   // ─────────────────────────────────────────────────────────────────────────
-  // 7. CLÁUSULAS
+  // 7. CLÁUSULAS — bilingual two-column layout
   // ─────────────────────────────────────────────────────────────────────────
 
   const drawClauses = () => {
-    const estimateClauseHeight = (title: string, body: string) => {
-      const titleLines = wrapText(title, bold, 10, contentWidth)
-      const bodyLines  = wrapText(body, font, 9.5, contentWidth - 12)
+    const estimateClauseHeight = (titlePt: string, titleEn: string, bodyPt: string, bodyEn: string) => {
+      const titleLinesPt = wrapText(titlePt, bold, 8.5, columnWidth)
+      const bodyLinesPt = wrapText(bodyPt, font, 8, columnWidth - 10)
+      const titleLinesEn = wrapText(titleEn, bold, 8.5, columnWidth)
+      const bodyLinesEn = wrapText(bodyEn, font, 8, columnWidth - 10)
 
-      const titleH = titleLines.length * 14
-      const bodyH  = bodyLines.length * 13
+      const heightPt = titleLinesPt.length * 12 + bodyLinesPt.length * 11 + 15
+      const heightEn = titleLinesEn.length * 12 + bodyLinesEn.length * 11 + 15
 
-      return titleH + bodyH + 20
+      return Math.max(heightPt, heightEn)
     }
-    const clauses: Array<[string, string]> = [
 
+    const clauses: Array<[string, string, string, string]> = [
       [
         '1. Finalidade',
-        'Os equipamentos ora cedidos destinam-se exclusivamente à execução das atividades laborais do colaborador, sendo vedada sua utilização para fins pessoais.'
+        '1. Purpose',
+        'Os equipamentos ora cedidos destinam-se exclusivamente à execução das atividades laborais do colaborador, sendo vedada sua utilização para fins pessoais.',
+        'The equipment hereby assigned is intended exclusively for the execution of the employee\'s work activities, and its use for personal purposes is prohibited.'
       ],
       [
         '2. Proibição de Troca',
-        'É expressamente proibida a troca, empréstimo, doação ou qualquer forma de cessão dos equipamentos entre colaboradores ou prestadores de serviços, sem prévia autorização formal da empresa.'
+        '2. Exchange Prohibition',
+        'É expressamente proibida a troca, empréstimo, doação ou qualquer forma de cessão dos equipamentos entre colaboradores ou prestadores de serviços, sem prévia autorização formal da empresa.',
+        'It is expressly prohibited to exchange, lend, donate or otherwise assign equipment among employees or service providers without prior formal authorization from the company.'
       ],
       [
         '3. Responsabilidade',
-        'O colaborador compromete-se a zelar pela correta utilização e conservação dos equipamentos, responsabilizando-se por quaisquer danos decorrentes de uso indevido, negligência, perda ou extravio.'
+        '3. Responsibility',
+        'O colaborador compromete-se a zelar pela correta utilização e conservação dos equipamentos, responsabilizando-se por quaisquer danos decorrentes de uso indevido, negligência, perda ou extravio.',
+        'The employee undertakes to ensure proper use and conservation of the equipment, assuming responsibility for any damage resulting from improper use, negligence, loss or misplacement.'
       ],
       [
         '4. Manutenção e Suporte',
-        'A manutenção dos equipamentos será de responsabilidade da empresa, exceto nos casos de mau uso devidamente comprovado. A empresa poderá realizar vistorias periódicas, a seu critério, para verificar as condições de uso e conservação dos equipamentos.'
+        '4. Maintenance and Support',
+        'A manutenção dos equipamentos será de responsabilidade da empresa, exceto nos casos de mau uso devidamente comprovado. A empresa poderá realizar vistorias periódicas, a seu critério, para verificar as condições de uso e conservação dos equipamentos.',
+        'Equipment maintenance will be the responsibility of the company, except in cases of proven misuse. The company may conduct periodic inspections at its discretion to verify the conditions of use and conservation of the equipment.'
       ],
       [
         '5. Perda, Roubo, Furto ou Extravio',
-        'Em caso de perda, roubo, furto, extravio ou danos irreversíveis decorrentes de uso indevido, negligência ou má-fé, o colaborador deverá ressarcir a empresa pelo valor de mercado correspondente ao bem.'
+        '5. Loss, Theft or Misplacement',
+        'Em caso de perda, roubo, furto, extravio ou danos irreversíveis decorrentes de uso indevido, negligência ou má-fé, o colaborador deverá ressarcir a empresa pelo valor de mercado correspondente ao bem.',
+        'In case of loss, theft, misplacement or irreversible damage resulting from improper use, negligence or bad faith, the employee must reimburse the company for the market value corresponding to the item.'
       ],
       [
         '6. Devolução',
-        'Os equipamentos deverão ser devolvidos nas mesmas condições em que foram entregues, ressalvado o desgaste natural decorrente do uso regular, sempre que solicitado pela empresa ou em caso de desligamento, rescisão contratual ou encerramento da prestação de serviços.'
+        '6. Return',
+        'Os equipamentos deverão ser devolvidos nas mesmas condições em que foram entregues, ressalvado o desgaste natural decorrente do uso regular, sempre que solicitado pela empresa ou em caso de desligamento, rescisão contratual ou encerramento da prestação de serviços.',
+        'The equipment must be returned in the same conditions as received, except for natural wear resulting from regular use, whenever requested by the company or in case of dismissal, contractual termination or end of service provision.'
       ],
       [
         '7. Penalidades',
-        'O descumprimento das obrigações previstas neste termo poderá acarretar a aplicação de medidas disciplinares, bem como a obrigação de ressarcimento dos prejuízos causados, observadas as disposições legais e contratuais aplicáveis.'
+        '7. Penalties',
+        'O descumprimento das obrigações previstas neste termo poderá acarretar a aplicação de medidas disciplinares, bem como a obrigação de ressarcimento dos prejuízos causados, observadas as disposições legais e contratuais aplicáveis.',
+        'Non-compliance with the obligations provided for in this term may result in the application of disciplinary measures, as well as the obligation to reimburse damages caused, in accordance with applicable legal and contractual provisions.'
       ]
     ]
 
-      // garante espaço para o título + primeira cláusula
-    const firstClauseHeight = estimateClauseHeight(
-      clauses[0][0],
-      clauses[0][1]
-    )
+    const firstClauseHeight = estimateClauseHeight(clauses[0][0], clauses[0][1], clauses[0][2], clauses[0][3])
     ensureSpace(firstClauseHeight + 40)
-    sectionTitle('Clausulas Gerais')
+    sectionTitle('Cláusulas Gerais', 'General Clauses')
 
-    clauses.forEach(([title, body]) => {
-      const neededHeight = estimateClauseHeight(title, body)
+    clauses.forEach(([titlePt, titleEn, bodyPt, bodyEn]) => {
+      const neededHeight = estimateClauseHeight(titlePt, titleEn, bodyPt, bodyEn)
       ensureSpace(neededHeight)
-      y -= 10
-      writeParagraph(title, { size: 10, bold: true, color: C.black, lineGap: 3 })
-      writeParagraph(body, { size: 9.5, color: C.ink, lineGap: 5, x: PAGE.marginX + 12, width: contentWidth - 12 })
+
+      const startY = y
+      let leftY = startY
+      let rightY = startY
+
+      y -= 8
+
+      // Left column (PT-BR)
+      drawText(titlePt, PAGE.marginX, leftY, 8.5, bold, C.black)
+      leftY -= 12
+      const bodyLinesPt = wrapText(bodyPt, font, 8, columnWidth - 10)
+      bodyLinesPt.forEach((line) => {
+        drawText(line, PAGE.marginX + 10, leftY, 8, font, C.ink)
+        leftY -= 11
+      })
+
+      // Reset y to start point for right column
+      y = startY - 8
+
+      // Right column (EN)
+      drawText(titleEn, PAGE.marginX + columnWidth + columnGap, rightY, 8.5, bold, C.black)
+      rightY -= 12
+      const bodyLinesEn = wrapText(bodyEn, font, 8, columnWidth - 10)
+      bodyLinesEn.forEach((line) => {
+        drawText(line, PAGE.marginX + columnWidth + columnGap + 10, rightY, 8, font, C.ink)
+        rightY -= 11
+      })
+
+      // Draw vertical divider only within the bilingual section
+      const separatorTop = startY
+      const separatorBottom = Math.min(leftY, rightY) + 5
+      page.drawLine({
+        start: { x: PAGE.marginX + columnWidth + columnGap / 2, y: separatorTop },
+        end: { x: PAGE.marginX + columnWidth + columnGap / 2, y: separatorBottom },
+        thickness: 0.5,
+        color: C.borderLight
+      })
+
+      y = Math.min(leftY, rightY) - 15
     })
   }
 
   // ─────────────────────────────────────────────────────────────────────────
-  // 8. BLOCO DE ASSINATURAS — estilo do PDF modelo
-  //    Coluna esq: empresa + assinatura automática da representante
-  //    Coluna dir: colaborador + assinatura desenhada/digitada
+  // 8. BLOCO DE ASSINATURAS — original full-width layout
   // ─────────────────────────────────────────────────────────────────────────
 
  const drawSignatureBlock = async () => {
@@ -593,7 +705,7 @@ export async function buildTermoPdf(params: BuildTermoPdfParams) {
 
     ensureSpace(signatureBlockHeight)
 
-    sectionTitle('Assinaturas')
+    sectionTitle('Assinaturas', 'Signatures')
     y -= 15
 
     const localDataTexto = `São Paulo - SP, ${formatDateLongBR(signedAt)}.`
@@ -699,23 +811,66 @@ export async function buildTermoPdf(params: BuildTermoPdfParams) {
   drawDocTitle()
   drawIntroduction()
 
-  sectionTitle('Dados do Colaborador')
+  sectionTitle('Dados do Colaborador', 'Employee Information')
   drawCollaboratorBlock()
 
-  sectionTitle('Equipamentos Cedidos')
+  sectionTitle('Equipamentos Cedidos', 'Assigned Equipment')
   drawEquipmentTable()
   console.log('[pdf] tabela de equipamentos renderizada')
 
   drawClauses()
   
   y -= 20
-  // Observações opcionais
+  // Observações opcionais — bilingual two-column layout
   if (params.observacoes || metadata.observacoes || params.dataDevolucao || metadata.dataDevolucao) {
-    sectionTitle('Observacoes Complementares')
-    if (params.dataDevolucao || metadata.dataDevolucao)
-      writeParagraph(`Data prevista de devolucao: ${params.dataDevolucao || metadata.dataDevolucao}`, { size: 10 })
-    if (params.observacoes || metadata.observacoes)
-      writeParagraph(params.observacoes || metadata.observacoes || '-', { size: 10 })
+    sectionTitle('Observações Complementares', 'Additional Notes')
+
+    const startY = y
+    let leftY = startY
+    let rightY = startY
+
+    y -= 8
+
+    // Left column (PT-BR)
+    if (params.dataDevolucao || metadata.dataDevolucao) {
+      drawText(`Data prevista de devolução: ${params.dataDevolucao || metadata.dataDevolucao}`, PAGE.marginX, leftY, 8.5, font, C.ink)
+      leftY -= 12
+    }
+    if (params.observacoes || metadata.observacoes) {
+      const obsLines = wrapText(params.observacoes || metadata.observacoes || '-', font, 8, columnWidth - 10)
+      obsLines.forEach((line) => {
+        drawText(line, PAGE.marginX + 10, leftY, 8, font, C.ink)
+        leftY -= 11
+      })
+    }
+
+    // Reset y to start point for right column
+    y = startY - 8
+
+    // Right column (EN)
+    if (params.dataDevolucao || metadata.dataDevolucao) {
+      drawText(`Expected return date: ${params.dataDevolucao || metadata.dataDevolucao}`, PAGE.marginX + columnWidth + columnGap, rightY, 8.5, font, C.ink)
+      rightY -= 12
+    }
+    if (params.observacoes || metadata.observacoes) {
+      const obsLines = wrapText(params.observacoes || metadata.observacoes || '-', font, 8, columnWidth - 10)
+      obsLines.forEach((line) => {
+        drawText(line, PAGE.marginX + columnWidth + columnGap + 10, rightY, 8, font, C.ink)
+        rightY -= 11
+      })
+    }
+
+    // Draw vertical divider only within the bilingual section
+    const separatorTop = startY
+    const separatorBottom = Math.min(leftY, rightY) + 5
+    page.drawLine({
+      start: { x: PAGE.marginX + columnWidth + columnGap / 2, y: separatorTop },
+      end: { x: PAGE.marginX + columnWidth + columnGap / 2, y: separatorBottom },
+      thickness: 0.5,
+      color: C.borderLight
+    })
+
+    y = Math.min(leftY, rightY) - 15
   }
 
   console.log('[pdf] desenhando bloco de assinaturas')

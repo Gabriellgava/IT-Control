@@ -1,0 +1,22 @@
+Sempre seguir este fluxo:
+
+1. Entender a solicitação.
+2. Analisar arquivos relacionados.
+3. Identificar tabelas impactadas.
+4. Identificar APIs impactadas.
+5. Identificar páginas impactadas.
+6. Explicar o plano.
+7. Listar riscos.
+8. Somente depois sugerir alterações.
+
+Nunca realizar alterações grandes sem mostrar um plano primeiro.
+
+Sempre considerar:
+
+- Inventário
+- Movimentações
+- Termos
+- Assinaturas
+- Relatórios
+
+ao avaliar impactos.

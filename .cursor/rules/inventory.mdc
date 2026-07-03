@@ -1,0 +1,24 @@
+# Inventory Rules
+
+O inventário é uma das entidades centrais do sistema.
+
+Regras obrigatórias:
+
+- Toda alteração de inventário deve ser rastreável.
+- Nunca atualizar quantidades sem registrar movimentação.
+- Preservar histórico de alterações.
+- Não permitir inconsistência entre estoque físico e estoque lógico.
+- Sempre validar impacto em produtos relacionados.
+
+Antes de alterar funcionalidades de inventário:
+
+- Identificar movimentações relacionadas.
+- Identificar relatórios afetados.
+- Identificar produtos afetados.
+- Identificar integrações afetadas.
+
+Ao gerar código:
+
+- Priorizar integridade dos dados.
+- Evitar operações destrutivas.
+- Validar concorrência quando aplicável.

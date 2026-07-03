@@ -1,0 +1,29 @@
+Sistema IT-Control.
+
+Objetivo:
+
+Controle de ativos e inventário de TI.
+
+Módulos principais:
+
+- Produtos
+- Inventário
+- Movimentações
+- Funcionários
+- Setores
+- Empresas
+- Fornecedores
+- Smartphones
+- Licenças
+- Termos de responsabilidade
+- Assinaturas digitais
+
+Regras de negócio:
+
+- Toda movimentação deve ser rastreável.
+- Inventário deve manter histórico.
+- Assinaturas não podem ser alteradas após confirmação.
+- Termos assinados devem ser preservados.
+- Produtos impactam inventário e movimentações.
+
+Sempre identificar módulos afetados antes de propor alterações.

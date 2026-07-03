@@ -1,0 +1,23 @@
+# Responsibility Terms Rules
+
+Termos de responsabilidade possuem valor administrativo e jurídico.
+
+Regras obrigatórias:
+
+- Nunca sobrescrever termos assinados.
+- Preservar histórico de versões.
+- Preservar integridade dos PDFs.
+- Manter vínculo com funcionário e produto.
+- Garantir rastreabilidade das alterações.
+
+Antes de alterar este módulo:
+
+- Identificar impacto em assinaturas.
+- Identificar impacto em PDFs.
+- Identificar impacto em funcionários.
+- Identificar impacto em produtos vinculados.
+
+Ao gerar código:
+
+- Priorizar integridade documental.
+- Não alterar documentos históricos.

@@ -174,3 +174,6 @@ export function StatCard({ label, value, icon, color = 'blue', sub }: { label: s
     </Card>
   )
 }
+
+export { LoadingSpinner } from './LoadingSpinner'
+export { ConfirmDeleteModal } from './ConfirmDeleteModal'
