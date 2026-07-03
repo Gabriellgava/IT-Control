@@ -32,7 +32,7 @@ export default function AdminFuncionariosPage() {
     openDelete,
     closeDelete,
     update,
-    delete: deletar
+    deleteItem: deletar
   } = useCrud<Funcionario>({
     fetchUrl: '/api/funcionarios',
   })

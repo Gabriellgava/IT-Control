@@ -31,7 +31,7 @@ export default function AdminSetoresPage() {
     openDelete,
     closeDelete,
     update,
-    delete: deletar
+    deleteItem: deletar
   } = useCrud<Setor>({
     fetchUrl: '/api/setores',
   })

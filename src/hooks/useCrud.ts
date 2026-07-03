@@ -25,7 +25,7 @@ interface UseCrudReturn<T> {
   closeDelete: () => void
   create: (data: Partial<T>) => Promise<void>
   update: (id: string, data: Partial<T>) => Promise<void>
-  delete: (id: string) => Promise<void>
+  deleteItem: (id: string) => Promise<void>
 }
 
 export function useCrud<T extends { id: string }>({
@@ -135,7 +135,7 @@ export function useCrud<T extends { id: string }>({
     }
   }
 
-  const delete = async (id: string) => {
+  const deleteItem = async (id: string) => {
     setSaving(true)
     setError('')
     try {
@@ -171,6 +171,6 @@ export function useCrud<T extends { id: string }>({
     closeDelete,
     create,
     update,
-    delete,
+    deleteItem,
   }
 }

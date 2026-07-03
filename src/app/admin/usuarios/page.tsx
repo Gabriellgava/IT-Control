@@ -34,7 +34,7 @@ export default function AdminUsuariosPage() {
     closeDelete,
     create,
     update,
-    delete: deletar
+    deleteItem: deletar
   } = useCrud<UsuarioAdmin>({
     fetchUrl: '/api/admin/usuarios',
     createUrl: '/api/admin/usuarios',

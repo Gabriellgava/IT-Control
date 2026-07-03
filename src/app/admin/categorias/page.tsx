@@ -25,7 +25,7 @@ export default function Page() {
     openDelete,
     closeDelete,
     update,
-    delete: deletar
+    deleteItem: deletar
   } = useCrud<Categoria>({
     fetchUrl: '/api/categorias',
   })
