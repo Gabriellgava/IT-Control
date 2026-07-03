@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { uploadDocumento, TipoDocumento } from '@/lib/drive-document-upload'
 
 function parseDateWithCurrentTime(data?: string): Date {
   const agora = new Date()
@@ -38,10 +39,19 @@ export async function GET(request: NextRequest) {
         ],
       },
       include: {
-        unidade: { include: { produto: { include: { categoria: true } } } },
+        unidade: {
+          include: {
+            produto: {
+              include: {
+                categoria: true
+              }
+            }
+          }
+        },
         fornecedor: true,
         setor: true,
         usuario: true,
+        documentos: true
       },
       orderBy: { data: 'desc' },
       ...(limite && Number.isFinite(limite) && limite > 0 ? { take: limite } : {}),
@@ -56,8 +66,35 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
-    const { tipo, subtipo, produtoId, etiqueta, etiquetas, dataCompra, valorUnitario, fornecedorId, setorId, usuarioId, responsavel, observacoes, funcionarioId, funcionarioRecebe, funcionarioDevolve } = body
+    const contentType = request.headers.get('content-type') || ''
+    
+    let body: Record<string, any> = {}
+    let notaFiscalFile: File | null = null
+
+    // Se for multipart/form-data, processar arquivo
+    if (contentType.includes('multipart/form-data')) {
+      const formData = await request.formData()
+      
+      // Converter FormData para objeto
+      for (const [key, value] of formData.entries()) {
+        if (value instanceof File) {
+          if (key === 'notaFiscal') {
+            notaFiscalFile = value
+          }
+        } else {
+          body[key] = value
+        }
+      }
+    } else {
+      // Se for JSON, processar normalmente
+      body = await request.json()
+    }
+
+    const { 
+      tipo, subtipo, produtoId, etiqueta, etiquetas, dataCompra, valorUnitario, 
+      fornecedorId, setorId, usuarioId, responsavel, observacoes, funcionarioId, 
+      funcionarioRecebe, funcionarioDevolve 
+    } = body
 
     // ENTRADA: cria nova unidade física
     if (tipo === 'ENTRADA') {
@@ -189,8 +226,57 @@ export async function POST(request: NextRequest) {
           fornecedor: true,
           setor: true,
           usuario: true,
+          documentos: true,
         },
       })
+
+      // Se houver arquivo de nota fiscal, fazer upload e salvar em Documento
+      if (notaFiscalFile) {
+        try {
+          const notaFiscalBuffer = Buffer.from(await notaFiscalFile.arrayBuffer())
+          const uploadResult = await uploadDocumento({
+            tipo: 'ATIVO',
+            nomeItem: produto.nome,
+            dataCompra: parseDateWithCurrentTime(dataCompra),
+            arquivo: notaFiscalBuffer,
+            nomeArquivo: notaFiscalFile.name,
+          })
+          
+          // Criar registro em Documento
+          await prisma.documento.create({
+            data: {
+              nomeArquivo: notaFiscalFile.name,
+              tipoArquivo: notaFiscalFile.type,
+              tamanho: notaFiscalFile.size,
+
+              driveFileId: uploadResult.driveFileId,
+              driveLink: uploadResult.driveFileLink,
+
+              tipoDocumento: 'NOTA_FISCAL',
+
+              movimentacao: {
+                connect: {
+                  id: movimentacao.id
+                }
+              },
+
+              produto: {
+                connect: {
+                  id: produto.id
+                }
+              }
+            }
+          })
+          
+          console.log('[API] Nota fiscal vinculada à movimentação', { 
+            movimentacaoId: movimentacao.id, 
+            fileId: uploadResult.driveFileId 
+          })
+        } catch (driveError) {
+          console.error('[API] Erro ao fazer upload de nota fiscal:', driveError)
+          // Não falhar a movimentação se o upload falhar
+        }
+      }
 
       return NextResponse.json(movimentacao, { status: 201 })
     }

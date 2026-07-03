@@ -1,0 +1,23 @@
+# Digital Signatures Rules
+
+Assinaturas digitais são dados críticos.
+
+Regras obrigatórias:
+
+- Nunca alterar assinaturas já confirmadas.
+- Nunca substituir arquivos assinados.
+- Preservar data e hora da assinatura.
+- Preservar identidade do signatário.
+- Garantir integridade do documento assinado.
+
+Antes de alterar este módulo:
+
+- Identificar impacto em PDFs.
+- Identificar impacto em termos.
+- Identificar impacto em auditoria.
+
+Ao gerar código:
+
+- Priorizar segurança.
+- Preservar rastreabilidade.
+- Evitar alterações destrutivas.

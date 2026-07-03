@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { Badge, Button, Input, Select } from '@/components/ui'
-import { FileText, Printer, Search } from 'lucide-react'
+import { FileText, Search } from 'lucide-react'
 import { fetchJsonOrThrow } from '@/lib/http/fetch-json'
 
 interface InventarioItem {
@@ -289,10 +289,6 @@ export default function TermosPage() {
     }
   }
 
-  const imprimir = () => {
-    window.print()
-  }
-
   return (
     <AppLayout>
       <div className="space-y-6 termos-page">
@@ -308,9 +304,6 @@ export default function TermosPage() {
             <Link href="/licencas-assinaturas">
               <Button variant="secondary">Ir para Licenças e Assinaturas</Button>
             </Link>
-            <Button icon={<Printer className="w-4 h-4" />} onClick={imprimir} disabled={!responsavelAtivo}>
-              Imprimir termo
-            </Button>
           </div>
         </div>
 

@@ -1,0 +1,23 @@
+# Movement Rules
+
+Movimentações representam o histórico oficial do sistema.
+
+Regras obrigatórias:
+
+- Nunca excluir movimentações já registradas.
+- Preferir cancelamento ou estorno.
+- Toda movimentação deve possuir responsável.
+- Toda movimentação deve possuir data e hora.
+- Toda movimentação deve possuir origem identificável.
+
+Antes de alterar movimentações:
+
+- Avaliar impacto em inventário.
+- Avaliar impacto em relatórios.
+- Avaliar impacto em auditoria.
+
+Ao gerar código:
+
+- Garantir rastreabilidade completa.
+- Preservar histórico.
+- Evitar perda de dados.

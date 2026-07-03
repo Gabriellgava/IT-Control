@@ -1,0 +1,11 @@
+Autenticação realizada com NextAuth.
+
+Regras:
+
+- Validar sessão em operações protegidas.
+- Não expor dados sensíveis.
+- Respeitar permissões existentes.
+- Preservar compatibilidade com usuários atuais.
+- Verificar autorização antes de alterações críticas.
+- Não permitir bypass de autenticação.
+- Priorizar segurança sobre conveniência.

@@ -1,0 +1,13 @@
+Banco PostgreSQL utilizando Prisma.
+
+Regras:
+
+- Toda alteração estrutural deve possuir migration Prisma.
+- Nunca remover colunas sem análise de impacto.
+- Sempre validar relacionamentos existentes.
+- Evitar consultas desnecessárias.
+- Utilizar select para reduzir tráfego de dados.
+- Priorizar desempenho em consultas de inventário.
+- Avaliar impacto em relatórios antes de alterar entidades.
+- Não utilizar SQL bruto sem justificativa.
+- Sempre considerar índices para consultas frequentes.

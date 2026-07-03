@@ -1,0 +1,26 @@
+# Next.js Rules
+
+Este projeto utiliza Next.js App Router.
+
+Regras:
+
+- Seguir padrões já existentes.
+- Utilizar Server Components quando possível.
+- Evitar Client Components desnecessários.
+- Reutilizar componentes existentes.
+- Reutilizar hooks existentes.
+- Manter compatibilidade com App Router.
+
+APIs:
+
+- Utilizar Route Handlers.
+- Validar entradas.
+- Retornar erros consistentes.
+
+Antes de criar novos componentes:
+
+- Procurar componentes semelhantes.
+- Procurar páginas semelhantes.
+- Procurar APIs semelhantes.
+
+Priorizar consistência da arquitetura.

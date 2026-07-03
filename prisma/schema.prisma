@@ -56,8 +56,8 @@ model Usuario {
   ativo         Boolean        @default(true)
   criadoEm      DateTime       @default(now()) @map("criado_em")
   accounts      Account[]
-  sessions      Session[]
   movimentacoes Movimentacao[]
+  sessions      Session[]
   termosCriados Termo[]
 
   @@map("usuarios")
@@ -82,8 +82,8 @@ model Fornecedor {
   site          String?
   criadoEm      DateTime       @default(now()) @map("criado_em")
   atualizadoEm  DateTime       @updatedAt @map("atualizado_em")
-  produtos      Produto[]
   movimentacoes Movimentacao[]
+  produtos      Produto[]
 
   @@map("fornecedores")
 }
@@ -92,40 +92,41 @@ model Setor {
   id            String         @id @default(cuid())
   nome          String         @unique
   criadoEm      DateTime       @default(now()) @map("criado_em")
-  movimentacoes Movimentacao[]
   funcionarios  Funcionario[]
+  movimentacoes Movimentacao[]
 
   @@map("setores")
 }
 
 model Funcionario {
-  id        String   @id @default(cuid())
-  nome      String
-  setorId   String   @map("setor_id")
-  setor     Setor    @relation(fields: [setorId], references: [id])
-  ativo     Boolean  @default(true)
-  email     String?
-  criadoEm  DateTime @default(now()) @map("criado_em")
-  termos     Termo[]
+  id       String   @id @default(cuid())
+  nome     String
+  setorId  String   @map("setor_id")
+  ativo    Boolean  @default(true)
+  criadoEm DateTime @default(now()) @map("criado_em")
+  email    String?
+  setor    Setor    @relation(fields: [setorId], references: [id])
+  termos   Termo[]
 
   @@unique([nome, setorId])
   @@map("funcionarios")
 }
 
 model Produto {
-  id            String     @id @default(cuid())
+  id            String      @id @default(cuid())
   nome          String
-  codigo        String     @unique
-  categoriaId   String?    @map("categoria_id")
-  categoria     Categoria? @relation(fields: [categoriaId], references: [id])
-  fornecedorId  String?    @map("fornecedor_id")
-  fornecedor    Fornecedor? @relation(fields: [fornecedorId], references: [id])
-  valorUnitario Float      @default(0) @map("valor_unitario")
-  linkCompra    String?    @map("link_compra")
+  codigo        String      @unique
+  categoriaId   String?     @map("categoria_id")
+  fornecedorId  String?     @map("fornecedor_id")
+  valorUnitario Float       @default(0) @map("valor_unitario")
+  linkCompra    String?     @map("link_compra")
   observacoes   String?
-  criadoEm      DateTime   @default(now()) @map("criado_em")
-  atualizadoEm  DateTime   @updatedAt @map("atualizado_em")
+  criadoEm      DateTime    @default(now()) @map("criado_em")
+  atualizadoEm  DateTime    @updatedAt @map("atualizado_em")
+  categoria     Categoria?  @relation(fields: [categoriaId], references: [id])
+  fornecedor    Fornecedor? @relation(fields: [fornecedorId], references: [id])
   unidades      Unidade[]
+  documentos    Documento[]
 
   @@map("produtos")
 }
@@ -133,12 +134,12 @@ model Produto {
 model Unidade {
   id            String         @id @default(cuid())
   produtoId     String         @map("produto_id")
-  produto       Produto        @relation(fields: [produtoId], references: [id])
   etiqueta      String         @unique
   dataCompra    DateTime?      @map("data_compra")
   status        String         @default("ATIVA")
   criadoEm      DateTime       @default(now()) @map("criado_em")
   movimentacoes Movimentacao[]
+  produto       Produto        @relation(fields: [produtoId], references: [id])
 
   @@map("unidades")
 }
@@ -148,21 +149,22 @@ model Movimentacao {
   tipo          String
   subtipo       String?
   unidadeId     String      @map("unidade_id")
-  unidade       Unidade     @relation(fields: [unidadeId], references: [id])
   valorUnitario Float       @default(0) @map("valor_unitario")
   data          DateTime    @default(now())
   fornecedorId  String?     @map("fornecedor_id")
-  fornecedor    Fornecedor? @relation(fields: [fornecedorId], references: [id])
   setorId       String?     @map("setor_id")
-  setor         Setor?      @relation(fields: [setorId], references: [id])
   usuarioId     String?     @map("usuario_id")
-  usuario       Usuario?    @relation(fields: [usuarioId], references: [id])
   responsavel   String?
   observacoes   String?
   cancelado     Boolean     @default(false)
   canceladoEm   DateTime?   @map("cancelado_em")
   canceladoPor  String?     @map("cancelado_por")
   criadoEm      DateTime    @default(now()) @map("criado_em")
+  fornecedor    Fornecedor? @relation(fields: [fornecedorId], references: [id])
+  setor         Setor?      @relation(fields: [setorId], references: [id])
+  unidade       Unidade     @relation(fields: [unidadeId], references: [id])
+  usuario       Usuario?    @relation(fields: [usuarioId], references: [id])
+  documentos    Documento[]
 
   @@map("movimentacoes")
 }
@@ -175,46 +177,88 @@ model Inventario {
   marca        String
   modelo       String
   etiqueta     String   @unique
-  numero       String?  @map("numero")
   observacoes  String?
-  criadoEm    DateTime @default(now()) @map("criado_em")
+  criadoEm     DateTime @default(now()) @map("criado_em")
   atualizadoEm DateTime @updatedAt @map("atualizado_em")
+  numero       String?  @map("numero")
 
   @@map("inventario")
 }
 
 model Empresa {
-  id                      String   @id @default(cuid())
-  razaoSocial             String   @map("razao_social")
-  nomeFantasia            String?  @map("nome_fantasia")
-  cnpj                    String   @unique
-  inscricaoEstadual       String?  @map("inscricao_estadual")
-  emailCorporativo        String?  @map("email_corporativo")
-  telefone                String?
-  website                 String?
-  endereco                String?
-  cep                     String?
-  rua                     String?
-  numero                  String?
-  complemento             String?
-  bairro                  String?
-  cidade                  String?
-  estado                  String?
-  representanteNome       String?  @map("representante_nome")
-  representanteCargo      String?  @map("representante_cargo")
-  representanteEmail      String?  @map("representante_email")
-  representanteTelefone   String?  @map("representante_telefone")
-  logoUrl                 String?  @map("logo_url")
-  assinaturaUrl           String?  @map("assinatura_url")
-  usarLogoNoPdf           Boolean  @default(true) @map("usar_logo_no_pdf")
-  exibirCargoRepresentante Boolean @default(true) @map("exibir_cargo_representante")
-  assinaturaAutomatica    Boolean  @default(false) @map("assinatura_automatica")
-  mostrarEnderecoNoTermo  Boolean  @default(true) @map("mostrar_endereco_no_termo")
-
-  criadoEm                DateTime @default(now()) @map("criado_em")
-  atualizadoEm            DateTime @updatedAt @map("atualizado_em")
+  id                       String   @id @default(cuid())
+  razaoSocial              String   @map("razao_social")
+  nomeFantasia             String?  @map("nome_fantasia")
+  cnpj                     String   @unique
+  endereco                 String?
+  telefone                 String?
+  logoUrl                  String?  @map("logo_url")
+  criadoEm                 DateTime @default(now()) @map("criado_em")
+  atualizadoEm             DateTime @updatedAt @map("atualizado_em")
+  assinaturaAutomatica     Boolean  @default(false) @map("assinatura_automatica")
+  assinaturaUrl            String?  @map("assinatura_url")
+  bairro                   String?
+  cep                      String?
+  cidade                   String?
+  complemento              String?
+  emailCorporativo         String?  @map("email_corporativo")
+  estado                   String?
+  exibirCargoRepresentante Boolean  @default(true) @map("exibir_cargo_representante")
+  inscricaoEstadual        String?  @map("inscricao_estadual")
+  mostrarEnderecoNoTermo   Boolean  @default(true) @map("mostrar_endereco_no_termo")
+  numero                   String?
+  representanteCargo       String?  @map("representante_cargo")
+  representanteEmail       String?  @map("representante_email")
+  representanteNome        String?  @map("representante_nome")
+  representanteTelefone    String?  @map("representante_telefone")
+  rua                      String?
+  usarLogoNoPdf            Boolean  @default(true) @map("usar_logo_no_pdf")
+  website                  String?
 
   @@map("empresas")
+}
+
+model Termo {
+  id                    String           @id @default(cuid())
+  titulo                String
+  conteudoHtml          String           @map("conteudo_html")
+  status                TermoStatus      @default(PENDENTE)
+  funcionarioId         String           @map("funcionario_id")
+  criadoPorId           String?          @map("criado_por_id")
+  driveFolderId         String?          @map("drive_folder_id")
+  criadoEm              DateTime         @default(now()) @map("criado_em")
+  atualizadoEm          DateTime         @updatedAt @map("atualizado_em")
+  acceptedTerms         Boolean          @default(false) @map("accepted_terms")
+  driveFileId           String?          @map("drive_file_id")
+  driveFileLink         String?          @map("drive_file_link")
+  signatureImageDataUrl String?          @map("signature_image_data_url")
+  signedAt              DateTime?        @map("signed_at")
+  signerIp              String?          @map("signer_ip")
+  signerName            String?          @map("signer_name")
+  signerUserAgent       String?          @map("signer_user_agent")
+  token                 String           @unique
+  criadoPor             Usuario?         @relation(fields: [criadoPorId], references: [id])
+  funcionario           Funcionario      @relation(fields: [funcionarioId], references: [id])
+  auditorias            TermoAuditoria[]
+
+  @@index([funcionarioId])
+  @@index([status])
+  @@map("termos")
+}
+
+model TermoAuditoria {
+  id        String   @id @default(cuid())
+  termoId   String   @map("termo_id")
+  evento    String
+  detalhes  Json?
+  ip        String?
+  userAgent String?  @map("user_agent")
+  atorId    String?  @map("ator_id")
+  criadoEm  DateTime @default(now()) @map("criado_em")
+  termo     Termo    @relation(fields: [termoId], references: [id], onDelete: Cascade)
+
+  @@index([termoId, criadoEm])
+  @@map("termos_auditoria")
 }
 
 enum TermoStatus {
@@ -224,45 +268,76 @@ enum TermoStatus {
   CANCELADO
 }
 
-model Termo {
-  id                 String             @id @default(cuid())
-  titulo             String
-  conteudoHtml       String             @map("conteudo_html")
-  status             TermoStatus        @default(PENDENTE)
-  funcionarioId      String             @map("funcionario_id")
-  funcionario        Funcionario        @relation(fields: [funcionarioId], references: [id])
-  criadoPorId        String?            @map("criado_por_id")
-  criadoPor          Usuario?           @relation(fields: [criadoPorId], references: [id])
-  token              String             @unique
-  signedAt            DateTime?          @map("signed_at")
-  signerIp            String?            @map("signer_ip")
-  signerUserAgent     String?            @map("signer_user_agent")
-  signerName          String?            @map("signer_name")
-  signatureImageDataUrl String?          @map("signature_image_data_url")
-  acceptedTerms       Boolean            @default(false) @map("accepted_terms")
-  driveFolderId       String?            @map("drive_folder_id")
-  driveFileId         String?            @map("drive_file_id")
-  driveFileLink       String?            @map("drive_file_link")
-  criadoEm           DateTime           @default(now()) @map("criado_em")
-  atualizadoEm       DateTime           @updatedAt @map("atualizado_em")
-  auditorias         TermoAuditoria[]
-
-  @@index([funcionarioId])
-  @@index([status])
-  @@map("termos")
+enum TipoDocumento {
+  NOTA_FISCAL
+  CONTRATO
+  LICENCA
+  COMPROVANTE
+  OUTRO
 }
 
-model TermoAuditoria {
-  id          String   @id @default(cuid())
-  termoId     String   @map("termo_id")
-  termo       Termo    @relation(fields: [termoId], references: [id], onDelete: Cascade)
-  evento      String
-  detalhes    Json?
-  ip          String?
-  userAgent   String?  @map("user_agent")
-  atorId      String?  @map("ator_id")
-  criadoEm    DateTime @default(now()) @map("criado_em")
+model Documento {
+  id String @id @default(cuid())
 
-  @@index([termoId, criadoEm])
-  @@map("termos_auditoria")
+  nomeArquivo String  @map("nome_arquivo")
+  tipoArquivo String? @map("tipo_arquivo")
+  tamanho     Int?    @map("tamanho")
+
+  driveFileId   String? @map("drive_file_id")
+  driveLink     String? @map("drive_link")
+  driveFolderId String? @map("drive_folder_id")
+
+  tipoDocumento TipoDocumento
+
+  criadoEm DateTime @default(now()) @map("criado_em")
+
+  produtoId String?  @map("produto_id")
+  produto   Produto? @relation(fields: [produtoId], references: [id], onDelete: Cascade)
+
+  movimentacaoId String?       @map("movimentacao_id")
+  movimentacao   Movimentacao? @relation(fields: [movimentacaoId], references: [id], onDelete: Cascade)
+
+  licencaId String?  @map("licenca_id")
+  licenca   Licenca? @relation(fields: [licencaId], references: [id], onDelete: Cascade)
+
+  assinaturaId String?     @map("assinatura_id")
+  assinatura   Assinatura? @relation(fields: [assinaturaId], references: [id], onDelete: Cascade)
+
+  @@index([produtoId])
+  @@index([movimentacaoId])
+  @@index([licencaId])
+  @@index([assinaturaId])
+  @@map("documentos")
+}
+
+model Licenca {
+  id String @id @default(cuid())
+
+  solicitadoPor   String  @map("solicitado_por")
+  maquinaEtiqueta String  @map("maquina_etiqueta")
+  produtoLicenca  String  @map("produto_licenca")
+  codigoLicenca   String? @map("codigo_licenca")
+
+  criadoEm     DateTime @default(now()) @map("criado_em")
+  atualizadoEm DateTime @updatedAt @map("atualizado_em")
+
+  documentos Documento[]
+
+  @@map("licencas")
+}
+
+model Assinatura {
+  id String @id @default(cuid())
+
+  plataforma String
+  setor      String
+  periodo    String
+  email      String
+
+  criadoEm     DateTime @default(now()) @map("criado_em")
+  atualizadoEm DateTime @updatedAt @map("atualizado_em")
+
+  documentos Documento[]
+
+  @@map("assinaturas")
 }

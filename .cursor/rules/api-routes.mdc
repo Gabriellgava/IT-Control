@@ -1,0 +1,12 @@
+Todas as APIs seguem o padrão Next.js App Router.
+
+Regras:
+
+- Validar entradas.
+- Utilizar status HTTP corretos.
+- Retornar erros consistentes.
+- Não duplicar lógica entre endpoints.
+- Reutilizar funções existentes.
+- Preservar compatibilidade com frontend atual.
+- Seguir padrões já utilizados no projeto.
+- Sempre avaliar impacto em integrações existentes.
