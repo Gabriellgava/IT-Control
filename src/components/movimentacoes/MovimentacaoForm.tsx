@@ -91,7 +91,10 @@ export function MovimentacaoForm({ tipo }: { tipo: 'ENTRADA' | 'SAIDA' }) {
     produtos.flatMap((produto) => (
       ((produto.unidades || []) as UnidadeSaida[])
         .filter((unidade) =>
-          unidade.status === 'ATIVA' && unidade.localAtual?.toLowerCase() === 'estoque',
+          unidade.status === 'ATIVA' && 
+          (!unidade.localAtual || 
+           unidade.localAtual.toLowerCase() === 'estoque' ||
+           unidade.localAtual === 'Estoque')
         )
         .map((unidade) => ({
           etiqueta: unidade.etiqueta,
