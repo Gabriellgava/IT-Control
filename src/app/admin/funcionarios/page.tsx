@@ -31,6 +31,7 @@ export default function AdminFuncionariosPage() {
     closeModal,
     openDelete,
     closeDelete,
+    create,
     update,
     deleteItem: deletar
   } = useCrud<Funcionario>({
@@ -62,6 +63,8 @@ export default function AdminFuncionariosPage() {
 
     if (editingItem) {
       await update(editingItem.id, { nome: form.nome.trim(), email: form.email.trim(), setorId: form.setorId, ativo: form.ativo })
+    } else {
+      await create({ nome: form.nome.trim(), email: form.email.trim(), setorId: form.setorId, ativo: form.ativo })
     }
   }
 
