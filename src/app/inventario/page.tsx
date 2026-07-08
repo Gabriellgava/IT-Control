@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { AppLayout } from '@/components/layout/AppLayout'
-import { Button, Input, Modal, Table, Badge } from '@/components/ui'
+import { Button, Input, Modal, Table, Badge, Pagination } from '@/components/ui'
 import { Search, Plus, Edit2, Trash2, Download, Upload, AlertCircle, CheckCircle, RefreshCw } from 'lucide-react'
 import { exportarCSV, formatData } from '@/lib/utils'
 import { corrigirMojibake, decodificarCsvComFallback } from '@/lib/csv'
@@ -186,6 +186,8 @@ export default function InventarioPage() {
   const [syncStatus, setSyncStatus] = useState<{ tipo: 'ok' | 'erro'; msg: string } | null>(null)
   const [previewImport, setPreviewImport] = useState<Record<string, string>[]>([])
   const [textoImportacao, setTextoImportacao] = useState('')
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pagination, setPagination] = useState<{ page: number; limit: number; total: number; totalPages: number } | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
   // Setores e tipos únicos para filtros
@@ -203,6 +205,8 @@ export default function InventarioPage() {
       if (filtroSetor) p.set('setor', filtroSetor)
       if (filtroTipo) p.set('tipo', filtroTipo)
       if (filtroResponsavel) p.set('responsavel', filtroResponsavel)
+      p.set('page', currentPage.toString())
+      p.set('limit', '50')
 
       const res = await fetch(`/api/inventario?${p}`)
       const data = await res.json()
@@ -213,19 +217,24 @@ export default function InventarioPage() {
         return
       }
 
-      if (!Array.isArray(data)) {
+      if (!Array.isArray(data.data)) {
         setItens([])
         setErroCarregamento('Resposta inválida ao carregar inventário.')
         return
       }
 
-      setItens(data)
+      setItens(data.data)
+      setPagination(data.pagination || null)
     } catch {
       setItens([])
       setErroCarregamento('Erro de conexão ao carregar inventário.')
     } finally {
       setLoading(false)
     }
+  }, [busca, filtroSetor, filtroTipo, filtroResponsavel, currentPage])
+
+  useEffect(() => {
+    setCurrentPage(1)
   }, [busca, filtroSetor, filtroTipo, filtroResponsavel])
 
   useEffect(() => { buscarItens() }, [buscarItens])
@@ -445,6 +454,16 @@ export default function InventarioPage() {
               </tr>
             ))}
           </Table>
+        )}
+
+        {pagination && (
+          <Pagination
+            currentPage={currentPage}
+            totalPages={pagination.totalPages}
+            totalItems={pagination.total}
+            itemsPerPage={pagination.limit}
+            onPageChange={setCurrentPage}
+          />
         )}
 
         {/* Modal — Formulário */}

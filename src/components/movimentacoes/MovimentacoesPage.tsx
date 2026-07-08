@@ -3,7 +3,7 @@ import { useEffect, useState, useCallback, useMemo } from 'react'
 import Link from 'next/link'
 import { useSession } from 'next-auth/react'
 import { ArrowDownCircle, ArrowUpCircle, Download, FileText, XCircle, Trash2 } from 'lucide-react'
-import { Button, Badge, Table, Select, Modal, LoadingState, ErrorState, PageHeader } from '@/components/ui'
+import { Button, Badge, Table, Select, Modal, LoadingState, ErrorState, PageHeader, Pagination } from '@/components/ui'
 import { formatMoeda, formatDataHora, exportarCSV } from '@/lib/utils'
 import type { Movimentacao, Produto } from '@/types'
 
@@ -21,6 +21,8 @@ export function MovimentacoesPage() {
   const [sort, setSort] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null)
   const [cancelandoId, setCancelandoId] = useState<string | null>(null)
   const [cancelando, setCancelando] = useState(false)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pagination, setPagination] = useState<{ page: number; limit: number; total: number; totalPages: number } | null>(null)
   const isAdmin = session?.user.perfil === 'admin'
 
   const buscar = useCallback(async () => {
@@ -29,22 +31,30 @@ export function MovimentacoesPage() {
     const p = new URLSearchParams()
     if (filtroTipo) p.set('tipo', filtroTipo)
     if (filtroProduto) p.set('produtoId', filtroProduto)
+    p.set('page', currentPage.toString())
+    p.set('limit', '50')
     try {
       const res = await fetch(`/api/movimentacoes?${p}`)
       if (!res.ok) throw new Error('Não foi possível carregar movimentações.')
-      setMovs(await res.json())
+      const data = await res.json()
+      setMovs(data.data || data)
+      setPagination(data.pagination || null)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Erro inesperado ao carregar movimentações.')
     } finally {
       setLoading(false)
     }
+  }, [filtroTipo, filtroProduto, currentPage])
+
+  useEffect(() => {
+    setCurrentPage(1)
   }, [filtroTipo, filtroProduto])
 
   useEffect(() => {
     buscar()
     fetch('/api/produtos')
       .then(r => r.ok ? r.json() : [])
-      .then(setProdutos)
+      .then(data => setProdutos(data.data || data))
       .catch(() => setProdutos([]))
   }, [buscar])
 
@@ -209,7 +219,7 @@ export function MovimentacoesPage() {
     <div className="space-y-6">
       <PageHeader
         title="Movimentações"
-        description={`${movs.filter(m => !m.cancelado).length} registro${movs.filter(m => !m.cancelado).length !== 1 ? 's' : ''}`}
+        description={`${pagination?.total || movs.filter(m => !m.cancelado).length} registro${(pagination?.total || movs.filter(m => !m.cancelado).length) !== 1 ? 's' : ''}`}
         actions={
           <>
             <Button variant="secondary" size="sm" icon={<Download className="w-4 h-4" />} onClick={exportar}>CSV</Button>
@@ -262,7 +272,7 @@ export function MovimentacoesPage() {
         </div>
       </div>
 
-      <Table headers={['Tipo', 'Produto / Etiqueta', 'Valor Unit.', 'Destino', 'Responsável', 'Data', ...(isAdmin ? [''] : [])]} empty={movimentacoesFiltradas.length === 0} sort={sort} onSort={alternarOrdenacao}>
+      <Table headers={['Tipo', 'Produto / Etiqueta', 'Valor Unit.', 'Destino', 'Responsável', 'Usuário', 'Data', ...(isAdmin ? [''] : [])]} empty={movimentacoesFiltradas.length === 0} sort={sort} onSort={alternarOrdenacao}>
         {movimentacoesFiltradas.map(m => (
           <tr key={m.id} className={`hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors ${m.cancelado ? 'opacity-40' : ''}`}>
             <td className="px-4 py-3">
@@ -285,7 +295,8 @@ export function MovimentacoesPage() {
                 : m.subtipo === 'DESCARTE' ? <span className="text-red-500 text-xs font-medium">Descartado</span>
                 : (m.setor?.nome ?? '—')}
             </td>
-            <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">{m.responsavel ?? m.usuario?.nome ?? '—'}</td>
+            <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">{m.responsavel ?? '—'}</td>
+            <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">{m.usuario?.nome ?? m.usuario?.email ?? '—'}</td>
             <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">{formatDataHora(m.data)}</td>
             {isAdmin && (
               <td className="px-4 py-3">
@@ -301,6 +312,16 @@ export function MovimentacoesPage() {
           </tr>
         ))}
       </Table>
+
+      {pagination && (
+        <Pagination
+          currentPage={currentPage}
+          totalPages={pagination.totalPages}
+          totalItems={pagination.total}
+          itemsPerPage={pagination.limit}
+          onPageChange={setCurrentPage}
+        />
+      )}
 
       <Modal open={!!cancelandoId} onClose={() => setCancelandoId(null)} title="Cancelar movimentação">
         <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">Deseja cancelar esta movimentação?</p>

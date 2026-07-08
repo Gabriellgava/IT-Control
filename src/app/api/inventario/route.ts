@@ -74,11 +74,15 @@ const buscarInventarioResiliente = async ({
   setor,
   tipo,
   responsavel,
+  skip,
+  take,
 }: {
   busca: string
   setor: string
   tipo: string
   responsavel: string
+  skip: number
+  take: number
 }) => {
   const filtros: Prisma.Sql[] = []
 
@@ -124,6 +128,8 @@ const buscarInventarioResiliente = async ({
     FROM inventario
     ${where}
     ORDER BY COALESCE(setor, '') ASC, COALESCE(responsavel, '') ASC
+    LIMIT ${take}
+    OFFSET ${skip}
   `)
 
   return itens.map(normalizarItem)
@@ -136,37 +142,77 @@ export async function GET(request: NextRequest) {
     const setor = searchParams.get('setor') || ''
     const tipo = searchParams.get('tipo') || ''
     const responsavel = searchParams.get('responsavel') || ''
+    const page = parseInt(searchParams.get('page') || '1')
+    const limit = parseInt(searchParams.get('limit') || '50')
+    const skip = (page - 1) * limit
+
+    const whereClause: any = {
+      AND: [
+        busca ? {
+          OR: [
+            { responsavel: { contains: busca, mode: 'insensitive' as const } },
+            { etiqueta: { contains: busca, mode: 'insensitive' as const } },
+            { modelo: { contains: busca, mode: 'insensitive' as const } },
+            { marca: { contains: busca, mode: 'insensitive' as const } },
+          ],
+        } : {},
+        setor ? { setor: { contains: setor, mode: 'insensitive' as const } } : {},
+        tipo ? { tipo: { contains: tipo, mode: 'insensitive' as const } } : {},
+        responsavel ? { responsavel: { contains: responsavel, mode: 'insensitive' as const } } : {},
+      ],
+    }
 
     try {
-      const itens = await prisma.inventario.findMany({
-        where: {
-          AND: [
-            busca ? {
-              OR: [
-                { responsavel: { contains: busca, mode: 'insensitive' } },
-                { etiqueta: { contains: busca, mode: 'insensitive' } },
-                { modelo: { contains: busca, mode: 'insensitive' } },
-                { marca: { contains: busca, mode: 'insensitive' } },
-              ],
-            } : {},
-            setor ? { setor: { contains: setor, mode: 'insensitive' } } : {},
-            tipo ? { tipo: { contains: tipo, mode: 'insensitive' } } : {},
-            responsavel ? { responsavel: { contains: responsavel, mode: 'insensitive' } } : {},
-          ],
-        },
-        orderBy: [{ setor: 'asc' }, { responsavel: 'asc' }],
-      })
+      const [itens, total] = await Promise.all([
+        prisma.inventario.findMany({
+          where: whereClause,
+          orderBy: [{ setor: 'asc' }, { responsavel: 'asc' }],
+          skip,
+          take: limit,
+        }),
+        prisma.inventario.count({ where: whereClause })
+      ])
 
       const itensNormalizados = itens.map(normalizarItem)
       await corrigirRegistrosComMojibake(itens as InventarioItem[], itensNormalizados)
-      return NextResponse.json(itensNormalizados)
+      return NextResponse.json({
+        data: itensNormalizados,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit)
+        }
+      })
     } catch (error: unknown) {
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
         error.code === 'P2032'
       ) {
-        const itens = await buscarInventarioResiliente({ busca, setor, tipo, responsavel })
-        return NextResponse.json(itens)
+        const itens = await buscarInventarioResiliente({ busca, setor, tipo, responsavel, skip, take: limit })
+        const total = await prisma.$queryRaw<{ count: bigint }[]>(Prisma.sql`
+          SELECT COUNT(*) as count FROM inventario
+          ${whereClause ? Prisma.sql`WHERE ${Prisma.join([
+            busca ? Prisma.sql`(
+              COALESCE(responsavel, '') ILIKE ${`%${busca}%`}
+              OR COALESCE(etiqueta, '') ILIKE ${`%${busca}%`}
+              OR COALESCE(modelo, '') ILIKE ${`%${busca}%`}
+              OR COALESCE(marca, '') ILIKE ${`%${busca}%`}
+            )` : Prisma.empty,
+            setor ? Prisma.sql`COALESCE(setor, '') ILIKE ${`%${setor}%`}` : Prisma.empty,
+            tipo ? Prisma.sql`COALESCE(tipo, '') ILIKE ${`%${tipo}%`}` : Prisma.empty,
+            responsavel ? Prisma.sql`COALESCE(responsavel, '') ILIKE ${`%${responsavel}%`}` : Prisma.empty,
+          ].filter(f => f !== Prisma.empty), ' AND ')}` : Prisma.empty}
+        `)
+        return NextResponse.json({
+          data: itens,
+          pagination: {
+            page,
+            limit,
+            total: Number(total[0]?.count || 0),
+            totalPages: Math.ceil(Number(total[0]?.count || 0) / limit)
+          }
+        })
       }
       throw error
     }

@@ -54,14 +54,27 @@ export async function DELETE(_: NextRequest, { params }: { params: { id: string 
   try {
     const unidade = await prisma.unidade.findUnique({
       where: { id: params.id },
-      include: { movimentacoes: { select: { id: true } } },
+      include: { movimentacoes: { where: { cancelado: false }, select: { id: true, tipo: true, subtipo: true } } },
     })
 
     if (!unidade)
       return NextResponse.json({ error: 'Unidade não encontrada' }, { status: 404 })
 
-    if (unidade.movimentacoes.length > 0)
-      return NextResponse.json({ error: 'Esta unidade possui movimentações. Cancele as movimentações antes de excluir.' }, { status: 400 })
+    // Verifica se há movimentações que bloqueiam a exclusão
+    const movimentacoesBloqueantes = unidade.movimentacoes.filter(m =>
+      m.tipo === 'SAIDA' || (m.tipo === 'ENTRADA' && m.subtipo === 'DEVOLUCAO')
+    )
+
+    if (movimentacoesBloqueantes.length > 0)
+      return NextResponse.json({ error: 'Esta unidade possui movimentações (saída ou devolução). Cancele as movimentações antes de excluir.' }, { status: 400 })
+
+    // Deletar movimentações de ENTRADA simples antes da unidade para evitar violação de chave estrangeira
+    const movimentacoesEntrada = unidade.movimentacoes.filter(m => m.tipo === 'ENTRADA' && m.subtipo === null)
+    if (movimentacoesEntrada.length > 0) {
+      await prisma.movimentacao.deleteMany({
+        where: { id: { in: movimentacoesEntrada.map(m => m.id) } }
+      })
+    }
 
     await prisma.unidade.delete({ where: { id: unidade.id } })
     await prisma.inventario.deleteMany({ where: { etiqueta: unidade.etiqueta } })

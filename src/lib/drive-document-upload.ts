@@ -1,6 +1,6 @@
 import { Readable } from 'stream'
 import { google } from 'googleapis'
-import { getGoogleDriveConfig } from '@/lib/termos/config'
+import { getGoogleDriveConfig, getNotaFiscalRootFolderId } from '@/lib/termos/config'
 
 const cfg = getGoogleDriveConfig()
 
@@ -26,7 +26,8 @@ export type TipoDocumento = 'ATIVO' | 'LICENCA' | 'ASSINATURA'
 export interface UploadDocumentoParams {
   tipo: TipoDocumento
   nomeItem: string // Ex: "Notebook Acer Nitro", "Office 365", "ChatGPT Team"
-  dataCompra: Date
+  etiqueta?: string // Ex: "teste1" - para nota fiscal de ativos
+  dataCompra?: Date // Opcional para outros tipos de documentos
   arquivo: Buffer | Uint8Array
   nomeArquivo: string
 }
@@ -142,6 +143,19 @@ async function ensureRootCategoryFolder(tipoDocumento: TipoDocumento): Promise<s
   return ensureFolderByName(cfg.rootFolderId, categoryNames[tipoDocumento], `categoria ${tipoDocumento}`)
 }
 
+async function ensureNotaFiscalAtivoItemFolder(nomeItem: string): Promise<string> {
+  const notaFiscalRootId = getNotaFiscalRootFolderId()
+  return ensureFolderByName(notaFiscalRootId, nomeItem, `Nota Fiscal Ativos/${nomeItem}`)
+}
+
+async function ensureNotaFiscalEtiquetaFolder(nomeItem: string, etiqueta: string): Promise<string> {
+  const itemFolderId = await ensureNotaFiscalAtivoItemFolder(nomeItem)
+  const dataHoje = new Date()
+  const dataFormatada = dataHoje.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+  const nomePasta = `${etiqueta}-${dataFormatada}`
+  return ensureFolderByName(itemFolderId, nomePasta, `Nota Fiscal Ativos/${nomeItem}/${nomePasta}`)
+}
+
 async function ensureItemFolder(
   tipoDocumento: TipoDocumento,
   nomeItem: string
@@ -178,16 +192,29 @@ export async function uploadDocumento(
   console.log('[DRIVE] Iniciando upload de documento', {
     tipo: params.tipo,
     nomeItem: params.nomeItem,
+    etiqueta: params.etiqueta,
     nomeArquivo: params.nomeArquivo,
     tamanhoBytes: params.arquivo.length,
   })
 
   // Criar estrutura de pastas
-  const dateFolderId = await ensureDateFolder(
-    params.tipo,
-    params.nomeItem,
-    params.dataCompra
-  )
+  let targetFolderId: string
+
+  if (params.etiqueta) {
+    // Nova estrutura para nota fiscal de ativos: Nota Fiscal Ativos > nomeItem > etiqueta
+    targetFolderId = await ensureNotaFiscalEtiquetaFolder(params.nomeItem, params.etiqueta)
+  } else if (params.dataCompra) {
+    // Estrutura antiga com data para outros documentos
+    targetFolderId = await ensureDateFolder(
+      params.tipo,
+      params.nomeItem,
+      params.dataCompra
+    )
+  } else {
+    // Fallback para estrutura simples sem data
+    const itemFolderId = await ensureItemFolder(params.tipo, params.nomeItem)
+    targetFolderId = await ensureDocumentoFolder(params.tipo, params.nomeItem)
+  }
 
   // Upload do arquivo
   const safeName = sanitizeDriveName(params.nomeArquivo)
@@ -195,7 +222,7 @@ export async function uploadDocumento(
   const stream = Readable.from(buffer)
 
   console.log('[DRIVE] Enviando arquivo para Drive', {
-    pasta: dateFolderId,
+    pasta: targetFolderId,
     arquivo: safeName,
     bytes: buffer.length,
   })
@@ -203,7 +230,7 @@ export async function uploadDocumento(
   const file = await drive.files.create({
     requestBody: {
       name: safeName,
-      parents: [dateFolderId],
+      parents: [targetFolderId],
     },
     media: {
       mimeType: 'application/octet-stream',

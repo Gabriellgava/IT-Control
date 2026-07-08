@@ -177,3 +177,4 @@ export function StatCard({ label, value, icon, color = 'blue', sub }: { label: s
 
 export { LoadingSpinner } from './LoadingSpinner'
 export { ConfirmDeleteModal } from './ConfirmDeleteModal'
+export { Pagination } from './Pagination'

@@ -9,6 +9,7 @@ type GoogleDriveConfig = {
 
 const SHARED_DRIVE_ID = '0AEcWwKcSvCUbUk9PVA'
 const TERMOS_ROOT_FOLDER_ID = '1pzEKyp0mvmTVtBHaHggHwmwonARpQPLC'
+const NOTA_FISCAL_ROOT_FOLDER_ID = '1slRnqGIs-QBOirrAdNx87RCHc4QXusre'
 
 function required(name: string, value?: string) {
   if (!value?.trim()) {
@@ -68,4 +69,8 @@ export function getGoogleDriveConfig(): GoogleDriveConfig {
   debugConfig(cfg)
 
   return cfg
+}
+
+export function getNotaFiscalRootFolderId(): string {
+  return NOTA_FISCAL_ROOT_FOLDER_ID
 }

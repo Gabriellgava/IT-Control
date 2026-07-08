@@ -65,6 +65,12 @@ export async function DELETE(_: NextRequest, { params }: { params: { id: string 
         if (temSaida > 0)
           return NextResponse.json({ error: 'Não é possível cancelar: unidade já possui saída registrada' }, { status: 400 })
 
+        const outrasMovimentacoes = await prisma.movimentacao.count({
+          where: { unidadeId: mov.unidadeId, id: { not: mov.id }, cancelado: false },
+        })
+        if (outrasMovimentacoes > 0)
+          return NextResponse.json({ error: 'Não é possível cancelar: existem outras movimentações não canceladas para esta unidade' }, { status: 400 })
+
         await prisma.unidade.delete({ where: { id: mov.unidadeId } })
         await prisma.inventario.deleteMany({ where: { etiqueta: mov.unidade.etiqueta } })
       }

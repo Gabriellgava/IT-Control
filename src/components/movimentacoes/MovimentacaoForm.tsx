@@ -57,7 +57,7 @@ export function MovimentacaoForm({ tipo }: { tipo: 'ENTRADA' | 'SAIDA' }) {
   const s = (k: string, v: string) => { setForm(f => ({ ...f, [k]: v })); setErros(e => ({ ...e, [k]: '' })) }
 
   useEffect(() => {
-    fetch('/api/produtos').then(r => r.json()).then(setProdutos)
+    fetch('/api/produtos').then(r => r.json()).then(data => setProdutos(data.data || data))
     fetch('/api/fornecedores').then(r => r.json()).then(setFornecedores)
     fetch('/api/funcionarios').then(r => r.json()).then((dados) => setFuncionarios(Array.isArray(dados) ? dados.filter((f) => f.ativo) : []))
     fetch('/api/inventario')

@@ -21,50 +21,60 @@ export async function GET(request: NextRequest) {
     const busca = searchParams.get('search') || ''
     const categoriaId = searchParams.get('categoriaId') || ''
     const fornecedorId = searchParams.get('fornecedorId') || ''
+    const page = parseInt(searchParams.get('page') || '1')
+    const limit = parseInt(searchParams.get('limit') || '50')
+    const skip = (page - 1) * limit
 
-    const produtos = await prisma.produto.findMany({
-      where: {
-        AND: [
-          busca ? { OR: [
-            { nome: { contains: busca, mode: 'insensitive' } },
-            { codigo: { contains: busca, mode: 'insensitive' } },
-            { unidades: { some: { etiqueta: { contains: busca, mode: 'insensitive' } } } },
-          ]} : {},
-          categoriaId ? { categoriaId } : {},
-          fornecedorId ? { fornecedorId } : {},
-        ],
-      },
-      include: {
-        categoria: true,
-        fornecedor: true,
-        unidades: {
-          orderBy: { criadoEm: 'desc' },
-          select: {
-            id: true,
-            etiqueta: true,
-            dataCompra: true,
-            status: true,
-            criadoEm: true,
-            produtoId: true,
-            movimentacoes: {
-              where: { cancelado: false },
-              orderBy: { data: 'desc' },
-              take: 1,
-              select: {
-                tipo: true,
-                subtipo: true,
-                responsavel: true,
+    const whereClause: any = {
+      AND: [
+        busca ? { OR: [
+          { nome: { contains: busca, mode: 'insensitive' as const } },
+          { codigo: { contains: busca, mode: 'insensitive' as const } },
+          { unidades: { some: { etiqueta: { contains: busca, mode: 'insensitive' as const } } } },
+        ]} : {},
+        categoriaId ? { categoriaId } : {},
+        fornecedorId ? { fornecedorId } : {},
+      ],
+    }
+
+    const [produtos, total] = await Promise.all([
+      prisma.produto.findMany({
+        where: whereClause,
+        include: {
+          categoria: true,
+          fornecedor: true,
+          unidades: {
+            orderBy: { criadoEm: 'desc' },
+            select: {
+              id: true,
+              etiqueta: true,
+              dataCompra: true,
+              status: true,
+              criadoEm: true,
+              produtoId: true,
+              movimentacoes: {
+                where: { cancelado: false },
+                orderBy: { data: 'desc' },
+                take: 1,
+                select: {
+                  tipo: true,
+                  subtipo: true,
+                  responsavel: true,
+                },
               },
             },
           },
+          _count: { select: { unidades: { where: { status: 'ATIVA' } } } },
         },
-        _count: { select: { unidades: { where: { status: 'ATIVA' } } } },
-      },
-      orderBy: { nome: 'asc' },
-    })
+        orderBy: { nome: 'asc' },
+        skip,
+        take: limit,
+      }),
+      prisma.produto.count({ where: whereClause })
+    ])
 
-    const etiquetas = produtos.flatMap((produto) =>
-      produto.unidades.map((unidade) => unidade.etiqueta)
+    const etiquetas = produtos.flatMap((produto: any) =>
+      produto.unidades.map((unidade: any) => unidade.etiqueta)
     )
 
     const itensInventario = etiquetas.length > 0
@@ -84,9 +94,9 @@ export async function GET(request: NextRequest) {
       itensInventario.map((item) => [item.etiqueta.trim().toUpperCase(), item])
     )
 
-    const produtosComLocalizacao = produtos.map((produto) => ({
+    const produtosComLocalizacao = produtos.map((produto: any) => ({
       ...produto,
-      unidades: produto.unidades.map((unidade) => {
+      unidades: produto.unidades.map((unidade: any) => {
         const ultimaMovimentacao = unidade.movimentacoes[0]
         const emPosseDeColaborador =
           ultimaMovimentacao?.tipo === 'SAIDA' && ultimaMovimentacao?.subtipo === 'USUARIO'
@@ -107,7 +117,15 @@ export async function GET(request: NextRequest) {
       }),
     }))
 
-    return NextResponse.json(produtosComLocalizacao)
+    return NextResponse.json({
+      data: produtosComLocalizacao,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit)
+      }
+    })
   } catch (error) {
     console.error(error)
     return NextResponse.json({ error: 'Erro ao buscar produtos' }, { status: 500 })
