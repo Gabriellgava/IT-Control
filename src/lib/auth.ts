@@ -12,7 +12,10 @@ function CustomPrismaAdapter(p: any) {
   const adapter = PrismaAdapter(p) as any
   return {
     ...adapter,
-    createUser: (data: any) => p.usuario.create({ data }),
+    createUser: (data: any) => {
+      const { name, ...rest } = data
+      return p.usuario.create({ data: { ...rest, nome: name } })
+    },
     getUser: (id: string) => p.usuario.findUnique({ where: { id } }),
     getUserByEmail: (email: string) => p.usuario.findUnique({ where: { email } }),
     getUserByAccount: async ({ providerAccountId, provider }: any) => {
@@ -22,7 +25,10 @@ function CustomPrismaAdapter(p: any) {
       })
       return account?.user ?? null
     },
-    updateUser: ({ id, ...data }: any) => p.usuario.update({ where: { id }, data }),
+    updateUser: ({ id, ...data }: any) => {
+      const { name, ...rest } = data
+      return p.usuario.update({ where: { id }, data: name ? { ...rest, nome: name } : rest })
+    },
     linkAccount: (data: any) => p.account.create({ data }),
     createSession: (data: any) => p.session.create({ data }),
     getSessionAndUser: async (sessionToken: string) => {
@@ -74,6 +80,9 @@ export const authOptions: NextAuthOptions = {
       try {
         const email = user.email?.toLowerCase().trim()
         if (!email) return false
+
+        // Restringe acesso apenas para emails @fastgsa.com
+        if (!email.endsWith('@fastgsa.com')) return false
 
         const dbUser = await prisma.usuario.findUnique({ where: { email } })
         if (!dbUser) return true
