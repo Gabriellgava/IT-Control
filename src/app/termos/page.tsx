@@ -47,6 +47,7 @@ interface Empresa {
   cep?: string | null
 }
 
+
 const RESPONSABILIDADES_PADRAO = [
   'Utilizar os equipamentos exclusivamente para atividades profissionais autorizadas.',
   'Zelar pela integridade física e lógica de todos os equipamentos recebidos.',
@@ -83,30 +84,46 @@ export default function TermosPage() {
   const [enviando, setEnviando] = useState(false)
   const [statusEnvio, setStatusEnvio] = useState('')
 
-  useEffect(() => {
-    const carregar = async () => {
-      try {
-        setLoading(true)
-        const data = await fetchJsonOrThrow<InventarioItem[]>('/api/inventario', {
+useEffect(() => {
+  const carregar = async () => {
+    try {
+      setLoading(true)
+
+      const itensInventario = await fetchJsonOrThrow<InventarioItem[]>(
+        '/api/inventario/termos',
+        {
           context: 'termos-carregar-inventario',
-        })
-        setItens(data)
-        const dataFuncionarios = await fetchJsonOrThrow<Funcionario[]>('/api/funcionarios', {
+        }
+      )
+
+      setItens(itensInventario)
+
+      const dataFuncionarios = await fetchJsonOrThrow<Funcionario[]>(
+        '/api/funcionarios',
+        {
           context: 'termos-carregar-funcionarios',
-        })
-        setFuncionarios(Array.isArray(dataFuncionarios) ? dataFuncionarios : [])
+        }
+      )
 
-        const primeiroResponsavel = data[0]?.responsavel
-        if (primeiroResponsavel) setResponsavelSelecionado(primeiroResponsavel)
-      } catch {
-        setErro('Não foi possível carregar o inventário para gerar o termo.')
-      } finally {
-        setLoading(false)
+      setFuncionarios(
+        Array.isArray(dataFuncionarios) ? dataFuncionarios : []
+      )
+
+      const primeiroResponsavel = itensInventario[0]?.responsavel
+
+      if (primeiroResponsavel) {
+        setResponsavelSelecionado(primeiroResponsavel)
       }
+    } catch (error) {
+      console.error(error)
+      setErro('Não foi possível carregar o inventário para gerar o termo.')
+    } finally {
+      setLoading(false)
     }
+  }
 
-    carregar()
-  }, [])
+  carregar()
+}, [])
 
   useEffect(() => {
     const carregarEmpresas = async () => {
