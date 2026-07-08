@@ -26,38 +26,53 @@ export async function GET(request: NextRequest) {
     const tipo = searchParams.get('tipo') || ''
     const subtipo = searchParams.get('subtipo') || ''
     const produtoId = searchParams.get('produtoId') || ''
-    const limiteParam = searchParams.get('limite')
-    const limite = limiteParam ? parseInt(limiteParam, 10) : null
+    const page = parseInt(searchParams.get('page') || '1')
+    const limit = parseInt(searchParams.get('limit') || '50')
+    const skip = (page - 1) * limit
 
-    const movimentacoes = await prisma.movimentacao.findMany({
-      where: {
-        cancelado: false,
-        AND: [
-          tipo ? { tipo } : {},
-          subtipo ? { subtipo } : {},
-          produtoId ? { unidade: { produtoId } } : {},
-        ],
-      },
-      include: {
-        unidade: {
-          include: {
-            produto: {
-              include: {
-                categoria: true
+    const whereClause: any = {
+      cancelado: false,
+      AND: [
+        tipo ? { tipo } : {},
+        subtipo ? { subtipo } : {},
+        produtoId ? { unidade: { produtoId } } : {},
+      ],
+    }
+
+    const [movimentacoes, total] = await Promise.all([
+      prisma.movimentacao.findMany({
+        where: whereClause,
+        include: {
+          unidade: {
+            include: {
+              produto: {
+                include: {
+                  categoria: true
+                }
               }
             }
-          }
+          },
+          fornecedor: true,
+          setor: true,
+          usuario: true,
+          documentos: true
         },
-        fornecedor: true,
-        setor: true,
-        usuario: true,
-        documentos: true
-      },
-      orderBy: { data: 'desc' },
-      ...(limite && Number.isFinite(limite) && limite > 0 ? { take: limite } : {}),
-    })
+        orderBy: { data: 'desc' },
+        skip,
+        take: limit,
+      }),
+      prisma.movimentacao.count({ where: whereClause })
+    ])
 
-    return NextResponse.json(movimentacoes)
+    return NextResponse.json({
+      data: movimentacoes,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit)
+      }
+    })
   } catch (error) {
     console.error(error)
     return NextResponse.json({ error: 'Erro ao buscar movimentações' }, { status: 500 })
@@ -237,7 +252,7 @@ export async function POST(request: NextRequest) {
           const uploadResult = await uploadDocumento({
             tipo: 'ATIVO',
             nomeItem: produto.nome,
-            dataCompra: parseDateWithCurrentTime(dataCompra),
+            etiqueta: etiqueta.trim(),
             arquivo: notaFiscalBuffer,
             nomeArquivo: notaFiscalFile.name,
           })

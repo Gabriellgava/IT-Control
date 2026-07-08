@@ -2,7 +2,7 @@
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import Link from 'next/link'
 import { Search, Plus, Edit2, Trash2, Download, Package, Tag, ChevronDown, ChevronRight, Eye, ArrowRightLeft } from 'lucide-react'
-import { Button, Badge, Input, Select, Modal, Table, PageHeader, LoadingState, ErrorState } from '@/components/ui'
+import { Button, Badge, Input, Select, Modal, Table, PageHeader, LoadingState, ErrorState, Pagination } from '@/components/ui'
 import { formatMoeda, formatData, exportarCSV } from '@/lib/utils'
 import type { Produto, Categoria, Fornecedor } from '@/types'
 import { ProdutoForm } from './ProdutoForm'
@@ -26,6 +26,8 @@ export function ProdutosPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [sortIndividual, setSortIndividual] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pagination, setPagination] = useState<{ page: number; limit: number; total: number; totalPages: number } | null>(null)
 
   const buscarProdutos = useCallback(async () => {
     setLoading(true)
@@ -34,15 +36,23 @@ export function ProdutosPage() {
     if (busca) p.set('search', busca)
     if (filtroCategoria) p.set('categoriaId', filtroCategoria)
     if (filtroFornecedor) p.set('fornecedorId', filtroFornecedor)
+    p.set('page', currentPage.toString())
+    p.set('limit', '50')
     try {
       const res = await fetch(`/api/produtos?${p}`)
       if (!res.ok) throw new Error('Não foi possível carregar produtos.')
-      setProdutos(await res.json())
+      const data = await res.json()
+      setProdutos(data.data || data)
+      setPagination(data.pagination || null)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Erro inesperado ao carregar produtos.')
     } finally {
       setLoading(false)
     }
+  }, [busca, filtroCategoria, filtroFornecedor, currentPage])
+
+  useEffect(() => {
+    setCurrentPage(1)
   }, [busca, filtroCategoria, filtroFornecedor])
 
   useEffect(() => {
@@ -159,7 +169,7 @@ export function ProdutosPage() {
     <div className="space-y-6">
       <PageHeader
         title="Produtos"
-        description={`${produtos.length} modelo${produtos.length !== 1 ? 's' : ''} cadastrado${produtos.length !== 1 ? 's' : ''}`}
+        description={`${pagination?.total || produtos.length} modelo${(pagination?.total || produtos.length) !== 1 ? 's' : ''} cadastrado${(pagination?.total || produtos.length) !== 1 ? 's' : ''}`}
         actions={
           <>
             <Button variant="secondary" size="sm" icon={<Download className="w-4 h-4" />} onClick={exportar}>CSV</Button>
@@ -200,7 +210,8 @@ export function ProdutosPage() {
       {loading ? (
         <LoadingState message="Carregando produtos..." />
       ) : modo === 'agrupado' ? (
-        /* MODO AGRUPADO */
+        <>
+        {/* MODO AGRUPADO */}
         <div className="space-y-2">
           {produtos.length === 0 && <p className="text-center text-gray-400 py-12">Nenhum produto encontrado</p>}
           {produtos.map(p => (
@@ -265,8 +276,19 @@ export function ProdutosPage() {
             </div>
           ))}
         </div>
+        {pagination && (
+          <Pagination
+            currentPage={currentPage}
+            totalPages={pagination.totalPages}
+            totalItems={pagination.total}
+            itemsPerPage={pagination.limit}
+            onPageChange={setCurrentPage}
+          />
+        )}
+        </>
       ) : (
-        /* MODO INDIVIDUAL — por etiqueta */
+        <>
+        {/* MODO INDIVIDUAL — por etiqueta */}
         <Table headers={['Etiqueta', 'Produto', 'Categoria', 'Fornecedor', 'Valor', 'Data Compra', 'Status', 'Ações']} empty={itensIndividuais.length === 0} sort={sortIndividual} onSort={alternarOrdenacaoIndividual}>
           {itensIndividuais.map(({ produto: p, unidade: u }) => (
               <tr key={u.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
@@ -303,6 +325,16 @@ export function ProdutosPage() {
               </tr>
             ))}
         </Table>
+        {pagination && (
+          <Pagination
+            currentPage={currentPage}
+            totalPages={pagination.totalPages}
+            totalItems={pagination.total}
+            itemsPerPage={pagination.limit}
+            onPageChange={setCurrentPage}
+          />
+        )}
+        </>
       )}
 
       {/* Modal editar */}
