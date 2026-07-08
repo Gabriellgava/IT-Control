@@ -81,6 +81,9 @@ export const authOptions: NextAuthOptions = {
         const email = user.email?.toLowerCase().trim()
         if (!email) return false
 
+        // Restringe acesso apenas para emails @fastgsa.com
+        if (!email.endsWith('@fastgsa.com')) return false
+
         const dbUser = await prisma.usuario.findUnique({ where: { email } })
         if (!dbUser) return true
 
