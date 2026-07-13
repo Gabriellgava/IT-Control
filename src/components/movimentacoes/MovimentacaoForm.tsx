@@ -59,12 +59,19 @@ export function MovimentacaoForm({ tipo }: { tipo: 'ENTRADA' | 'SAIDA' }) {
   useEffect(() => {
     fetch('/api/produtos').then(r => r.json()).then(data => setProdutos(data.data || data))
     fetch('/api/fornecedores').then(r => r.json()).then(setFornecedores)
-    fetch('/api/funcionarios').then(r => r.json()).then((dados) => setFuncionarios(Array.isArray(dados) ? dados.filter((f) => f.ativo) : []))
-    fetch('/api/inventario')
+    fetch('/api/funcionarios')
+      .then(r => r.json())
+      .then((dados) => {
+        const funcionariosArray = Array.isArray(dados) ? dados : []
+        setFuncionarios(funcionariosArray.filter((f) => f.ativo))
+      })
+      .catch(() => setFuncionarios([]))
+    fetch('/api/inventario?limit=10000')
       .then(r => r.ok ? r.json() : [])
       .then((dados) => {
-        if (!Array.isArray(dados)) return setItensInventario([])
-        setItensInventario(dados.map((item) => ({
+        const itensArray = Array.isArray(dados) ? dados : (dados.data || [])
+        if (!Array.isArray(itensArray)) return setItensInventario([])
+        setItensInventario(itensArray.map((item) => ({
           responsavel: item.responsavel ?? '',
           etiqueta: item.etiqueta ?? '',
           modelo: item.modelo ?? '',
@@ -87,6 +94,7 @@ export function MovimentacaoForm({ tipo }: { tipo: 'ENTRADA' | 'SAIDA' }) {
   const produtoSel = produtos.find(p => p.id === form.produtoId)
   const funcionarioSelecionado = funcionarios.find((f) => f.id === form.funcionarioId)
   const etiquetasSaida = ativosSelecionados.map((item) => item.etiqueta)
+
   const ativosDisponiveisSaida = useMemo<AtivoSaida[]>(() => (
     produtos.flatMap((produto) => (
       ((produto.unidades || []) as UnidadeSaida[])
@@ -173,16 +181,16 @@ export function MovimentacaoForm({ tipo }: { tipo: 'ENTRADA' | 'SAIDA' }) {
       setorId: subtipo === 'USUARIO' ? funcionarioSelecionado?.setorId || null : form.setorId || null,
       funcionarioId: form.funcionarioId || null,
       funcionarioRecebe: funcionarioSelecionado?.nome || null,
-      funcionarioDevolve: form.funcionarioDevolve.trim() || null,
+      funcionarioDevolve: form.funcionarioDevolve ? funcionarios.find(f => f.id === form.funcionarioDevolve)?.nome?.trim() || null : null,
       valorUnitario: form.valorUnitario,
       usuarioId: session?.user.id,
       responsavel: tipo === 'SAIDA' && subtipo === 'USUARIO'
         ? funcionarioSelecionado?.nome || null
         : tipo === 'ENTRADA' && modoEntrada === 'DEVOLUCAO'
-          ? form.funcionarioDevolve.trim()
+          ? (form.funcionarioDevolve ? funcionarios.find(f => f.id === form.funcionarioDevolve)?.nome?.trim() || null : null)
           : (session?.user.name ?? session?.user.email),
       observacoes: tipo === 'ENTRADA' && modoEntrada === 'DEVOLUCAO'
-        ? `Devolução de itens de: ${form.funcionarioDevolve.trim()}${form.observacoes ? ' | ' + form.observacoes : ''}`
+        ? `Devolução de itens de: ${form.funcionarioDevolve ? funcionarios.find(f => f.id === form.funcionarioDevolve)?.nome?.trim() || '' : ''}${form.observacoes ? ' | ' + form.observacoes : ''}`
         : tipo === 'SAIDA' && subtipo === 'USUARIO' && funcionarioSelecionado?.nome
           ? `Registrado por: ${session?.user.name ?? session?.user.email}${form.observacoes ? ' | ' + form.observacoes : ''}`
           : form.observacoes,
@@ -249,9 +257,13 @@ export function MovimentacaoForm({ tipo }: { tipo: 'ENTRADA' | 'SAIDA' }) {
       .filter(Boolean),
   )].sort((a, b) => a.localeCompare(b, 'pt-BR'))
 
-  const itensParaDevolver = itensInventario.filter(
-    item => item.responsavel.trim().toLowerCase() === form.funcionarioDevolve.trim().toLowerCase(),
-  )
+  const itensParaDevolver = useMemo(() => {
+    const funcionarioSelecionado = funcionarios.find(f => f.id === form.funcionarioDevolve)
+    const nomeFuncionario = funcionarioSelecionado?.nome || ''
+    return itensInventario.filter(
+      item => item.responsavel.trim().toLowerCase() === nomeFuncionario.trim().toLowerCase(),
+    )
+  }, [itensInventario, form.funcionarioDevolve, funcionarios])
   const itemSelecionadoDevolucao = itensParaDevolver.find(
     item => item.etiqueta.trim().toLowerCase() === form.etiqueta.trim().toLowerCase(),
   )
@@ -391,7 +403,7 @@ export function MovimentacaoForm({ tipo }: { tipo: 'ENTRADA' | 'SAIDA' }) {
                 }}
                 className={`w-full border bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all ${erros.funcionarioDevolve ? 'border-red-400' : 'border-gray-300 dark:border-gray-700'}`}>
                 <option value="">Selecionar funcionário</option>
-                {responsaveisInventario.map(nome => <option key={nome} value={nome}>{nome}</option>)}
+                {funcionarios.map(f => <option key={f.id} value={f.id}>{f.nome} — {f.setor?.nome}</option>)}
               </select>
               {erros.funcionarioDevolve && <p className="text-xs text-red-500">{erros.funcionarioDevolve}</p>}
             </div>

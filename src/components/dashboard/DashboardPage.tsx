@@ -26,27 +26,24 @@ export function DashboardPage() {
         <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Visão geral do estoque e ativos de TI</p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
         <StatCard label="Total de Produtos" value={stats.totalProdutos} icon={<Package className="w-5 h-5" />} color="blue" sub="modelos cadastrados" />
         <StatCard label="Unidades em Estoque" value={stats.totalUnidades} icon={<TrendingUp className="w-5 h-5" />} color="green" sub="itens ativos" />
         <StatCard label="Valor do Estoque" value={formatMoeda(stats.valorTotal)} icon={<DollarSign className="w-5 h-5" />} color="purple" sub="valor total" />
         <StatCard label="Estoque Baixo" value={stats.estoqueBaixoCount} icon={<AlertTriangle className="w-5 h-5" />} color={stats.estoqueBaixoCount > 0 ? 'red' : 'green'} sub={stats.estoqueBaixoCount > 0 ? 'categorias abaixo do mínimo' : 'tudo ok'} />
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-1 xl:grid-cols-1 gap-4">
         <StatCard label="Descartes no Mês" value={stats.descartesDoMes.count} icon={<Trash2 className="w-5 h-5" />} color="amber" sub="itens descartados" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card className="p-6 lg:col-span-2">
+        <Card className="p-6">
           <h3 className="text-sm font-bold text-gray-900 dark:text-white mb-4">Movimentações — Últimos 7 dias</h3>
-          <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={stats.graficoMovimentacoes} barGap={4}>
+          <ResponsiveContainer width="100%" height={350}>
+            <BarChart data={stats.graficoMovimentacoes} barGap={4} margin={{ top: 20, right: 20, left: 40, bottom: 60 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-              <XAxis dataKey="data" tick={{ fontSize: 11 }} />
-              <YAxis tick={{ fontSize: 11 }} />
+              <XAxis dataKey="data" tick={{ fontSize: 10 }} angle={-45} textAnchor="end" height={60} interval={0} />
+              <YAxis tick={{ fontSize: 10 }} width={40} />
               <Tooltip />
-              <Legend iconSize={10} wrapperStyle={{ fontSize: 12 }} />
+              <Legend iconSize={8} wrapperStyle={{ fontSize: 10 }} verticalAlign="top" height={30} />
               <Bar dataKey="entradas" name="Entradas" fill="#3b82f6" radius={[4, 4, 0, 0]} />
               <Bar dataKey="saidas" name="Saídas" fill="#f59e0b" radius={[4, 4, 0, 0]} />
               <Bar dataKey="descartes" name="Descartes" fill="#ef4444" radius={[4, 4, 0, 0]} />
@@ -54,16 +51,17 @@ export function DashboardPage() {
           </ResponsiveContainer>
         </Card>
 
-        <Card className="p-6">
+        <Card className="p-6 lg:col-span-2">
           <h3 className="text-sm font-bold text-gray-900 dark:text-white mb-4">Por Categoria</h3>
-          <ResponsiveContainer width="100%" height={220}>
-            <PieChart>
-              <Pie data={stats.distribuicaoCategoria} dataKey="quantidade" nameKey="nome" cx="50%" cy="50%" outerRadius={80} innerRadius={40}>
-                {stats.distribuicaoCategoria.map((_, i) => <Cell key={i} fill={CORES[i % CORES.length]} />)}
-              </Pie>
+          <ResponsiveContainer width="100%" height={350}>
+            <BarChart data={stats.distribuicaoCategoria} barGap={8} margin={{ top: 20, right: 20, left: 50, bottom: 60 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+              <XAxis dataKey="nome" tick={{ fontSize: 11 }} angle={-45} textAnchor="end" height={60} interval={0} />
+              <YAxis tick={{ fontSize: 11 }} width={50} />
               <Tooltip />
-              <Legend iconSize={10} wrapperStyle={{ fontSize: 11 }} />
-            </PieChart>
+              <Legend iconSize={10} wrapperStyle={{ fontSize: 12 }} verticalAlign="top" height={30} />
+              <Bar dataKey="quantidade" name="Quantidade" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+            </BarChart>
           </ResponsiveContainer>
         </Card>
       </div>
