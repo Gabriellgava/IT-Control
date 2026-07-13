@@ -43,6 +43,8 @@ export default function ConsultaProdutosPage() {
   const [filtroSituacao, setFiltroSituacao] = useState<'todos' | 'estoque' | 'alocados'>('todos')
   const [loading, setLoading] = useState(true)
   const [sort, setSort] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null)
+  const [pagina, setPagina] = useState(1)
+  const itensPorPagina = 50
 
   useEffect(() => {
     const carregar = async () => {
@@ -53,7 +55,8 @@ export default function ConsultaProdutosPage() {
           setItens([])
           return
         }
-        const itensMapeados: ItemInventario[] = (Array.isArray(data) ? data : [])
+        const produtos = Array.isArray(data) ? data : (data.data || [])
+        const itensMapeados: ItemInventario[] = produtos
           .flatMap((produto: ProdutoConsulta) => produto.unidades.map((unidade) => {
             const responsavel = unidade.localAtual?.trim() || ''
             const emEstoque = responsavel.localeCompare('Estoque', 'pt-BR', { sensitivity: 'base' }) === 0
@@ -126,6 +129,18 @@ export default function ConsultaProdutosPage() {
     })
   }, [itens, busca, filtroSituacao, sort])
 
+  const paginados = useMemo(() => {
+    const inicio = (pagina - 1) * itensPorPagina
+    const fim = inicio + itensPorPagina
+    return filtrados.slice(inicio, fim)
+  }, [filtrados, pagina])
+
+  const totalPaginas = Math.ceil(filtrados.length / itensPorPagina)
+
+  useEffect(() => {
+    setPagina(1)
+  }, [busca, filtroSituacao])
+
   const alternarOrdenacao = (header: string) => {
     setSort((atual) => {
       if (!atual || atual.key !== header) return { key: header, direction: 'asc' }
@@ -143,6 +158,7 @@ export default function ConsultaProdutosPage() {
           </h1>
           <p className="text-sm text-gray-500 mt-1">
             {filtrados.length} item(ns) listado(s) com etiqueta, marca, modelo e localização atual.
+            {totalPaginas > 1 && ` — Página ${pagina} de ${totalPaginas}`}
           </p>
         </div>
 
@@ -178,7 +194,7 @@ export default function ConsultaProdutosPage() {
             sort={sort}
             onSort={alternarOrdenacao}
           >
-            {filtrados.map((item) => {
+            {paginados.map((item) => {
               const emEstoque = estaEmEstoque(item)
 
               return (
@@ -204,6 +220,55 @@ export default function ConsultaProdutosPage() {
               )
             })}
           </Table>
+        )}
+
+        {totalPaginas > 1 && (
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-gray-500">
+              {(pagina - 1) * itensPorPagina + 1}–{Math.min(pagina * itensPorPagina, filtrados.length)} de {filtrados.length}
+            </p>
+            <div className="flex gap-1">
+              <button
+                onClick={() => setPagina(p => Math.max(1, p - 1))}
+                disabled={pagina === 1}
+                className="px-3 py-1 text-sm text-gray-900 dark:text-white border border-gray-300 dark:border-gray-700 rounded hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Anterior
+              </button>
+              {Array.from({ length: Math.min(totalPaginas, 10) }, (_, i) => {
+                let pageNum
+                if (totalPaginas <= 10) {
+                  pageNum = i + 1
+                } else if (pagina <= 5) {
+                  pageNum = i + 1
+                } else if (pagina >= totalPaginas - 4) {
+                  pageNum = totalPaginas - 9 + i
+                } else {
+                  pageNum = pagina - 5 + i
+                }
+                return (
+                  <button
+                    key={pageNum}
+                    onClick={() => setPagina(pageNum)}
+                    className={`px-3 py-1 text-sm border rounded ${
+                      pagina === pageNum
+                        ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
+                        : 'text-gray-900 dark:text-white border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800'
+                    }`}
+                  >
+                    {pageNum}
+                  </button>
+                )
+              })}
+              <button
+                onClick={() => setPagina(p => Math.min(totalPaginas, p + 1))}
+                disabled={pagina === totalPaginas}
+                className="px-3 py-1 text-sm text-gray-900 dark:text-white border border-gray-300 dark:border-gray-700 rounded hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Próxima
+              </button>
+            </div>
+          </div>
         )}
       </div>
     </AppLayout>
