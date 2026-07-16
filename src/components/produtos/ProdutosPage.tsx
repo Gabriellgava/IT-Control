@@ -36,8 +36,15 @@ export function ProdutosPage() {
     if (busca) p.set('search', busca)
     if (filtroCategoria) p.set('categoriaId', filtroCategoria)
     if (filtroFornecedor) p.set('fornecedorId', filtroFornecedor)
-    p.set('page', currentPage.toString())
-    p.set('limit', '50')
+    
+    // Se houver ordenação no modo individual, buscar todos os itens para ordenar localmente
+    if (sortIndividual && modo === 'individual') {
+      p.set('limit', '10000')
+    } else {
+      p.set('page', currentPage.toString())
+      p.set('limit', '50')
+    }
+    
     try {
       const res = await fetch(`/api/produtos?${p}`)
       if (!res.ok) throw new Error('Não foi possível carregar produtos.')
@@ -49,7 +56,7 @@ export function ProdutosPage() {
     } finally {
       setLoading(false)
     }
-  }, [busca, filtroCategoria, filtroFornecedor, currentPage])
+  }, [busca, filtroCategoria, filtroFornecedor, currentPage, sortIndividual, modo])
 
   useEffect(() => {
     setCurrentPage(1)

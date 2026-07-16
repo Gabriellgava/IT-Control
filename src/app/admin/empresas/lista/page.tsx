@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { Button, Input, Modal, Table, Badge } from '@/components/ui'
 import { Plus, Edit2, Trash2, Building2, Mail, Phone, MapPin } from 'lucide-react'
@@ -22,6 +22,7 @@ export default function EmpresasListaPage() {
   const [erro, setErro] = useState('')
   const [loading, setLoading] = useState(false)
   const [loadingBusca, setLoadingBusca] = useState(true)
+  const [sort, setSort] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null)
 
   const buscar = async () => {
     setLoadingBusca(true)
@@ -115,6 +116,34 @@ export default function EmpresasListaPage() {
       .replace(/(\d{5})(\d)/, "$1-$2")
   }
 
+  const empresasOrdenadas = useMemo(() => {
+    if (!sort) return empresas
+
+    const mapaCampos: Record<string, (e: Empresa) => string> = {
+      Empresa: (e) => e.nomeFantasia || e.razaoSocial,
+      CNPJ: (e) => e.cnpj,
+      Contato: (e) => `${e.emailCorporativo || ''} ${e.telefone || ''}`,
+      Endereço: (e) => e.endereco || '',
+    }
+
+    const selector = mapaCampos[sort.key]
+    if (!selector) return empresas
+
+    return [...empresas].sort((a, b) => {
+      const aValor = selector(a)
+      const bValor = selector(b)
+      const comparacao = aValor.localeCompare(bValor, 'pt-BR', { numeric: true, sensitivity: 'base' })
+      return sort.direction === 'asc' ? comparacao : -comparacao
+    })
+  }, [empresas, sort])
+
+  const alternarOrdenacao = (header: string) => {
+    setSort((atual) => {
+      if (!atual || atual.key !== header) return { key: header, direction: 'asc' }
+      return { key: header, direction: atual.direction === 'asc' ? 'desc' : 'asc' }
+    })
+  }
+
   return (
     <AppLayout>
       <div className="space-y-6">
@@ -134,8 +163,8 @@ export default function EmpresasListaPage() {
             {erro}
           </div>
         ) : (
-          <Table headers={['Empresa', 'CNPJ', 'Contato', 'Endereço', 'Ações']} empty={empresas.length === 0}>
-            {empresas.map(e => (
+          <Table headers={['Empresa', 'CNPJ', 'Contato', 'Endereço', 'Ações']} empty={empresasOrdenadas.length === 0} sort={sort} onSort={alternarOrdenacao}>
+            {empresasOrdenadas.map(e => (
               <tr key={e.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-3">
