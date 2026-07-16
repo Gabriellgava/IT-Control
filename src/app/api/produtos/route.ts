@@ -25,6 +25,9 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '50')
     const skip = (page - 1) * limit
 
+    // Se houver busca por etiqueta ou limit alto, buscar todos os produtos sem paginação
+    const buscarTodos = (busca && busca.length > 0) || limit >= 10000
+
     const whereClause: any = {
       AND: [
         busca ? { OR: [
@@ -67,8 +70,8 @@ export async function GET(request: NextRequest) {
           _count: { select: { unidades: { where: { status: 'ATIVA' } } } },
         },
         orderBy: { nome: 'asc' },
-        skip,
-        take: limit,
+        skip: buscarTodos ? 0 : skip,
+        take: buscarTodos ? 10000 : limit,
       }),
       prisma.produto.count({ where: whereClause })
     ])

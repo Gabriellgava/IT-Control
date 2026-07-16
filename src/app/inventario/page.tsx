@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState, useCallback, useRef } from 'react'
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { Button, Input, Modal, Table, Badge, Pagination } from '@/components/ui'
 import { Search, Plus, Edit2, Trash2, Download, Upload, AlertCircle, CheckCircle, RefreshCw } from 'lucide-react'
@@ -188,6 +188,7 @@ export default function InventarioPage() {
   const [textoImportacao, setTextoImportacao] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const [pagination, setPagination] = useState<{ page: number; limit: number; total: number; totalPages: number } | null>(null)
+  const [sort, setSort] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
   // Setores e tipos únicos para filtros
@@ -205,8 +206,14 @@ export default function InventarioPage() {
       if (filtroSetor) p.set('setor', filtroSetor)
       if (filtroTipo) p.set('tipo', filtroTipo)
       if (filtroResponsavel) p.set('responsavel', filtroResponsavel)
-      p.set('page', currentPage.toString())
-      p.set('limit', '50')
+      
+      // Se houver ordenação, buscar todos os itens para ordenar localmente
+      if (sort) {
+        p.set('limit', '10000')
+      } else {
+        p.set('page', currentPage.toString())
+        p.set('limit', '50')
+      }
 
       const res = await fetch(`/api/inventario?${p}`)
       const data = await res.json()
@@ -231,7 +238,7 @@ export default function InventarioPage() {
     } finally {
       setLoading(false)
     }
-  }, [busca, filtroSetor, filtroTipo, filtroResponsavel, currentPage])
+  }, [busca, filtroSetor, filtroTipo, filtroResponsavel, currentPage, sort])
 
   useEffect(() => {
     setCurrentPage(1)
@@ -275,6 +282,38 @@ export default function InventarioPage() {
     { Setor: 'Comercial', Responsável: 'João Silva', Tipo: 'Smartphone', Marca: 'Samsung', Modelo: 'Galaxy S23', Etiqueta: 'ETQ-001', Número: 'INV-2026-001', Observações: '' },
     { Setor: 'Operação', Responsável: 'Maria Souza', Tipo: 'Tablet', Marca: 'Apple', Modelo: 'iPad 10', Etiqueta: 'ETQ-002', Número: 'INV-2026-002', Observações: '' },
   ], 'modelo-inventario')
+
+  const itensOrdenados = useMemo(() => {
+    if (!sort) return itens
+
+    const mapaCampos: Record<string, (i: Item) => string | number> = {
+      Setor: (i) => i.setor,
+      Responsável: (i) => i.responsavel,
+      Tipo: (i) => i.tipo,
+      'Marca / Modelo': (i) => `${i.marca} ${i.modelo}`,
+      Etiqueta: (i) => i.etiqueta,
+      Número: (i) => i.numero || '',
+    }
+
+    const selector = mapaCampos[sort.key]
+    if (!selector) return itens
+
+    return [...itens].sort((a, b) => {
+      const aValor = selector(a)
+      const bValor = selector(b)
+      const comparacao = typeof aValor === 'number' && typeof bValor === 'number'
+        ? aValor - bValor
+        : String(aValor).localeCompare(String(bValor), 'pt-BR', { numeric: true, sensitivity: 'base' })
+      return sort.direction === 'asc' ? comparacao : -comparacao
+    })
+  }, [itens, sort])
+
+  const alternarOrdenacao = (header: string) => {
+    setSort((atual) => {
+      if (!atual || atual.key !== header) return { key: header, direction: 'asc' }
+      return { key: header, direction: atual.direction === 'asc' ? 'desc' : 'asc' }
+    })
+  }
 
   const processarTextoImportacao = (textoRaw: string) => {
     const texto = textoRaw.replace(/^\uFEFF/, '').replace(/\\n/g, '\n')
@@ -433,8 +472,8 @@ export default function InventarioPage() {
         {loading ? (
           <div className="flex items-center justify-center h-48"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" /></div>
         ) : (
-          <Table headers={['Setor', 'Responsável', 'Tipo', 'Marca / Modelo', 'Etiqueta', 'Número', 'Ações']} empty={itens.length === 0}>
-            {itens.map(item => (
+          <Table headers={['Setor', 'Responsável', 'Tipo', 'Marca / Modelo', 'Etiqueta', 'Número', 'Ações']} empty={itensOrdenados.length === 0} sort={sort} onSort={alternarOrdenacao}>
+            {itensOrdenados.map(item => (
               <tr key={item.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
                 <td className="px-4 py-3"><Badge variant="info">{item.setor}</Badge></td>
                 <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">{item.responsavel}</td>

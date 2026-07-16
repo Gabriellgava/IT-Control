@@ -49,7 +49,7 @@ export default function ConsultaProdutosPage() {
   useEffect(() => {
     const carregar = async () => {
       try {
-        const res = await fetch('/api/produtos', { cache: 'no-store' })
+        const res = await fetch('/api/produtos?limit=10000', { cache: 'no-store' })
         const data = await res.json()
         if (!res.ok) {
           setItens([])

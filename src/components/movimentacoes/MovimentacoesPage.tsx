@@ -16,6 +16,7 @@ export function MovimentacoesPage() {
   const [filtroTipo, setFiltroTipo] = useState('')
   const [filtroProduto, setFiltroProduto] = useState('')
   const [filtroResponsavel, setFiltroResponsavel] = useState('')
+  const [filtroEtiqueta, setFiltroEtiqueta] = useState('')
   const [filtroDataInicio, setFiltroDataInicio] = useState('')
   const [filtroDataFim, setFiltroDataFim] = useState('')
   const [sort, setSort] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null)
@@ -31,8 +32,15 @@ export function MovimentacoesPage() {
     const p = new URLSearchParams()
     if (filtroTipo) p.set('tipo', filtroTipo)
     if (filtroProduto) p.set('produtoId', filtroProduto)
-    p.set('page', currentPage.toString())
-    p.set('limit', '50')
+    
+    // Se houver ordenação, buscar todos os itens para ordenar localmente
+    if (sort) {
+      p.set('limit', '10000')
+    } else {
+      p.set('page', currentPage.toString())
+      p.set('limit', '50')
+    }
+    
     try {
       const res = await fetch(`/api/movimentacoes?${p}`)
       if (!res.ok) throw new Error('Não foi possível carregar movimentações.')
@@ -44,7 +52,7 @@ export function MovimentacoesPage() {
     } finally {
       setLoading(false)
     }
-  }, [filtroTipo, filtroProduto, currentPage])
+  }, [filtroTipo, filtroProduto, currentPage, sort])
 
   useEffect(() => {
     setCurrentPage(1)
@@ -52,7 +60,7 @@ export function MovimentacoesPage() {
 
   useEffect(() => {
     buscar()
-    fetch('/api/produtos')
+    fetch('/api/produtos?limit=10000')
       .then(r => r.ok ? r.json() : [])
       .then(data => setProdutos(data.data || data))
       .catch(() => setProdutos([]))
@@ -99,6 +107,7 @@ export function MovimentacoesPage() {
         ? `Produto: ${produtos.find((p) => p.id === filtroProduto)?.nome ?? 'Selecionado'}`
         : 'Produto: Todos',
       filtroResponsavel.trim() ? `Responsável: ${filtroResponsavel.trim()}` : 'Responsável: Todos',
+      filtroEtiqueta.trim() ? `Etiqueta: ${filtroEtiqueta.trim()}` : 'Etiqueta: Todas',
       filtroDataInicio ? `Período de: ${filtroDataInicio}` : 'Período de: Início',
       filtroDataFim ? `Período até: ${filtroDataFim}` : 'Período até: Hoje',
     ]
@@ -165,6 +174,7 @@ export function MovimentacoesPage() {
 
   const movimentacoesFiltradas = useMemo(() => {
     const responsavelBusca = filtroResponsavel.trim().toLowerCase()
+    const etiquetaBusca = filtroEtiqueta.trim().toLowerCase()
 
     const inicio = filtroDataInicio ? new Date(`${filtroDataInicio}T00:00:00`) : null
     const fim = filtroDataFim ? new Date(`${filtroDataFim}T23:59:59.999`) : null
@@ -173,11 +183,14 @@ export function MovimentacoesPage() {
       const responsavel = (m.responsavel ?? m.usuario?.nome ?? '').toLowerCase()
       const atendeResponsavel = !responsavelBusca || responsavel.includes(responsavelBusca)
 
+      const etiqueta = (m.unidade?.etiqueta ?? '').toLowerCase()
+      const atendeEtiqueta = !etiquetaBusca || etiqueta.includes(etiquetaBusca)
+
       const dataMovimentacao = new Date(m.data)
       const atendeInicio = !inicio || dataMovimentacao >= inicio
       const atendeFim = !fim || dataMovimentacao <= fim
 
-      return atendeResponsavel && atendeInicio && atendeFim
+      return atendeResponsavel && atendeEtiqueta && atendeInicio && atendeFim
     })
 
     if (!sort) return dadosFiltrados
@@ -204,7 +217,7 @@ export function MovimentacoesPage() {
 
       return sort.direction === 'asc' ? comparacao : -comparacao
     })
-  }, [movs, filtroResponsavel, filtroDataInicio, filtroDataFim, sort])
+  }, [movs, filtroResponsavel, filtroEtiqueta, filtroDataInicio, filtroDataFim, sort])
 
   const alternarOrdenacao = (header: string) => {
     setSort((atual) => {
@@ -249,6 +262,16 @@ export function MovimentacoesPage() {
             value={filtroResponsavel}
             onChange={(e) => setFiltroResponsavel(e.target.value)}
             placeholder="Filtrar por responsável"
+            className="w-60 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+        <div className="space-y-1">
+          <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide">Etiqueta</label>
+          <input
+            type="text"
+            value={filtroEtiqueta}
+            onChange={(e) => setFiltroEtiqueta(e.target.value)}
+            placeholder="Filtrar por etiqueta"
             className="w-60 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>

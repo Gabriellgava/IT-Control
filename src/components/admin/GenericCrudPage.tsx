@@ -1,4 +1,4 @@
-import { ReactNode } from 'react'
+import { ReactNode, useState, useMemo } from 'react'
 import { Plus } from 'lucide-react'
 import { Button, Table, Modal, PageHeader, LoadingState, ErrorState } from '@/components/ui'
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner'
@@ -25,6 +25,7 @@ interface GenericCrudPageProps<T extends { id: string }> {
   deleteMessage?: string
   newItemButtonText?: string
   emptyMessage?: string
+  getSortValue?: (item: T, header: string) => string | number
 }
 
 export function GenericCrudPage<T extends { id: string }>({
@@ -47,8 +48,30 @@ export function GenericCrudPage<T extends { id: string }>({
   onCloseDelete,
   deleteMessage,
   newItemButtonText = `Novo ${title}`,
-  emptyMessage = `Nenhum ${title.toLowerCase()} encontrado`
+  emptyMessage = `Nenhum ${title.toLowerCase()} encontrado`,
+  getSortValue,
 }: GenericCrudPageProps<T>) {
+  const [sort, setSort] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null)
+
+  const sortedData = useMemo(() => {
+    if (!sort) return data
+
+    return [...data].sort((a, b) => {
+      const aValor = getSortValue ? getSortValue(a, sort.key) : String(a[sort.key as keyof T] || '')
+      const bValor = getSortValue ? getSortValue(b, sort.key) : String(b[sort.key as keyof T] || '')
+      const comparacao = typeof aValor === 'number' && typeof bValor === 'number'
+        ? aValor - bValor
+        : String(aValor).localeCompare(String(bValor), 'pt-BR', { numeric: true, sensitivity: 'base' })
+      return sort.direction === 'asc' ? comparacao : -comparacao
+    })
+  }, [data, sort, getSortValue])
+
+  const alternarOrdenacao = (header: string) => {
+    setSort((atual) => {
+      if (!atual || atual.key !== header) return { key: header, direction: 'asc' }
+      return { key: header, direction: atual.direction === 'asc' ? 'desc' : 'asc' }
+    })
+  }
   if (loading) {
     return <LoadingState message="Carregando..." />
   }
@@ -63,8 +86,8 @@ export function GenericCrudPage<T extends { id: string }>({
 
       {error && <ErrorState message={error} />}
 
-      <Table headers={tableHeaders} empty={data.length === 0}>
-        {data.map(renderRow)}
+      <Table headers={tableHeaders} empty={sortedData.length === 0} sort={sort} onSort={alternarOrdenacao}>
+        {sortedData.map(renderRow)}
       </Table>
 
       <Modal open={modalOpen} onClose={onCloseModal} title={editingItem ? `Editar ${title}` : `Novo ${title}`}>

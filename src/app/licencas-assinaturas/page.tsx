@@ -91,6 +91,7 @@ const detectarDelimitador = (linha: string) => {
 export default function LicencasAssinaturasPage() {
   const [inventario, setInventario] = useState<InventarioItem[]>([])
   const [registros, setRegistros] = useState<RegistroLicencaAssinatura[]>([])
+  const [sort, setSort] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null)
 
   const [tipoRegistro, setTipoRegistro] = useState<TipoRegistro>('licenca')
   const [solicitadoPor, setSolicitadoPor] = useState('')
@@ -106,10 +107,42 @@ export default function LicencasAssinaturasPage() {
   const [importStatus, setImportStatus] = useState<{ tipo: 'ok' | 'erro'; msg: string } | null>(null)
   const inputFileRef = useRef<HTMLInputElement>(null)
 
+  const registrosOrdenados = useMemo(() => {
+    if (!sort) return registros
+
+    const mapaCampos: Record<string, (r: RegistroLicencaAssinatura) => string | number> = {
+      Tipo: (r) => r.tipoRegistro,
+      Dados: (r) => r.tipoRegistro === 'licenca' 
+        ? `${r.solicitadoPor} ${r.maquinaEtiqueta} ${r.produtoLicenca}`
+        : `${r.plataformaAssinatura} ${r.setorAssinatura} ${r.periodoAssinatura}`,
+      'Código / E-mail': (r) => r.tipoRegistro === 'licenca' ? r.codigoLicenca : r.emailAssinatura,
+      Data: (r) => new Date(r.criadoEm).getTime(),
+    }
+
+    const selector = mapaCampos[sort.key]
+    if (!selector) return registros
+
+    return [...registros].sort((a, b) => {
+      const aValor = selector(a)
+      const bValor = selector(b)
+      const comparacao = typeof aValor === 'number' && typeof bValor === 'number'
+        ? aValor - bValor
+        : String(aValor).localeCompare(String(bValor), 'pt-BR', { numeric: true, sensitivity: 'base' })
+      return sort.direction === 'asc' ? comparacao : -comparacao
+    })
+  }, [registros, sort])
+
+  const alternarOrdenacao = (header: string) => {
+    setSort((atual) => {
+      if (!atual || atual.key !== header) return { key: header, direction: 'asc' }
+      return { key: header, direction: atual.direction === 'asc' ? 'desc' : 'asc' }
+    })
+  }
+
   useEffect(() => {
     const carregarInventario = async () => {
       try {
-        const res = await fetch('/api/inventario')
+        const res = await fetch('/api/inventario?limit=10000')
         if (!res.ok) return
         const data = (await res.json()) as InventarioItem[]
         setInventario(
@@ -393,8 +426,8 @@ export default function LicencasAssinaturasPage() {
             <Badge variant="info">{registros.length} registro(s)</Badge>
           </div>
 
-          <Table headers={['Tipo', 'Dados', 'Código / E-mail', 'Data', 'Ações']} empty={registros.length === 0}>
-            {registros.map((registro) => (
+          <Table headers={['Tipo', 'Dados', 'Código / E-mail', 'Data', 'Ações']} empty={registrosOrdenados.length === 0} sort={sort} onSort={alternarOrdenacao}>
+            {registrosOrdenados.map((registro) => (
               <tr key={registro.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/40 transition-colors">
                 <td className="px-4 py-3">
                   <Badge variant={registro.tipoRegistro === 'licenca' ? 'info' : 'success'}>

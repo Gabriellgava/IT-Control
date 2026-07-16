@@ -17,7 +17,7 @@ interface ItemSmartphone {
   observacoes?: string | null
 }
 
-const TIPOS_MOBILE = ['celular', 'smartphone', 'tablet']
+const TIPOS_MOBILE = ['smartphone']
 
 export default function SmartphonesPage() {
   const [itens, setItens] = useState<ItemSmartphone[]>([])
@@ -28,12 +28,14 @@ export default function SmartphonesPage() {
   const [loadingForm, setLoadingForm] = useState(false)
   const [erroForm, setErroForm] = useState('')
   const [form, setForm] = useState({ setor: '', responsavel: '', tipo: '', marca: '', modelo: '', etiqueta: '', numero: '', observacoes: '' })
+  const [sort, setSort] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null)
 
   useEffect(() => {
     const carregar = async () => {
-      const res = await fetch('/api/inventario')
+      const res = await fetch('/api/inventario?limit=10000')
       const data = await res.json()
-      setItens(Array.isArray(data) ? data : [])
+      const itensArray = Array.isArray(data) ? data : (data.data || [])
+      setItens(Array.isArray(itensArray) ? itensArray : [])
       setLoading(false)
     }
     carregar()
@@ -90,6 +92,38 @@ export default function SmartphonesPage() {
     )
   }, [itens, busca])
 
+  const filtradosOrdenados = useMemo(() => {
+    if (!sort) return filtrados
+
+    const mapaCampos: Record<string, (i: ItemSmartphone) => string | number> = {
+      Setor: (i) => i.setor,
+      Responsável: (i) => i.responsavel,
+      Tipo: (i) => i.tipo,
+      'Marca / Modelo': (i) => `${i.marca} ${i.modelo}`,
+      Etiqueta: (i) => i.etiqueta,
+      'Número em uso': (i) => i.numero || '',
+    }
+
+    const selector = mapaCampos[sort.key]
+    if (!selector) return filtrados
+
+    return [...filtrados].sort((a, b) => {
+      const aValor = selector(a)
+      const bValor = selector(b)
+      const comparacao = typeof aValor === 'number' && typeof bValor === 'number'
+        ? aValor - bValor
+        : String(aValor).localeCompare(String(bValor), 'pt-BR', { numeric: true, sensitivity: 'base' })
+      return sort.direction === 'asc' ? comparacao : -comparacao
+    })
+  }, [filtrados, sort])
+
+  const alternarOrdenacao = (header: string) => {
+    setSort((atual) => {
+      if (!atual || atual.key !== header) return { key: header, direction: 'asc' }
+      return { key: header, direction: atual.direction === 'asc' ? 'desc' : 'asc' }
+    })
+  }
+
   return (
     <AppLayout>
       <div className="space-y-6">
@@ -97,10 +131,10 @@ export default function SmartphonesPage() {
           <div>
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
               <Smartphone className="w-6 h-6 text-blue-600" />
-              Smartphones e Tablets
+              Smartphones
             </h1>
             <p className="text-sm text-gray-500 mt-1">
-              {filtrados.length} dispositivo(s) móvel(is) ativo(s) no inventário
+              {filtrados.length} smartphone(s) ativo(s) no inventário
             </p>
           </div>
         </div>
@@ -121,9 +155,11 @@ export default function SmartphonesPage() {
         ) : (
           <Table
             headers={['Setor', 'Responsável', 'Tipo', 'Marca / Modelo', 'Etiqueta', 'Número em uso', 'Ações']}
-            empty={filtrados.length === 0}
+            empty={filtradosOrdenados.length === 0}
+            sort={sort}
+            onSort={alternarOrdenacao}
           >
-            {filtrados.map((item) => (
+            {filtradosOrdenados.map((item) => (
               <tr key={item.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
                 <td className="px-4 py-3"><Badge variant="info">{item.setor}</Badge></td>
                 <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">{item.responsavel}</td>
