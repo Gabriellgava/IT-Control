@@ -15,83 +15,56 @@ interface InventarioItem {
   modelo?: string
 }
 
-type TipoRegistro = 'licenca' | 'assinatura'
-
-interface RegistroLicencaAssinatura {
+interface Produto {
   id: string
-  tipoRegistro: TipoRegistro
-  // Campos de licença
+  nome: string
+  codigo: string
+  categoria?: {
+    id: string
+    nome: string
+  }
+  unidades: Array<{
+    id: string
+    etiqueta: string
+    status: string
+  }>
+}
+
+interface Funcionario {
+  id: string
+  nome: string
+  setorId: string
+  ativo: boolean
+}
+
+interface Licenca {
+  id: string
   solicitadoPor: string
   maquinaEtiqueta: string
   produtoLicenca: string
-  codigoLicenca: string
-  // Campos de assinatura
-  plataformaAssinatura: string
-  setorAssinatura: string
-  periodoAssinatura: string
-  emailAssinatura: string
+  codigoLicenca: string | null
   criadoEm: string
 }
 
-const STORAGE_KEY = 'licencas-assinaturas-registros-v1'
-const ORDEM_CSV_SEM_CABECALHO = ['solicitadoPor', 'maquinaEtiqueta', 'produtoLicenca', 'codigoLicenca'] as const
-
-const gerarId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-const normalizarTexto = (valor: string) => corrigirMojibake(valor ?? '').trim()
-
-const formatarDataHora = (iso: string) => {
-  if (!iso) return '—'
-  return new Date(iso).toLocaleString('pt-BR')
+interface Assinatura {
+  id: string
+  plataforma: string
+  setor: string
+  periodo: string
+  email: string
+  criadoEm: string
 }
 
-const parseCsvLine = (linha: string, delimitador: ',' | ';' | '\t' = ',') => {
-  const cols: string[] = []
-  let atual = ''
-  let emAspas = false
-
-  for (let i = 0; i < linha.length; i++) {
-    const ch = linha[i]
-    if (ch === '"') {
-      if (emAspas && linha[i + 1] === '"') {
-        atual += '"'
-        i++
-      } else {
-        emAspas = !emAspas
-      }
-      continue
-    }
-    if (ch === delimitador && !emAspas) {
-      cols.push(atual.trim())
-      atual = ''
-      continue
-    }
-    atual += ch
-  }
-  cols.push(atual.trim())
-
-  return cols.map((c) => corrigirMojibake(c.replace(/^["']|["']$/g, '').trim()))
-}
-
-const detectarDelimitador = (linha: string) => {
-  const candidatos: Array<',' | ';' | '\t'> = [',', ';', '\t']
-  let melhor: ',' | ';' | '\t' = ','
-  let melhorContagem = -1
-
-  for (const d of candidatos) {
-    const partes = parseCsvLine(linha, d)
-    if (partes.length > melhorContagem) {
-      melhor = d
-      melhorContagem = partes.length
-    }
-  }
-
-  return melhor
-}
+type TipoRegistro = 'licenca' | 'assinatura'
 
 export default function LicencasAssinaturasPage() {
   const [inventario, setInventario] = useState<InventarioItem[]>([])
-  const [registros, setRegistros] = useState<RegistroLicencaAssinatura[]>([])
+  const [produtos, setProdutos] = useState<Produto[]>([])
+  const [funcionarios, setFuncionarios] = useState<Funcionario[]>([])
+  const [licencas, setLicencas] = useState<Licenca[]>([])
+  const [assinaturas, setAssinaturas] = useState<Assinatura[]>([])
   const [sort, setSort] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null)
+  const [filtroLicenca, setFiltroLicenca] = useState<'todas' | 'estoque' | 'vinculadas'>('todas')
 
   const [tipoRegistro, setTipoRegistro] = useState<TipoRegistro>('licenca')
   const [solicitadoPor, setSolicitadoPor] = useState('')
@@ -107,22 +80,73 @@ export default function LicencasAssinaturasPage() {
   const [importStatus, setImportStatus] = useState<{ tipo: 'ok' | 'erro'; msg: string } | null>(null)
   const inputFileRef = useRef<HTMLInputElement>(null)
 
-  const registrosOrdenados = useMemo(() => {
-    if (!sort) return registros
+  const normalizarTexto = (valor: string) => corrigirMojibake(valor ?? '').trim()
 
-    const mapaCampos: Record<string, (r: RegistroLicencaAssinatura) => string | number> = {
+  const normalizarCodigoLicenca = (codigo: string) => {
+    if (!codigo) return ''
+    // Remove espaços extras e converte para maiúsculas
+    return codigo.trim().toUpperCase().replace(/\s+/g, '')
+  }
+
+  const validarCodigoLicenca = (codigo: string) => {
+    if (!codigo) return true // Opcional
+    const normalizado = normalizarCodigoLicenca(codigo)
+    // Valida formato básico: 5 grupos de 5 caracteres separados por hífen (opcional)
+    const formatoValido = /^[A-Z0-9]{5}(-[A-Z0-9]{5}){4}$/.test(normalizado)
+    // Ou formato simplificado: apenas caracteres alfanuméricos
+    const formatoSimplificado = /^[A-Z0-9-]+$/.test(normalizado)
+    return formatoValido || formatoSimplificado
+  }
+
+  const validarEmail = (email: string) => {
+    if (!email) return true // Opcional
+    const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    return regex.test(email.trim())
+  }
+
+  const validarProdutoLicenca = (produto: string) => {
+    if (!produto || produto.trim().length < 3) return false
+    // Lista de produtos comuns para validação
+    const produtosComuns = [
+      'windows', 'office', 'microsoft', 'adobe', 'autocad', 'photoshop', 
+      'illustrator', 'acrobat', 'sketch', 'figma', 'visual studio', 'vscode'
+    ]
+    const produtoLower = produto.toLowerCase()
+    return produtosComuns.some(p => produtoLower.includes(p)) || produto.length >= 5
+  }
+
+  const formatarDataHora = (iso: string) => {
+    if (!iso) return '—'
+    return new Date(iso).toLocaleString('pt-BR')
+  }
+
+  const registrosOrdenados = useMemo(() => {
+    const licencasFiltradas = licencas.filter(l => {
+      if (filtroLicenca === 'estoque') return !l.maquinaEtiqueta
+      if (filtroLicenca === 'vinculadas') return !!l.maquinaEtiqueta
+      return true
+    })
+
+    const todos = [
+      ...licencasFiltradas.map(l => ({ ...l, tipoRegistro: 'licenca' as const })),
+      ...assinaturas.map(a => ({ ...a, tipoRegistro: 'assinatura' as const }))
+    ]
+
+    if (!sort) return todos
+
+    const mapaCampos: Record<string, (r: any) => string | number> = {
       Tipo: (r) => r.tipoRegistro,
       Dados: (r) => r.tipoRegistro === 'licenca' 
-        ? `${r.solicitadoPor} ${r.maquinaEtiqueta} ${r.produtoLicenca}`
-        : `${r.plataformaAssinatura} ${r.setorAssinatura} ${r.periodoAssinatura}`,
-      'Código / E-mail': (r) => r.tipoRegistro === 'licenca' ? r.codigoLicenca : r.emailAssinatura,
+        ? `${r.solicitadoPor} ${r.maquinaEtiqueta || 'Estoque'} ${r.produtoLicenca}`
+        : `${r.plataforma} ${r.setor} ${r.periodo}`,
+      'Código / E-mail': (r) => r.tipoRegistro === 'licenca' ? r.codigoLicenca : r.email,
       Data: (r) => new Date(r.criadoEm).getTime(),
     }
 
     const selector = mapaCampos[sort.key]
-    if (!selector) return registros
+    if (!selector) return todos
 
-    return [...registros].sort((a, b) => {
+    return [...todos].sort((a, b) => {
       const aValor = selector(a)
       const bValor = selector(b)
       const comparacao = typeof aValor === 'number' && typeof bValor === 'number'
@@ -130,7 +154,7 @@ export default function LicencasAssinaturasPage() {
         : String(aValor).localeCompare(String(bValor), 'pt-BR', { numeric: true, sensitivity: 'base' })
       return sort.direction === 'asc' ? comparacao : -comparacao
     })
-  }, [registros, sort])
+  }, [licencas, assinaturas, sort, filtroLicenca])
 
   const alternarOrdenacao = (header: string) => {
     setSort((atual) => {
@@ -140,105 +164,265 @@ export default function LicencasAssinaturasPage() {
   }
 
   useEffect(() => {
-    const carregarInventario = async () => {
+    const carregarDados = async () => {
       try {
-        const res = await fetch('/api/inventario?limit=10000')
-        if (!res.ok) return
-        const data = (await res.json()) as InventarioItem[]
-        setInventario(
-          data.map((item) => ({
-            ...item,
-            setor: normalizarTexto(item.setor),
-            responsavel: normalizarTexto(item.responsavel),
-          }))
-        )
-      } catch {
-        // fallback silencioso: a tela funciona mesmo sem inventário carregado
+        const [invRes, prodRes, licRes, assRes, funcRes] = await Promise.all([
+          fetch('/api/inventario?limit=10000'),
+          fetch('/api/produtos?limit=10000'),
+          fetch('/api/licencas'),
+          fetch('/api/assinaturas'),
+          fetch('/api/funcionarios')
+        ])
+
+        if (invRes.ok) {
+          const invData = await invRes.json()
+          const invArray = Array.isArray(invData) ? invData : (invData.data || [])
+          setInventario(
+            invArray.map((item: any) => ({
+              ...item,
+              setor: normalizarTexto(item.setor),
+              responsavel: normalizarTexto(item.responsavel),
+            }))
+          )
+        }
+
+        if (prodRes.ok) {
+          const prodData = await prodRes.json()
+          const prodArray = Array.isArray(prodData) ? prodData : (prodData.data || [])
+          setProdutos(prodArray)
+        }
+
+        if (licRes.ok) {
+          const licData = await licRes.json()
+          const licArray = Array.isArray(licData) ? licData : (licData.data || [])
+          setLicencas(licArray)
+        }
+
+        if (assRes.ok) {
+          const assData = await assRes.json()
+          const assArray = Array.isArray(assData) ? assData : (assData.data || [])
+          setAssinaturas(assArray)
+        }
+
+        if (funcRes.ok) {
+          const funcData = await funcRes.json()
+          const funcArray = Array.isArray(funcData) ? funcData : (funcData.data || [])
+          setFuncionarios(funcArray)
+        }
+      } catch (error) {
+        console.error('Erro ao carregar dados:', error)
       }
     }
 
-    carregarInventario()
-
-    try {
-      const salvo = localStorage.getItem(STORAGE_KEY)
-      if (!salvo) return
-      const data = JSON.parse(salvo) as RegistroLicencaAssinatura[]
-      if (Array.isArray(data)) {
-        setRegistros(
-          data.map((registro) => ({
-            ...registro,
-            tipoRegistro: registro.tipoRegistro === 'assinatura' ? 'assinatura' : 'licenca',
-            solicitadoPor: normalizarTexto(registro.solicitadoPor),
-            maquinaEtiqueta: normalizarTexto(registro.maquinaEtiqueta),
-            produtoLicenca: normalizarTexto(registro.produtoLicenca),
-            codigoLicenca: normalizarTexto(registro.codigoLicenca),
-            plataformaAssinatura: normalizarTexto(registro.plataformaAssinatura),
-            setorAssinatura: normalizarTexto(registro.setorAssinatura),
-            periodoAssinatura: normalizarTexto(registro.periodoAssinatura),
-            emailAssinatura: normalizarTexto(registro.emailAssinatura),
-          }))
-        )
-      }
-    } catch {
-      // ignora dados inválidos no localStorage
-    }
+    carregarDados()
   }, [])
 
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(registros))
-  }, [registros])
-
   const opcoesResponsaveis = useMemo(() => {
-    const nomes = Array.from(new Set(inventario.map((item) => item.responsavel).filter(Boolean)))
-    return nomes.sort((a, b) => a.localeCompare(b))
-  }, [inventario])
+    return funcionarios
+      .filter(f => f.ativo)
+      .map(f => f.nome)
+      .sort((a, b) => a.localeCompare(b))
+  }, [funcionarios])
 
   const opcoesSetorAssinatura = useMemo(() => {
     const setores = Array.from(new Set(inventario.map((item) => normalizarTexto(item.setor)).filter(Boolean)))
     return setores.sort((a, b) => a.localeCompare(b))
   }, [inventario])
 
-  const cadastrar = () => {
-    if (tipoRegistro === 'licenca' && (!solicitadoPor.trim() || !maquinaEtiqueta.trim() || !produtoLicenca.trim())) {
-      setErro('Preencha solicitado por, máquina e produto da licença.')
-      return
-    }
+  const opcoesMaquinas = useMemo(() => {
+    const computadores = produtos.filter(p => {
+      const categoriaNome = p.categoria?.nome?.toLowerCase() || ''
+      const produtoNome = p.nome.toLowerCase()
+      
+      // Verifica se é notebook ou desktop, mas não é suporte
+      const isComputador = 
+        categoriaNome === 'notebook' || 
+        categoriaNome === 'desktop' ||
+        categoriaNome === 'desktop alta performance' ||
+        (produtoNome.includes('notebook') && !produtoNome.includes('suporte')) ||
+        (produtoNome.includes('desktop') && !produtoNome.includes('suporte'))
+      
+      return isComputador
+    })
+    
+    return computadores.flatMap(produto =>
+      (produto.unidades || []).map(unidade => ({
+        etiqueta: unidade.etiqueta,
+        modelo: produto.nome
+      }))
+    )
+  }, [produtos])
 
-    if (tipoRegistro === 'assinatura' && (!plataformaAssinatura.trim() || !setorAssinatura.trim() || !periodoAssinatura.trim() || !emailAssinatura.trim())) {
-      setErro('Preencha plataforma, setor, período e e-mail da assinatura.')
-      return
-    }
+  // Mapa de responsável para máquina (etiqueta) - notebooks e desktops
+  const responsavelMaquinaMap = useMemo(() => {
+    const map: Record<string, string> = {}
+    
+    // Primeiro, coletar todas as etiquetas de computadores (notebooks e desktops)
+    const computadorEtiquetas = new Set(
+      opcoesMaquinas.map(m => m.etiqueta)
+    )
+    
+    inventario.forEach(item => {
+      if (item.responsavel && item.etiqueta && computadorEtiquetas.has(item.etiqueta)) {
+        const responsavelNormalizado = normalizarTexto(item.responsavel)
+        map[responsavelNormalizado] = item.etiqueta
+      }
+    })
+    
+    return map
+  }, [inventario, opcoesMaquinas])
 
-    const novo: RegistroLicencaAssinatura = {
-      id: gerarId(),
-      tipoRegistro,
-      solicitadoPor: normalizarTexto(solicitadoPor),
-      maquinaEtiqueta: normalizarTexto(maquinaEtiqueta),
-      produtoLicenca: normalizarTexto(produtoLicenca),
-      codigoLicenca: normalizarTexto(codigoLicenca),
-      plataformaAssinatura: normalizarTexto(plataformaAssinatura),
-      setorAssinatura: normalizarTexto(setorAssinatura),
-      periodoAssinatura: normalizarTexto(periodoAssinatura),
-      emailAssinatura: normalizarTexto(emailAssinatura),
-      criadoEm: new Date().toISOString(),
+  // Auto-preencher máquina ao selecionar responsável
+  useEffect(() => {
+    if (solicitadoPor && responsavelMaquinaMap[solicitadoPor]) {
+      setMaquinaEtiqueta(responsavelMaquinaMap[solicitadoPor])
     }
+  }, [solicitadoPor, responsavelMaquinaMap])
 
-    setRegistros((atual) => [novo, ...atual])
+  const cadastrar = async () => {
     setErro('')
+    
     if (tipoRegistro === 'licenca') {
-      setMaquinaEtiqueta('')
-      setProdutoLicenca('')
-      setCodigoLicenca('')
+      if (!produtoLicenca.trim()) {
+        setErro('Preencha o produto da licença.')
+        return
+      }
+
+      if (!validarProdutoLicenca(produtoLicenca)) {
+        setErro('Produto da licença inválido. Use nomes como "Windows 11 Pro", "Office 365", etc.')
+        return
+      }
+
+      // Se tiver máquina, solicitadoPor é obrigatório
+      if (maquinaEtiqueta.trim() && !solicitadoPor.trim()) {
+        setErro('Preencha o responsável quando há máquina vinculada.')
+        return
+      }
+
+      // Validar código da licença se fornecido
+      if (codigoLicenca.trim() && !validarCodigoLicenca(codigoLicenca)) {
+        setErro('Código da licença inválido. Use formato como "XXXXX-XXXXX-XXXXX-XXXXX-XXXXX"')
+        return
+      }
+
+      try {
+        const res = await fetch('/api/licencas', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            solicitadoPor: solicitadoPor.trim() || null,
+            maquinaEtiqueta: maquinaEtiqueta.trim() || null,
+            produtoLicenca: produtoLicenca.trim(),
+            codigoLicenca: normalizarCodigoLicenca(codigoLicenca) || null,
+          }),
+        })
+        
+        if (!res.ok) {
+          const data = await res.json()
+          setErro(data.error || 'Erro ao criar licença')
+          return
+        }
+
+        const novaLicenca = await res.json()
+        setLicencas(atual => [novaLicenca, ...atual])
+        setSolicitadoPor('')
+        setMaquinaEtiqueta('')
+        setProdutoLicenca('')
+        setCodigoLicenca('')
+      } catch (error) {
+        setErro('Erro ao criar licença')
+      }
     } else {
-      setPlataformaAssinatura('')
-      setSetorAssinatura('')
-      setPeriodoAssinatura('')
-      setEmailAssinatura('')
+      if (!plataformaAssinatura.trim()) {
+        setErro('Preencha a plataforma da assinatura.')
+        return
+      }
+
+      if (!setorAssinatura.trim()) {
+        setErro('Preencha o setor da assinatura.')
+        return
+      }
+
+      if (!periodoAssinatura.trim()) {
+        setErro('Preencha o período da assinatura.')
+        return
+      }
+
+      if (emailAssinatura.trim() && !validarEmail(emailAssinatura)) {
+        setErro('E-mail inválido. Use formato como "usuario@empresa.com"')
+        return
+      }
+
+      try {
+        const res = await fetch('/api/assinaturas', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            plataforma: plataformaAssinatura.trim(),
+            setor: setorAssinatura.trim(),
+            periodo: periodoAssinatura.trim(),
+            email: emailAssinatura.trim() || null,
+          }),
+        })
+        
+        if (!res.ok) {
+          const data = await res.json()
+          setErro(data.error || 'Erro ao criar assinatura')
+          return
+        }
+
+        const novaAssinatura = await res.json()
+        setAssinaturas(atual => [novaAssinatura, ...atual])
+        setPlataformaAssinatura('')
+        setSetorAssinatura('')
+        setPeriodoAssinatura('')
+        setEmailAssinatura('')
+      } catch (error) {
+        setErro('Erro ao criar assinatura')
+      }
     }
   }
 
-  const remover = (id: string) => {
-    setRegistros((atual) => atual.filter((registro) => registro.id !== id))
+  const remover = async (id: string, tipo: TipoRegistro) => {
+    try {
+      const endpoint = tipo === 'licenca' ? '/api/licencas' : '/api/assinaturas'
+      const res = await fetch(`${endpoint}/${id}`, { method: 'DELETE' })
+      
+      if (!res.ok) {
+        console.error('Erro ao remover')
+        return
+      }
+
+      if (tipo === 'licenca') {
+        setLicencas(atual => atual.filter(l => l.id !== id))
+      } else {
+        setAssinaturas(atual => atual.filter(a => a.id !== id))
+      }
+    } catch (error) {
+      console.error('Erro ao remover:', error)
+    }
+  }
+
+  const vincularLicenca = async (licencaId: string, maquina: string) => {
+    try {
+      const res = await fetch(`/api/licencas/${licencaId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ maquinaEtiqueta: maquina }),
+      })
+      
+      if (!res.ok) {
+        const data = await res.json()
+        setErro(data.error || 'Erro ao vincular licença')
+        return
+      }
+
+      const atualizada = await res.json()
+      setLicencas(atual => atual.map(l => l.id === licencaId ? atualizada : l))
+      setErro('')
+    } catch (error) {
+      setErro('Erro ao vincular licença')
+    }
   }
 
   const importarCsvSemCabecalho = async (file: File) => {
@@ -250,49 +434,56 @@ export default function LicencasAssinaturasPage() {
       const linhas = texto.replace(/^\uFEFF/, '').split(/\r?\n/).map((l) => l.trim()).filter(Boolean)
 
       if (linhas.length === 0) {
-        setImportStatus({ tipo: 'erro', msg: 'Arquivo vazio. Inclua os dados na ordem: Solicitado por, Setor, Tipo, Código.' })
+        setImportStatus({ tipo: 'erro', msg: 'Arquivo vazio. Inclua os dados na ordem: Solicitado por, Máquina (etiqueta), Produto da licença, Código.' })
         return
       }
 
-      const delimitador = detectarDelimitador(linhas[0])
-      const validos: RegistroLicencaAssinatura[] = []
-      let ignorados = 0
+      let importadas = 0
+      let ignoradas = 0
 
       for (const linha of linhas) {
-        const cols = parseCsvLine(linha, delimitador)
-        const registro = Object.fromEntries(
-          ORDEM_CSV_SEM_CABECALHO.map((campo, index) => [campo, normalizarTexto(cols[index] ?? '')])
-        ) as Record<(typeof ORDEM_CSV_SEM_CABECALHO)[number], string>
+        const cols = linha.split(',').map(c => c.trim())
+        const solicitadoPor = cols[0] || ''
+        const maquinaEtiqueta = cols[1] || ''
+        const produtoLicenca = cols[2] || ''
+        const codigoLicenca = cols[3] || ''
 
-        if (!registro.solicitadoPor || !registro.maquinaEtiqueta || !registro.produtoLicenca) {
-          ignorados++
+        if (!solicitadoPor || !maquinaEtiqueta || !produtoLicenca) {
+          ignoradas++
           continue
         }
 
-        validos.push({
-          id: gerarId(),
-          tipoRegistro: 'licenca',
-          solicitadoPor: registro.solicitadoPor,
-          maquinaEtiqueta: registro.maquinaEtiqueta,
-          produtoLicenca: registro.produtoLicenca,
-          codigoLicenca: registro.codigoLicenca,
-          plataformaAssinatura: '',
-          setorAssinatura: '',
-          periodoAssinatura: '',
-          emailAssinatura: '',
-          criadoEm: new Date().toISOString(),
-        })
+        try {
+          const res = await fetch('/api/licencas', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              solicitadoPor: solicitadoPor.trim(),
+              maquinaEtiqueta: maquinaEtiqueta.trim(),
+              produtoLicenca: produtoLicenca.trim(),
+              codigoLicenca: codigoLicenca.trim() || null,
+            }),
+          })
+
+          if (res.ok) {
+            importadas++
+          } else {
+            ignoradas++
+          }
+        } catch {
+          ignoradas++
+        }
       }
 
-      if (validos.length === 0) {
-        setImportStatus({ tipo: 'erro', msg: 'Nenhuma linha válida encontrada. Garanta a ordem correta sem cabeçalho.' })
-        return
+      // Recarregar licenças
+      const licRes = await fetch('/api/licencas')
+      if (licRes.ok) {
+        setLicencas(await licRes.json())
       }
 
-      setRegistros((atual) => [...validos, ...atual])
       setImportStatus({
-        tipo: ignorados > 0 ? 'erro' : 'ok',
-        msg: `${validos.length} licença(s) importada(s)${ignorados > 0 ? `, ${ignorados} linha(s) ignorada(s)` : ''}.`,
+        tipo: ignoradas > 0 ? 'erro' : 'ok',
+        msg: `${importadas} licença(s) importada(s)${ignoradas > 0 ? `, ${ignoradas} linha(s) ignorada(s)` : ''}.`,
       })
     } catch {
       setImportStatus({ tipo: 'erro', msg: 'Não foi possível ler o CSV. Verifique o arquivo e tente novamente.' })
@@ -344,17 +535,17 @@ export default function LicencasAssinaturasPage() {
 
           {tipoRegistro === 'licenca' ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 bg-blue-50/70 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-900/30 rounded-xl p-3">
-              <Select label="Solicitado por" value={solicitadoPor} onChange={(e) => setSolicitadoPor(e.target.value)}>
+              <Select label="Solicitado por (opcional se em estoque)" value={solicitadoPor} onChange={(e) => setSolicitadoPor(e.target.value)}>
                 <option value="">Selecionar responsável</option>
                 {opcoesResponsaveis.map((nome) => (
                   <option key={nome} value={nome}>{nome}</option>
                 ))}
               </Select>
-              <Select label="Máquina vinculada" value={maquinaEtiqueta} onChange={(e) => setMaquinaEtiqueta(e.target.value)}>
-                <option value="">Selecionar máquina</option>
-                {inventario.map((item) => (
-                  <option key={item.id} value={item.etiqueta ?? ''}>
-                    {item.etiqueta || item.id} — {item.tipo || 'Equipamento'} {item.modelo ? `(${item.modelo})` : ''}
+              <Select label="Máquina vinculada (opcional)" value={maquinaEtiqueta} onChange={(e) => setMaquinaEtiqueta(e.target.value)}>
+                <option value="">Deixar em estoque</option>
+                {opcoesMaquinas.map((item) => (
+                  <option key={item.etiqueta} value={item.etiqueta}>
+                    {item.etiqueta} — {item.modelo}
                   </option>
                 ))}
               </Select>
@@ -422,8 +613,42 @@ export default function LicencasAssinaturasPage() {
 
         <section className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-4 space-y-4">
           <div className="flex items-center justify-between gap-2">
-            <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Registros cadastrados</h2>
-            <Badge variant="info">{registros.length} registro(s)</Badge>
+            <div className="flex items-center gap-3">
+              <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Registros cadastrados</h2>
+              <div className="inline-flex rounded-lg border border-gray-200 dark:border-gray-700 p-0.5 bg-gray-50 dark:bg-gray-800/60">
+                <button
+                  onClick={() => setFiltroLicenca('todas')}
+                  className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
+                    filtroLicenca === 'todas'
+                      ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                      : 'text-gray-600 dark:text-gray-400 hover:bg-white/50 dark:hover:bg-gray-700/50'
+                  }`}
+                >
+                  Todas
+                </button>
+                <button
+                  onClick={() => setFiltroLicenca('estoque')}
+                  className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
+                    filtroLicenca === 'estoque'
+                      ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                      : 'text-gray-600 dark:text-gray-400 hover:bg-white/50 dark:hover:bg-gray-700/50'
+                  }`}
+                >
+                  Estoque
+                </button>
+                <button
+                  onClick={() => setFiltroLicenca('vinculadas')}
+                  className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
+                    filtroLicenca === 'vinculadas'
+                      ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                      : 'text-gray-600 dark:text-gray-400 hover:bg-white/50 dark:hover:bg-gray-700/50'
+                  }`}
+                >
+                  Vinculadas
+                </button>
+              </div>
+            </div>
+            <Badge variant="info">{licencas.length + assinaturas.length} registro(s)</Badge>
           </div>
 
           <Table headers={['Tipo', 'Dados', 'Código / E-mail', 'Data', 'Ações']} empty={registrosOrdenados.length === 0} sort={sort} onSort={alternarOrdenacao}>
@@ -443,17 +668,28 @@ export default function LicencasAssinaturasPage() {
                     </div>
                   ) : (
                     <div>
-                      <p className="font-medium text-gray-900 dark:text-white">{registro.plataformaAssinatura}</p>
-                      <p className="text-xs text-gray-500">Setor: {registro.setorAssinatura || '—'}</p>
-                      <p className="text-xs text-gray-500">Período: {registro.periodoAssinatura || '—'}</p>
+                      <p className="font-medium text-gray-900 dark:text-white">{registro.plataforma}</p>
+                      <p className="text-xs text-gray-500">Setor: {registro.setor || '—'}</p>
+                      <p className="text-xs text-gray-500">Período: {registro.periodo || '—'}</p>
                     </div>
                   )}
                 </td>
-                <td className="px-4 py-3">{registro.tipoRegistro === 'licenca' ? (registro.codigoLicenca || '—') : (registro.emailAssinatura || '—')}</td>
+                <td className="px-4 py-3">{registro.tipoRegistro === 'licenca' ? (registro.codigoLicenca || '—') : (registro.email || '—')}</td>
                 <td className="px-4 py-3 text-xs text-gray-500">{formatarDataHora(registro.criadoEm)}</td>
                 <td className="px-4 py-3">
+                  {registro.tipoRegistro === 'licenca' && !registro.maquinaEtiqueta ? (
+                    <button
+                      onClick={() => {
+                        const maquina = prompt('Digite a etiqueta da máquina para vincular esta licença:')
+                        if (maquina) vincularLicenca(registro.id, maquina)
+                      }}
+                      className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 mr-2"
+                    >
+                      <Plus className="w-3.5 h-3.5" /> Vincular
+                    </button>
+                  ) : null}
                   <button
-                    onClick={() => remover(registro.id)}
+                    onClick={() => remover(registro.id, registro.tipoRegistro)}
                     className="inline-flex items-center gap-1 text-xs text-red-600 hover:text-red-700"
                   >
                     <Trash2 className="w-3.5 h-3.5" /> Remover

@@ -15,9 +15,11 @@ interface ItemSmartphone {
   etiqueta: string
   numero?: string | null
   observacoes?: string | null
+  produtoId?: string
+  status?: string
 }
 
-const TIPOS_MOBILE = ['smartphone']
+const TIPOS_MOBILE = ['smartphone', 'smartphones', 'iphone', 'ipad']
 
 export default function SmartphonesPage() {
   const [itens, setItens] = useState<ItemSmartphone[]>([])
@@ -31,13 +33,6 @@ export default function SmartphonesPage() {
   const [sort, setSort] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null)
 
   useEffect(() => {
-    const carregar = async () => {
-      const res = await fetch('/api/inventario?limit=10000')
-      const data = await res.json()
-      const itensArray = Array.isArray(data) ? data : (data.data || [])
-      setItens(Array.isArray(itensArray) ? itensArray : [])
-      setLoading(false)
-    }
     carregar()
   }, [])
 
@@ -58,24 +53,42 @@ export default function SmartphonesPage() {
   }
 
   const salvar = async () => {
-    if (!editando) return
-    setLoadingForm(true)
-    setErroForm('')
-    const res = await fetch(`/api/inventario/${editando.id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(form),
-    })
-    const data = await res.json()
-    if (!res.ok) {
-      setErroForm(data?.error || 'Erro ao salvar alterações')
-      setLoadingForm(false)
-      return
-    }
-    setItens((prev) => prev.map((item) => (item.id === editando.id ? { ...item, ...form } : item)))
+    // Edição não suportada por enquanto - precisa de API específica
     setModalForm(false)
     setEditando(null)
     setLoadingForm(false)
+  }
+
+  const carregar = async () => {
+    try {
+      const res = await fetch('/api/produtos?limit=10000')
+      const data = await res.json()
+      const produtos = Array.isArray(data) ? data : (data.data || [])
+      
+      // Mapear unidades de produtos para o formato esperado
+      const itensMapeados: ItemSmartphone[] = produtos
+        .flatMap((produto: any) => 
+          (produto.unidades || []).map((unidade: any) => ({
+            id: unidade.id,
+            setor: unidade.setorAtual || '',
+            responsavel: unidade.localAtual || '',
+            tipo: produto.categoria?.nome || '',
+            marca: '',
+            modelo: produto.nome || '',
+            etiqueta: unidade.etiqueta || '',
+            numero: null,
+            observacoes: null,
+            produtoId: produto.id,
+            status: unidade.status,
+          }))
+        )
+      
+      setItens(itensMapeados)
+    } catch (error) {
+      console.error('Erro ao carregar smartphones:', error)
+      setItens([])
+    }
+    setLoading(false)
   }
 
   const filtrados = useMemo(() => {

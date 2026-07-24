@@ -313,8 +313,8 @@ model Documento {
 model Licenca {
   id String @id @default(cuid())
 
-  solicitadoPor   String  @map("solicitado_por")
-  maquinaEtiqueta String  @map("maquina_etiqueta")
+  solicitadoPor   String?  @map("solicitado_por")
+  maquinaEtiqueta String?  @map("maquina_etiqueta")
   produtoLicenca  String  @map("produto_licenca")
   codigoLicenca   String? @map("codigo_licenca")
 
