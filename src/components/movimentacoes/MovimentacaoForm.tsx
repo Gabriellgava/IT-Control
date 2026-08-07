@@ -6,6 +6,7 @@ import { Button, Input, Textarea } from '@/components/ui'
 import { User, Trash2, Tag } from 'lucide-react'
 import { DocumentoUpload } from './DocumentoUpload'
 import type { Produto, Fornecedor, Funcionario } from '@/types'
+import { fetchCachedList, invalidateCachedList } from '@/lib/http/fetch-cached-list'
 
 interface InventarioItem {
   responsavel: string
@@ -37,11 +38,11 @@ export function MovimentacaoForm({ tipo }: { tipo: 'ENTRADA' | 'SAIDA' }) {
   const [funcionarios, setFuncionarios] = useState<Funcionario[]>([])
   const [subtipo, setSubtipo] = useState<'USUARIO' | 'DESCARTE'>('USUARIO')
   const [modoEntrada, setModoEntrada] = useState<'CADASTRO' | 'DEVOLUCAO'>('CADASTRO')
-  const [modoDevolucao, setModoDevolucao] = useState<'TODOS' | 'UM'>('TODOS')
   const [itensInventario, setItensInventario] = useState<InventarioItem[]>([])
   const [filtroAtivo, setFiltroAtivo] = useState<'ETIQUETA' | 'PRODUTO' | 'CATEGORIA'>('ETIQUETA')
   const [buscaAtivo, setBuscaAtivo] = useState('')
   const [ativosSelecionados, setAtivosSelecionados] = useState<AtivoSaida[]>([])
+  const [itensDevolucaoSelecionados, setItensDevolucaoSelecionados] = useState<InventarioItem[]>([])
   const [notaFiscalFile, setNotaFiscalFile] = useState<File | null>(null)
   const [form, setForm] = useState({
     produtoId: '',
@@ -57,29 +58,31 @@ export function MovimentacaoForm({ tipo }: { tipo: 'ENTRADA' | 'SAIDA' }) {
   const s = (k: string, v: string) => { setForm(f => ({ ...f, [k]: v })); setErros(e => ({ ...e, [k]: '' })) }
 
   useEffect(() => {
-    fetch('/api/produtos?limit=10000').then(r => r.json()).then(data => setProdutos(data.data || data))
-    fetch('/api/fornecedores').then(r => r.json()).then(setFornecedores)
-    fetch('/api/funcionarios')
-      .then(r => r.json())
-      .then((dados) => {
-        const funcionariosArray = Array.isArray(dados) ? dados : []
-        setFuncionarios(funcionariosArray.filter((f) => f.ativo))
+    Promise.all([
+      fetchCachedList<Produto>('/api/produtos?limit=10000'),
+      fetchCachedList<Fornecedor>('/api/fornecedores'),
+      fetchCachedList<Funcionario>('/api/funcionarios'),
+    ])
+      .then(([produtosCarregados, fornecedoresCarregados, funcionariosCarregados]) => {
+        setProdutos(produtosCarregados)
+        setFornecedores(fornecedoresCarregados)
+        setFuncionarios(funcionariosCarregados.filter((funcionario) => funcionario.ativo))
+        setItensInventario(produtosCarregados.flatMap((produto) =>
+          (produto.unidades || []).map((unidade) => ({
+            responsavel: unidade.localAtual?.trim() || '',
+            etiqueta: unidade.etiqueta || '',
+            modelo: produto.nome || '',
+            marca: '',
+            tipo: produto.categoria?.nome || '',
+          })),
+        ))
       })
-      .catch(() => setFuncionarios([]))
-    fetch('/api/inventario?limit=10000')
-      .then(r => r.ok ? r.json() : [])
-      .then((dados) => {
-        const itensArray = Array.isArray(dados) ? dados : (dados.data || [])
-        if (!Array.isArray(itensArray)) return setItensInventario([])
-        setItensInventario(itensArray.map((item) => ({
-          responsavel: item.responsavel ?? '',
-          etiqueta: item.etiqueta ?? '',
-          modelo: item.modelo ?? '',
-          marca: item.marca ?? '',
-          tipo: item.tipo ?? '',
-        })))
+      .catch(() => {
+        setProdutos([])
+        setFornecedores([])
+        setFuncionarios([])
+        setItensInventario([])
       })
-      .catch(() => setItensInventario([]))
   }, [])
 
   // Preenche fornecedor e valor ao selecionar produto
@@ -148,8 +151,8 @@ export function MovimentacaoForm({ tipo }: { tipo: 'ENTRADA' | 'SAIDA' }) {
     if (tipo === 'ENTRADA' && modoEntrada === 'CADASTRO' && !form.produtoId) e.produtoId = 'Selecione um produto'
     if (tipo === 'ENTRADA' && modoEntrada === 'DEVOLUCAO' && !form.funcionarioDevolve.trim())
       e.funcionarioDevolve = 'Selecione o funcionário para devolver os itens'
-    if (tipo === 'ENTRADA' && modoEntrada === 'DEVOLUCAO' && modoDevolucao === 'UM' && !form.etiqueta.trim())
-      e.etiqueta = 'Selecione o item que será devolvido'
+    if (tipo === 'ENTRADA' && modoEntrada === 'DEVOLUCAO' && itensDevolucaoSelecionados.length === 0)
+      e.etiqueta = 'Selecione ao menos um item para devolver'
     if (tipo === 'SAIDA' && subtipo === 'USUARIO') {
       if (!form.funcionarioId) e.funcionarioId = 'Selecione o funcionário que receberá os itens'
       if (etiquetasSaida.length === 0) e.etiqueta = 'Informe ao menos uma etiqueta'
@@ -171,10 +174,10 @@ export function MovimentacaoForm({ tipo }: { tipo: 'ENTRADA' | 'SAIDA' }) {
       tipo,
       subtipo: tipo === 'SAIDA' ? subtipo : (modoEntrada === 'DEVOLUCAO' ? 'DEVOLUCAO' : undefined),
       produtoId: form.produtoId,
-      etiqueta: tipo === 'ENTRADA' && modoEntrada === 'DEVOLUCAO' && modoDevolucao === 'TODOS'
-        ? ''
-        : form.etiqueta.trim(),
-      etiquetas: tipo === 'SAIDA' ? etiquetasSaida : undefined,
+      etiqueta: tipo === 'ENTRADA' && modoEntrada === 'DEVOLUCAO' ? '' : form.etiqueta.trim(),
+      etiquetas: tipo === 'ENTRADA' && modoEntrada === 'DEVOLUCAO' 
+        ? itensDevolucaoSelecionados.map(item => item.etiqueta) 
+        : (tipo === 'SAIDA' ? etiquetasSaida : undefined),
       dataCompra: tipo === 'ENTRADA' ? form.data : undefined,
       data: form.data,
       fornecedorId: form.fornecedorId || null,
@@ -248,6 +251,7 @@ export function MovimentacaoForm({ tipo }: { tipo: 'ENTRADA' | 'SAIDA' }) {
         geral: `Saída concluída com ${data.totalProcessado} item(ns). Pendências: ${data.pendencias.map((p: { etiqueta: string, motivo: string }) => `${p.etiqueta} (${p.motivo})`).join(', ')}`,
       })
     }
+    invalidateCachedList('/api/produtos?limit=10000')
     router.push('/movimentacoes')
   }
 
@@ -260,13 +264,55 @@ export function MovimentacaoForm({ tipo }: { tipo: 'ENTRADA' | 'SAIDA' }) {
   const itensParaDevolver = useMemo(() => {
     const funcionarioSelecionado = funcionarios.find(f => f.id === form.funcionarioDevolve)
     const nomeFuncionario = funcionarioSelecionado?.nome || ''
+    const nomeNormalizado = nomeFuncionario
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .trim()
+      .replace(/\s+/g, ' ')
+      .replace(/s$/, '') // Remove 's' final para comparação
+    
     return itensInventario.filter(
-      item => item.responsavel.trim().toLowerCase() === nomeFuncionario.trim().toLowerCase(),
+      item => {
+        const responsavelNormalizado = item.responsavel
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .toLowerCase()
+          .trim()
+          .replace(/\s+/g, ' ')
+          .replace(/s$/, '') // Remove 's' final para comparação
+        return responsavelNormalizado === nomeNormalizado
+      }
     )
   }, [itensInventario, form.funcionarioDevolve, funcionarios])
-  const itemSelecionadoDevolucao = itensParaDevolver.find(
-    item => item.etiqueta.trim().toLowerCase() === form.etiqueta.trim().toLowerCase(),
-  )
+
+  const itensDevolucaoFiltrados = useMemo(() => {
+    const termo = buscaAtivo.trim().toLowerCase()
+    const etiquetasSelecionadas = new Set(itensDevolucaoSelecionados.map((item) => item.etiqueta.toLowerCase()))
+
+    return itensParaDevolver
+      .filter((item) => !etiquetasSelecionadas.has(item.etiqueta.toLowerCase()))
+      .filter((item) => {
+        if (!termo) return true
+        if (filtroAtivo === 'ETIQUETA') return item.etiqueta.toLowerCase().includes(termo)
+        if (filtroAtivo === 'PRODUTO') return item.modelo.toLowerCase().includes(termo) || item.marca.toLowerCase().includes(termo)
+        return item.tipo.toLowerCase().includes(termo)
+      })
+      .sort((a, b) => a.etiqueta.localeCompare(b.etiqueta, 'pt-BR'))
+  }, [itensParaDevolver, itensDevolucaoSelecionados, buscaAtivo, filtroAtivo])
+
+  const adicionarItemDevolucao = (item: InventarioItem) => {
+    setItensDevolucaoSelecionados((atual) => {
+      if (atual.some((i) => i.etiqueta === item.etiqueta)) return atual
+      return [...atual, item]
+    })
+    setErros((atual) => ({ ...atual, etiqueta: '' }))
+    setBuscaAtivo('')
+  }
+
+  const removerItemDevolucao = (etiqueta: string) => {
+    setItensDevolucaoSelecionados((atual) => atual.filter((item) => item.etiqueta !== etiqueta))
+  }
 
   return (
     <div className="max-w-2xl space-y-6">
@@ -296,11 +342,11 @@ export function MovimentacaoForm({ tipo }: { tipo: 'ENTRADA' | 'SAIDA' }) {
       {/* Toggle saída/descarte */}
       {tipo === 'ENTRADA' && (
         <div className="grid grid-cols-2 gap-3">
-          <button onClick={() => { setModoEntrada('CADASTRO'); setModoDevolucao('TODOS'); setErros({}) }}
+          <button onClick={() => { setModoEntrada('CADASTRO'); setErros({}); setItensDevolucaoSelecionados([]) }}
             className={`flex items-center justify-center gap-2 px-4 py-3 rounded-xl border-2 text-sm font-semibold transition-all ${modoEntrada === 'CADASTRO' ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400' : 'border-gray-200 dark:border-gray-700 text-gray-500 hover:border-gray-300'}`}>
             <Tag className="w-4 h-4" /> Entrada Individual
           </button>
-          <button onClick={() => { setModoEntrada('DEVOLUCAO'); setModoDevolucao('TODOS'); setErros({}) }}
+          <button onClick={() => { setModoEntrada('DEVOLUCAO'); setErros({}); setItensDevolucaoSelecionados([]) }}
             className={`flex items-center justify-center gap-2 px-4 py-3 rounded-xl border-2 text-sm font-semibold transition-all ${modoEntrada === 'DEVOLUCAO' ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400' : 'border-gray-200 dark:border-gray-700 text-gray-500 hover:border-gray-300'}`}>
             <User className="w-4 h-4" /> Devolução por Funcionário
           </button>
@@ -399,7 +445,8 @@ export function MovimentacaoForm({ tipo }: { tipo: 'ENTRADA' | 'SAIDA' }) {
                 value={form.funcionarioDevolve}
                 onChange={e => {
                   s('funcionarioDevolve', e.target.value)
-                  s('etiqueta', '')
+                  setItensDevolucaoSelecionados([])
+                  setBuscaAtivo('')
                 }}
                 className={`w-full border bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all ${erros.funcionarioDevolve ? 'border-red-400' : 'border-gray-300 dark:border-gray-700'}`}>
                 <option value="">Selecionar funcionário</option>
@@ -408,57 +455,83 @@ export function MovimentacaoForm({ tipo }: { tipo: 'ENTRADA' | 'SAIDA' }) {
               {erros.funcionarioDevolve && <p className="text-xs text-red-500">{erros.funcionarioDevolve}</p>}
             </div>
             {form.funcionarioDevolve && (
-              <div className="p-3 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-800 rounded-lg space-y-1">
-                <div className="grid grid-cols-2 gap-2 mb-2">
-                  <button
-                    type="button"
-                    onClick={() => { setModoDevolucao('TODOS'); s('etiqueta', '') }}
-                    className={`px-3 py-2 rounded-lg border text-xs font-semibold transition-all ${modoDevolucao === 'TODOS' ? 'border-emerald-500 bg-emerald-100/80 text-emerald-800 dark:text-emerald-300' : 'border-emerald-200 text-emerald-700 dark:text-emerald-400 hover:border-emerald-300'}`}>
-                    Devolver todos os itens
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setModoDevolucao('UM')}
-                    className={`px-3 py-2 rounded-lg border text-xs font-semibold transition-all ${modoDevolucao === 'UM' ? 'border-emerald-500 bg-emerald-100/80 text-emerald-800 dark:text-emerald-300' : 'border-emerald-200 text-emerald-700 dark:text-emerald-400 hover:border-emerald-300'}`}>
-                    Devolver apenas um item
-                  </button>
+              <div className={`space-y-3 rounded-lg border p-3 ${erros.etiqueta ? 'border-red-300 bg-red-50/30 dark:bg-red-900/10' : 'border-gray-200 dark:border-gray-700'}`}>
+                <div className="flex items-center justify-between gap-2">
+                  <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide">
+                    Itens para devolução *
+                  </label>
+                  <span className="text-xs text-gray-500 dark:text-gray-400">{itensDevolucaoSelecionados.length} selecionado(s)</span>
                 </div>
-                <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-400">
-                  {modoDevolucao === 'TODOS'
-                    ? `${itensParaDevolver.length} item(ns) serão devolvidos ao estoque`
-                    : itemSelecionadoDevolucao
-                      ? '1 item será devolvido ao estoque'
-                      : `${itensParaDevolver.length} item(ns) disponíveis para seleção`}
-                </p>
-                {modoDevolucao === 'UM' && (
-                  <div className="mt-2 space-y-1">
-                    <label className="block text-[11px] font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-400">
-                      Item para devolução *
-                    </label>
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
                     <select
-                      value={form.etiqueta}
-                      onChange={e => s('etiqueta', e.target.value)}
-                      className={`w-full border bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all ${erros.etiqueta ? 'border-red-400' : 'border-emerald-200 dark:border-emerald-700'}`}>
-                      <option value="">Selecionar item</option>
-                      {itensParaDevolver.map((item) => (
-                        <option key={item.etiqueta} value={item.etiqueta}>
-                          {item.etiqueta} • {item.tipo} {item.marca} {item.modelo}
-                        </option>
-                      ))}
+                      value={filtroAtivo}
+                      onChange={(e) => setFiltroAtivo(e.target.value as 'ETIQUETA' | 'PRODUTO' | 'CATEGORIA')}
+                      className="w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                    >
+                      <option value="ETIQUETA">Buscar por etiqueta</option>
+                      <option value="PRODUTO">Buscar por produto</option>
+                      <option value="CATEGORIA">Buscar por tipo</option>
                     </select>
-                    {erros.etiqueta && <p className="text-xs text-red-500">{erros.etiqueta}</p>}
+                    <input
+                      value={buscaAtivo}
+                      onChange={(e) => setBuscaAtivo(e.target.value)}
+                      placeholder={filtroAtivo === 'ETIQUETA' ? 'Digite a etiqueta...' : filtroAtivo === 'PRODUTO' ? 'Digite o modelo/marca...' : 'Digite o tipo...'}
+                      className="md:col-span-2 w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                    />
                   </div>
-                )}
-                {itensParaDevolver.length > 0 && (
-                  <ul className="mt-2 space-y-1">
-                    {(modoDevolucao === 'UM' && itemSelecionadoDevolucao ? [itemSelecionadoDevolucao] : itensParaDevolver).map((item) => (
-                      <li key={item.etiqueta} className="text-xs text-emerald-800 dark:text-emerald-300">
-                        <span className="font-mono font-medium">{item.etiqueta}</span>
-                        <span className="mx-1">•</span>
-                        <span>{item.tipo} {item.marca} {item.modelo}</span>
-                      </li>
-                    ))}
-                  </ul>
+                  <div className="max-h-44 overflow-auto rounded-lg border border-gray-200 dark:border-gray-700">
+                    {itensDevolucaoFiltrados.length === 0 ? (
+                      <p className="px-3 py-2 text-xs text-gray-500 dark:text-gray-400">Nenhum item disponível com esse filtro.</p>
+                    ) : (
+                      <ul className="divide-y divide-gray-200 dark:divide-gray-700">
+                        {itensDevolucaoFiltrados.slice(0, 30).map((item) => (
+                          <li key={item.etiqueta} className="px-3 py-2 flex items-center justify-between gap-3">
+                            <div className="min-w-0">
+                              <p className="text-sm font-mono text-gray-800 dark:text-gray-200 truncate">{item.etiqueta}</p>
+                              <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                                {item.tipo} {item.marca} {item.modelo}
+                              </p>
+                            </div>
+                            <Button size="sm" onClick={() => adicionarItemDevolucao(item)}>Adicionar</Button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                </>
+                {erros.etiqueta && <p className="text-xs text-red-500">{erros.etiqueta}</p>}
+                {itensDevolucaoSelecionados.length > 0 && (
+                  <div className="overflow-auto rounded-lg border border-gray-200 dark:border-gray-700">
+                    <table className="w-full text-sm text-gray-900 dark:text-white">
+                      <thead className="bg-gray-50 dark:bg-gray-800/80 text-gray-700 dark:text-white">
+                        <tr>
+                          <th className="text-left px-3 py-2">Etiqueta</th>
+                          <th className="text-left px-3 py-2">Tipo</th>
+                          <th className="text-left px-3 py-2">Marca/Modelo</th>
+                          <th className="text-right px-3 py-2">Ação</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {itensDevolucaoSelecionados.map((item) => (
+                          <tr key={item.etiqueta} className="border-t border-gray-200 dark:border-gray-700 text-gray-800 dark:text-white">
+                            <td className="px-3 py-2 font-mono">{item.etiqueta}</td>
+                            <td className="px-3 py-2">{item.tipo}</td>
+                            <td className="px-3 py-2">{item.marca} {item.modelo}</td>
+                            <td className="px-3 py-2 text-right">
+                              <button
+                                type="button"
+                                onClick={() => removerItemDevolucao(item.etiqueta)}
+                                className="text-xs font-semibold text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
+                              >
+                                Remover
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 )}
               </div>
             )}
@@ -583,6 +656,7 @@ export function MovimentacaoForm({ tipo }: { tipo: 'ENTRADA' | 'SAIDA' }) {
           onChange={e => s('observacoes', e.target.value)}
           placeholder={subtipo === 'DESCARTE' ? 'Ex: Equipamento danificado, queimado, sem conserto...' : modoEntrada === 'DEVOLUCAO' ? 'Ex: colaborador desligado, fim de contrato...' : 'Informações adicionais...'}
           rows={3}
+          error={erros.observacoes}
         />
       </div>
 

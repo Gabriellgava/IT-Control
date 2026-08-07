@@ -26,6 +26,10 @@ export async function GET(request: NextRequest) {
     const tipo = searchParams.get('tipo') || ''
     const subtipo = searchParams.get('subtipo') || ''
     const produtoId = searchParams.get('produtoId') || ''
+    const responsavel = searchParams.get('responsavel') || ''
+    const etiqueta = searchParams.get('etiqueta') || ''
+    const dataInicio = searchParams.get('dataInicio') || ''
+    const dataFim = searchParams.get('dataFim') || ''
     const page = parseInt(searchParams.get('page') || '1')
     const limit = parseInt(searchParams.get('limit') || '50')
     const skip = (page - 1) * limit
@@ -36,6 +40,10 @@ export async function GET(request: NextRequest) {
         tipo ? { tipo } : {},
         subtipo ? { subtipo } : {},
         produtoId ? { unidade: { produtoId } } : {},
+        responsavel ? { responsavel } : {},
+        etiqueta ? { unidade: { etiqueta: { contains: etiqueta } } } : {},
+        dataInicio ? { data: { gte: new Date(`${dataInicio}T00:00:00`) } } : {},
+        dataFim ? { data: { lte: new Date(`${dataFim}T23:59:59.999`) } } : {},
       ],
     }
 
@@ -118,45 +126,35 @@ export async function POST(request: NextRequest) {
           return NextResponse.json({ error: 'Funcionário é obrigatório para devolução' }, { status: 400 })
 
         const devolucao = await prisma.$transaction(async (tx) => {
-          const etiquetaFiltro = etiqueta?.trim()
-          const itensInventario = await tx.inventario.findMany({
-            where: {
-              responsavel: { equals: funcionarioDevolve.trim(), mode: 'insensitive' },
-              ...(etiquetaFiltro
-                ? { etiqueta: { equals: etiquetaFiltro, mode: 'insensitive' } }
-                : {}),
-            },
-            orderBy: { etiqueta: 'asc' },
-          })
+          const etiquetasNormalizadas = Array.from(new Set(
+            (Array.isArray(etiquetas) ? etiquetas : [etiqueta])
+              .map((v) => String(v || '').trim())
+              .filter(Boolean),
+          ))
 
-          if (itensInventario.length === 0) {
-            return {
-              erro: etiquetaFiltro
-                ? 'O item selecionado não está com este funcionário no inventário'
-                : 'Nenhum item encontrado no inventário para este funcionário',
-            }
-          }
+          if (etiquetasNormalizadas.length === 0)
+            return { erro: 'Nenhuma etiqueta informada para devolução' }
 
           const pendencias: Array<{ etiqueta: string, motivo: string }> = []
           const etiquetasProcessadas: string[] = []
 
-          for (const item of itensInventario) {
+          for (const etiquetaAtual of etiquetasNormalizadas) {
             const unidade = await tx.unidade.findUnique({
-              where: { etiqueta: item.etiqueta.trim() },
+              where: { etiqueta: etiquetaAtual },
               include: { produto: true },
             })
 
             if (!unidade) {
               pendencias.push({
-                etiqueta: item.etiqueta,
-                motivo: 'Etiqueta sem cadastro de unidade (apenas no inventário)',
+                etiqueta: etiquetaAtual,
+                motivo: 'Etiqueta não encontrada',
               })
               continue
             }
 
             if (unidade.status !== 'ATIVA') {
               pendencias.push({
-                etiqueta: item.etiqueta,
+                etiqueta: etiquetaAtual,
                 motivo: `Unidade com status ${unidade.status}`,
               })
               continue
@@ -176,14 +174,15 @@ export async function POST(request: NextRequest) {
               },
             })
 
-            etiquetasProcessadas.push(item.etiqueta.trim())
+            // Remover do inventário se existir
+            await tx.inventario.deleteMany({ where: { etiqueta: etiquetaAtual } })
+
+            etiquetasProcessadas.push(etiquetaAtual)
           }
 
           if (etiquetasProcessadas.length === 0) {
             return { erro: 'Nenhum item pôde ser devolvido ao estoque', pendencias }
           }
-
-          await tx.inventario.deleteMany({ where: { etiqueta: { in: etiquetasProcessadas } } })
 
           return {
             quantidadeDevolvida: etiquetasProcessadas.length,

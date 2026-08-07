@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { Badge, Input, Select, Table } from '@/components/ui'
 import { PackageSearch, Search } from 'lucide-react'
+import { FilterBar, SelectFilter, TextFilter } from '@/components/ui/filters'
 
 interface ItemInventario {
   id: string
@@ -41,6 +42,8 @@ export default function ConsultaProdutosPage() {
   const [itens, setItens] = useState<ItemInventario[]>([])
   const [busca, setBusca] = useState('')
   const [filtroSituacao, setFiltroSituacao] = useState<'todos' | 'estoque' | 'alocados'>('todos')
+  const [filtroResponsavel, setFiltroResponsavel] = useState('')
+  const [filtroTipo, setFiltroTipo] = useState('')
   const [loading, setLoading] = useState(true)
   const [sort, setSort] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null)
   const [pagina, setPagina] = useState(1)
@@ -84,7 +87,6 @@ export default function ConsultaProdutosPage() {
   }, [])
 
   const filtrados = useMemo(() => {
-    const termo = busca.trim().toLowerCase()
     let resultado = itens
 
     if (filtroSituacao === 'estoque') {
@@ -93,6 +95,19 @@ export default function ConsultaProdutosPage() {
       resultado = resultado.filter((item) => !estaEmEstoque(item))
     }
 
+    if (filtroResponsavel.trim()) {
+      resultado = resultado.filter(item => 
+        item.responsavel.toLowerCase() === filtroResponsavel.toLowerCase()
+      )
+    }
+
+    if (filtroTipo.trim()) {
+      resultado = resultado.filter(item => 
+        item.tipo.toLowerCase() === filtroTipo.toLowerCase()
+      )
+    }
+
+    const termo = busca.trim().toLowerCase()
     const dadosFiltrados = !termo ? resultado : resultado.filter((item) =>
       [item.etiqueta, item.marca, item.modelo, item.tipo, item.numero, item.observacoes, item.responsavel, item.setor]
         .join(' ')
@@ -127,7 +142,7 @@ export default function ConsultaProdutosPage() {
       const comparacao = aValor.localeCompare(bValor, 'pt-BR', { numeric: true, sensitivity: 'base' })
       return sort.direction === 'asc' ? comparacao : -comparacao
     })
-  }, [itens, busca, filtroSituacao, sort])
+  }, [itens, busca, filtroSituacao, filtroResponsavel, filtroTipo, sort])
 
   const paginados = useMemo(() => {
     const inicio = (pagina - 1) * itensPorPagina
@@ -137,9 +152,15 @@ export default function ConsultaProdutosPage() {
 
   const totalPaginas = Math.ceil(filtrados.length / itensPorPagina)
 
+  const opcoesDisponiveis = useMemo(() => {
+    const tipos = Array.from(new Set(itens.map(i => i.tipo))).sort()
+    const responsaveis = Array.from(new Set(itens.map(i => i.responsavel).filter(Boolean))).sort()
+    return { tipos, responsaveis }
+  }, [itens])
+
   useEffect(() => {
     setPagina(1)
-  }, [busca, filtroSituacao])
+  }, [busca, filtroSituacao, filtroResponsavel, filtroTipo])
 
   const alternarOrdenacao = (header: string) => {
     setSort((atual) => {
@@ -162,26 +183,15 @@ export default function ConsultaProdutosPage() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
-          <div className="lg:col-span-2">
-            <Input
-              label="Busca"
-              placeholder="Buscar por etiqueta, marca, modelo, responsável ou setor..."
-              value={busca}
-              onChange={(e) => setBusca(e.target.value)}
-              icon={<Search className="w-4 h-4" />}
-            />
-          </div>
-          <Select
-            label="Situação"
-            value={filtroSituacao}
-            onChange={(e) => setFiltroSituacao(e.target.value as 'todos' | 'estoque' | 'alocados')}
-          >
-            <option value="todos">Todas as situações</option>
-            <option value="estoque">Em estoque</option>
-            <option value="alocados">Com responsável</option>
-          </Select>
-        </div>
+        <FilterBar>
+          <TextFilter label="Busca" value={busca} onChange={setBusca} placeholder="Buscar por etiqueta, marca, modelo, responsavel ou setor..." className="flex-1 min-w-56" />
+          <SelectFilter label="Responsável" value={filtroResponsavel} onChange={setFiltroResponsavel} allLabel="Todos os responsáveis" options={opcoesDisponiveis.responsaveis.map((nome) => ({ value: nome, label: nome }))} />
+          <SelectFilter label="Tipo" value={filtroTipo} onChange={setFiltroTipo} allLabel="Todos os tipos" options={opcoesDisponiveis.tipos.map((nome) => ({ value: nome, label: nome }))} />
+          <SelectFilter label="Situação" value={filtroSituacao} onChange={(value) => setFiltroSituacao(value as 'todos' | 'estoque' | 'alocados')} allLabel="Todas as situações" options={[
+            { value: 'estoque', label: 'Em estoque' },
+            { value: 'alocados', label: 'Com responsavel' },
+          ]} />
+        </FilterBar>
 
         {loading ? (
           <div className="flex items-center justify-center h-48">

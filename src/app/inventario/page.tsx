@@ -1,7 +1,8 @@
 'use client'
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { AppLayout } from '@/components/layout/AppLayout'
-import { Button, Input, Modal, Table, Badge, Pagination } from '@/components/ui'
+import { Button, Input, Modal, Table, Badge, Pagination, Select , ConfirmDeleteModal} from '@/components/ui'
+import { FilterBar, SelectFilter, TextFilter } from '@/components/ui/filters'
 import { Search, Plus, Edit2, Trash2, Download, Upload, AlertCircle, CheckCircle, RefreshCw } from 'lucide-react'
 import { exportarCSV, formatData } from '@/lib/utils'
 import { corrigirMojibake, decodificarCsvComFallback } from '@/lib/csv'
@@ -191,10 +192,24 @@ export default function InventarioPage() {
   const [sort, setSort] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
-  // Setores e tipos únicos para filtros
-  const setoresUnicos = [...new Set(itens.map(i => i.setor))].sort()
-  const tiposUnicos = [...new Set(itens.map(i => i.tipo))].sort()
-  const responsaveisUnicos = [...new Set(itens.map(i => i.responsavel))].sort()
+  // Filtros disponíveis (carregados separadamente da paginação)
+  const [filtrosDisponiveis, setFiltrosDisponiveis] = useState<{ setores: string[]; tipos: string[]; responsaveis: string[] }>({
+    setores: [],
+    tipos: [],
+    responsaveis: []
+  })
+
+  const buscarFiltros = useCallback(async () => {
+    try {
+      const res = await fetch('/api/inventario/filtros')
+      const data = await res.json()
+      if (res.ok) {
+        setFiltrosDisponiveis(data)
+      }
+    } catch (error) {
+      console.error('Erro ao carregar filtros:', error)
+    }
+  }, [])
 
   const buscarItens = useCallback(async () => {
     try {
@@ -244,7 +259,10 @@ export default function InventarioPage() {
     setCurrentPage(1)
   }, [busca, filtroSetor, filtroTipo, filtroResponsavel])
 
-  useEffect(() => { buscarItens() }, [buscarItens])
+  useEffect(() => { 
+    buscarItens()
+    buscarFiltros()
+  }, [buscarItens, buscarFiltros])
 
   const abrirNovo = () => { setEditando(null); setForm(FORM_VAZIO); setErroForm(''); setModalForm(true) }
   const abrirEditar = (item: Item) => {
@@ -263,13 +281,13 @@ export default function InventarioPage() {
     const res = await fetch(url, { method: editando ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) })
     const data = await res.json()
     if (!res.ok) { setErroForm(data.error || 'Erro ao salvar'); setLoadingForm(false); return }
-    setModalForm(false); buscarItens(); setLoadingForm(false)
+    setModalForm(false); buscarItens(); buscarFiltros(); setLoadingForm(false)
   }
 
   const deletar = async () => {
     if (!deletandoId) return
     await fetch(`/api/inventario/${deletandoId}`, { method: 'DELETE' })
-    setDeletandoId(null); buscarItens()
+    setDeletandoId(null); buscarItens(); buscarFiltros()
   }
 
   const exportar = () => exportarCSV(itens.map(i => ({
@@ -378,7 +396,7 @@ export default function InventarioPage() {
     setImportStatus({ tipo: data.erros?.length ? 'erro' : 'ok', msg: data.mensagem })
     setPreviewImport([])
     if (fileRef.current) fileRef.current.value = ''
-    buscarItens(); setImportando(false)
+    buscarItens(); buscarFiltros(); setImportando(false)
   }
 
   const sincronizarProdutos = async () => {
@@ -397,6 +415,7 @@ export default function InventarioPage() {
 
       setSyncStatus({ tipo: 'ok', msg: data.mensagem || 'Sincronização concluída com sucesso.' })
       buscarItens()
+      buscarFiltros()
     } catch {
       setSyncStatus({ tipo: 'erro', msg: 'Erro de conexão ao sincronizar inventário.' })
     } finally {
@@ -447,26 +466,12 @@ export default function InventarioPage() {
         )}
 
         {/* Filtros */}
-        <div className="flex flex-col sm:flex-row gap-3">
-          <div className="flex-1">
-            <Input placeholder="Buscar por responsável, etiqueta, marca ou modelo..." value={busca} onChange={e => setBusca(e.target.value)} icon={<Search className="w-4 h-4" />} />
-          </div>
-          <select value={filtroSetor} onChange={e => setFiltroSetor(e.target.value)}
-            className="border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-            <option value="">Todos os setores</option>
-            {setoresUnicos.map(s => <option key={s} value={s}>{s}</option>)}
-          </select>
-          <select value={filtroTipo} onChange={e => setFiltroTipo(e.target.value)}
-            className="border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-            <option value="">Todos os tipos</option>
-            {tiposUnicos.map(t => <option key={t} value={t}>{t}</option>)}
-          </select>
-          <select value={filtroResponsavel} onChange={e => setFiltroResponsavel(e.target.value)}
-            className="border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-            <option value="">Todos os responsáveis</option>
-            {responsaveisUnicos.map(r => <option key={r} value={r}>{r}</option>)}
-          </select>
-        </div>
+        <FilterBar>
+          <TextFilter label="Etiqueta" value={busca} onChange={setBusca} placeholder="Buscar por etiqueta..." />
+          <SelectFilter label="Setor" value={filtroSetor} onChange={setFiltroSetor} allLabel="Todos os setores" options={filtrosDisponiveis.setores.map((nome) => ({ value: nome, label: nome }))} />
+          <SelectFilter label="Tipo" value={filtroTipo} onChange={setFiltroTipo} allLabel="Todos os tipos" options={filtrosDisponiveis.tipos.map((nome) => ({ value: nome, label: nome }))} />
+          <SelectFilter label="Responsável" value={filtroResponsavel} onChange={setFiltroResponsavel} allLabel="Todos os responsáveis" options={filtrosDisponiveis.responsaveis.map((nome) => ({ value: nome, label: nome }))} />
+        </FilterBar>
 
         {/* Tabela */}
         {loading ? (
@@ -618,13 +623,12 @@ export default function InventarioPage() {
         </Modal>
 
         {/* Modal — Deletar */}
-        <Modal open={!!deletandoId} onClose={() => setDeletandoId(null)} title="Confirmar exclusão">
-          <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">Tem certeza que deseja remover este item do inventário?</p>
-          <div className="flex gap-3 justify-end">
-            <Button variant="secondary" onClick={() => setDeletandoId(null)}>Cancelar</Button>
-            <Button variant="danger" onClick={deletar}>Remover</Button>
-          </div>
-        </Modal>
+      <ConfirmDeleteModal
+        open={!!deletandoId}
+        onClose={() => setDeletandoId(null)}
+        onConfirm={deletar}
+          message="Tem certeza que deseja remover este item do inventario?"
+      />
       </div>
     </AppLayout>
   )

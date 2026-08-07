@@ -2,10 +2,12 @@
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import Link from 'next/link'
 import { Search, Plus, Edit2, Trash2, Download, Package, Tag, ChevronDown, ChevronRight, Eye, ArrowRightLeft } from 'lucide-react'
-import { Button, Badge, Input, Select, Modal, Table, PageHeader, LoadingState, ErrorState, Pagination } from '@/components/ui'
+import { Button, Badge, Input, Select, Modal, Table, PageHeader, LoadingState, ErrorState, Pagination , ConfirmDeleteModal} from '@/components/ui'
+import { FilterBar, SelectFilter, TextFilter } from '@/components/ui/filters'
 import { formatMoeda, formatData, exportarCSV } from '@/lib/utils'
 import type { Produto, Categoria, Fornecedor } from '@/types'
 import { ProdutoForm } from './ProdutoForm'
+import { fetchCachedList, invalidateCachedList } from '@/lib/http/fetch-cached-list'
 
 export function ProdutosPage() {
   const [produtos, setProdutos] = useState<Produto[]>([])
@@ -64,9 +66,12 @@ export function ProdutosPage() {
 
   useEffect(() => {
     buscarProdutos()
-    fetch('/api/categorias').then(r => r.ok ? r.json() : []).then(setCategorias).catch(() => setCategorias([]))
-    fetch('/api/fornecedores').then(r => r.ok ? r.json() : []).then(setFornecedores).catch(() => setFornecedores([]))
   }, [buscarProdutos])
+
+  useEffect(() => {
+    fetchCachedList<Categoria>('/api/categorias').then(setCategorias).catch(() => setCategorias([]))
+    fetchCachedList<Fornecedor>('/api/fornecedores').then(setFornecedores).catch(() => setFornecedores([]))
+  }, [])
 
   const toggleExpandir = (id: string) => {
     setExpandidos(prev => {
@@ -85,6 +90,7 @@ export function ProdutosPage() {
       setError(data.error || 'Não foi possível excluir o produto.')
       return
     }
+    invalidateCachedList('/api/produtos?limit=10000')
     setDeletandoId(null)
     buscarProdutos()
   }
@@ -108,6 +114,7 @@ export function ProdutosPage() {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Não foi possível mover o item.')
       setMovendoUnidade(null)
+      invalidateCachedList('/api/produtos?limit=10000')
       setProdutoDestinoId('')
       buscarProdutos()
     } catch (e) {
@@ -125,6 +132,7 @@ export function ProdutosPage() {
       const res = await fetch(`/api/unidades/${excluindoUnidade.id}`, { method: 'DELETE' })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Não foi possível excluir o item.')
+      invalidateCachedList('/api/produtos?limit=10000')
       setExcluindoUnidade(null)
       buscarProdutos()
     } catch (e) {
@@ -188,19 +196,11 @@ export function ProdutosPage() {
       {error && <ErrorState message={error} />}
 
       {/* Filtros */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        <div className="flex-1">
-          <Input placeholder="Buscar por nome, código ou etiqueta..." value={busca} onChange={e => setBusca(e.target.value)} icon={<Search className="w-4 h-4" />} />
-        </div>
-        <Select value={filtroCategoria} onChange={e => setFiltroCategoria(e.target.value)}>
-          <option value="">Todas as categorias</option>
-          {categorias.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
-        </Select>
-        <Select value={filtroFornecedor} onChange={e => setFiltroFornecedor(e.target.value)}>
-          <option value="">Todos os fornecedores</option>
-          {fornecedores.map(f => <option key={f.id} value={f.id}>{f.nome}</option>)}
-        </Select>
-      </div>
+      <FilterBar>
+        <TextFilter label="Busca" value={busca} onChange={setBusca} placeholder="Buscar por nome, codigo ou etiqueta..." className="flex-1 min-w-56" />
+        <SelectFilter label="Categoria" value={filtroCategoria} onChange={setFiltroCategoria} allLabel="Todas as categorias" options={categorias.map((categoria) => ({ value: categoria.id, label: categoria.nome }))} />
+        <SelectFilter label="Fornecedor" value={filtroFornecedor} onChange={setFiltroFornecedor} allLabel="Todos os fornecedores" options={fornecedores.map((fornecedor) => ({ value: fornecedor.id, label: fornecedor.nome }))} />
+      </FilterBar>
 
       {/* Toggle modo */}
       <div className="flex gap-2">
@@ -413,13 +413,12 @@ export function ProdutosPage() {
       </Modal>
 
       {/* Modal deletar */}
-      <Modal open={!!deletandoId} onClose={() => setDeletandoId(null)} title="Confirmar exclusão">
-        <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">Tem certeza que deseja excluir este produto? Só é possível excluir produtos sem unidades ativas.</p>
-        <div className="flex gap-3 justify-end">
-          <Button variant="secondary" onClick={() => setDeletandoId(null)}>Cancelar</Button>
-          <Button variant="danger" onClick={deletar}>Excluir</Button>
-        </div>
-      </Modal>
+      <ConfirmDeleteModal
+        open={!!deletandoId}
+        onClose={() => setDeletandoId(null)}
+        onConfirm={deletar}
+          message="Tem certeza que deseja excluir este produto? A exclusao so e permitida para produtos sem unidades ativas."
+      />
 
       <Modal open={!!movendoUnidade} onClose={() => { setMovendoUnidade(null); setProdutoDestinoId('') }} title="Mover item para outro produto">
         {movendoUnidade && (

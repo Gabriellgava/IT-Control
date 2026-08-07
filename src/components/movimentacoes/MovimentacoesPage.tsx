@@ -1,22 +1,26 @@
 'use client'
-import { useEffect, useState, useCallback, useMemo } from 'react'
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import Link from 'next/link'
 import { useSession } from 'next-auth/react'
 import { ArrowDownCircle, ArrowUpCircle, Download, FileText, XCircle, Trash2 } from 'lucide-react'
-import { Button, Badge, Table, Select, Modal, LoadingState, ErrorState, PageHeader, Pagination } from '@/components/ui'
+import { Button, Badge, Table, Select, Modal, LoadingState, ErrorState, PageHeader, Pagination, Input } from '@/components/ui'
 import { formatMoeda, formatDataHora, exportarCSV } from '@/lib/utils'
+import { fetchCachedList } from '@/lib/http/fetch-cached-list'
 import type { Movimentacao, Produto } from '@/types'
+import { DateRangeFilter, FilterBar, SelectFilter, TextFilter } from '@/components/ui/filters'
 
 export function MovimentacoesPage() {
   const { data: session } = useSession()
   const [movs, setMovs] = useState<Movimentacao[]>([])
   const [produtos, setProdutos] = useState<Produto[]>([])
+  const [opcoesResponsaveis, setOpcoesResponsaveis] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [filtroTipo, setFiltroTipo] = useState('')
   const [filtroProduto, setFiltroProduto] = useState('')
   const [filtroResponsavel, setFiltroResponsavel] = useState('')
   const [filtroEtiqueta, setFiltroEtiqueta] = useState('')
+  const [filtroEtiquetaDebounced, setFiltroEtiquetaDebounced] = useState('')
   const [filtroDataInicio, setFiltroDataInicio] = useState('')
   const [filtroDataFim, setFiltroDataFim] = useState('')
   const [sort, setSort] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null)
@@ -24,6 +28,7 @@ export function MovimentacoesPage() {
   const [cancelando, setCancelando] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
   const [pagination, setPagination] = useState<{ page: number; limit: number; total: number; totalPages: number } | null>(null)
+  const debounceRef = useRef<NodeJS.Timeout>()
   const isAdmin = session?.user.perfil === 'admin'
 
   const buscar = useCallback(async () => {
@@ -32,7 +37,11 @@ export function MovimentacoesPage() {
     const p = new URLSearchParams()
     if (filtroTipo) p.set('tipo', filtroTipo)
     if (filtroProduto) p.set('produtoId', filtroProduto)
-    
+    if (filtroResponsavel) p.set('responsavel', filtroResponsavel)
+    if (filtroEtiquetaDebounced) p.set('etiqueta', filtroEtiquetaDebounced)
+    if (filtroDataInicio) p.set('dataInicio', filtroDataInicio)
+    if (filtroDataFim) p.set('dataFim', filtroDataFim)
+
     // Se houver ordenação, buscar todos os itens para ordenar localmente
     if (sort) {
       p.set('limit', '10000')
@@ -40,7 +49,7 @@ export function MovimentacoesPage() {
       p.set('page', currentPage.toString())
       p.set('limit', '50')
     }
-    
+
     try {
       const res = await fetch(`/api/movimentacoes?${p}`)
       if (!res.ok) throw new Error('Não foi possível carregar movimentações.')
@@ -52,19 +61,38 @@ export function MovimentacoesPage() {
     } finally {
       setLoading(false)
     }
-  }, [filtroTipo, filtroProduto, currentPage, sort])
+  }, [filtroTipo, filtroProduto, filtroResponsavel, filtroEtiquetaDebounced, filtroDataInicio, filtroDataFim, currentPage, sort])
 
   useEffect(() => {
     setCurrentPage(1)
-  }, [filtroTipo, filtroProduto])
+  }, [filtroTipo, filtroProduto, filtroResponsavel, filtroEtiqueta, filtroDataInicio, filtroDataFim])
+
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(() => {
+      setFiltroEtiquetaDebounced(filtroEtiqueta)
+    }, 500)
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current)
+    }
+  }, [filtroEtiqueta])
 
   useEffect(() => {
     buscar()
-    fetch('/api/produtos?limit=10000')
-      .then(r => r.ok ? r.json() : [])
-      .then(data => setProdutos(data.data || data))
-      .catch(() => setProdutos([]))
   }, [buscar])
+
+  useEffect(() => {
+    fetchCachedList<Produto>('/api/produtos?limit=10000')
+      .then(setProdutos)
+      .catch(() => setProdutos([]))
+  }, [])
+
+  useEffect(() => {
+    fetch("/api/movimentacoes/filtros")
+      .then(r => r.ok ? r.json() : { responsaveis: [] })
+      .then(data => setOpcoesResponsaveis(Array.isArray(data.responsaveis) ? data.responsaveis : []))
+      .catch(() => setOpcoesResponsaveis([]))
+  }, [])
 
   const cancelar = async () => {
     if (!cancelandoId) return
@@ -95,8 +123,6 @@ export function MovimentacoesPage() {
     Data: formatDataHora(m.data),
     Observações: m.observacoes ?? '',
   })), 'movimentacoes-ti')
-
-
 
   const gerarRelatorioPDF = () => {
     const registros = movimentacoesFiltradas.filter((m) => !m.cancelado)
@@ -173,6 +199,10 @@ export function MovimentacoesPage() {
   }
 
   const movimentacoesFiltradas = useMemo(() => {
+    // Se não há ordenação, a API já fez a paginação e filtros, retorna os dados como estão
+    if (!sort) return movs
+
+    // Se há ordenação, busca todos os itens e aplica filtros localmente
     const responsavelBusca = filtroResponsavel.trim().toLowerCase()
     const etiquetaBusca = filtroEtiqueta.trim().toLowerCase()
 
@@ -181,7 +211,7 @@ export function MovimentacoesPage() {
 
     const dadosFiltrados = movs.filter((m) => {
       const responsavel = (m.responsavel ?? m.usuario?.nome ?? '').toLowerCase()
-      const atendeResponsavel = !responsavelBusca || responsavel.includes(responsavelBusca)
+      const atendeResponsavel = !responsavelBusca || responsavel === responsavelBusca
 
       const etiqueta = (m.unidade?.etiqueta ?? '').toLowerCase()
       const atendeEtiqueta = !etiquetaBusca || etiqueta.includes(etiquetaBusca)
@@ -192,8 +222,6 @@ export function MovimentacoesPage() {
 
       return atendeResponsavel && atendeEtiqueta && atendeInicio && atendeFim
     })
-
-    if (!sort) return dadosFiltrados
 
     const mapaCampos: Record<string, (m: Movimentacao) => string | number> = {
       Tipo: (m) => m.tipo,
@@ -245,55 +273,16 @@ export function MovimentacoesPage() {
 
       {error && <ErrorState message={error} />}
 
-      <div className="flex gap-3 flex-wrap items-end">
-        <Select value={filtroTipo} onChange={e => setFiltroTipo(e.target.value)} className="w-44">
-          <option value="">Todos os tipos</option>
-          <option value="ENTRADA">Entradas</option>
-          <option value="SAIDA">Saídas</option>
-        </Select>
-        <Select value={filtroProduto} onChange={e => setFiltroProduto(e.target.value)} className="w-60">
-          <option value="">Todos os produtos</option>
-          {produtos.map(p => <option key={p.id} value={p.id}>{p.nome}</option>)}
-        </Select>
-        <div className="space-y-1">
-          <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide">Responsável</label>
-          <input
-            type="text"
-            value={filtroResponsavel}
-            onChange={(e) => setFiltroResponsavel(e.target.value)}
-            placeholder="Filtrar por responsável"
-            className="w-60 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
-        <div className="space-y-1">
-          <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide">Etiqueta</label>
-          <input
-            type="text"
-            value={filtroEtiqueta}
-            onChange={(e) => setFiltroEtiqueta(e.target.value)}
-            placeholder="Filtrar por etiqueta"
-            className="w-60 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
-        <div className="space-y-1">
-          <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide">Período (de)</label>
-          <input
-            type="date"
-            value={filtroDataInicio}
-            onChange={(e) => setFiltroDataInicio(e.target.value)}
-            className="w-44 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
-        <div className="space-y-1">
-          <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide">Período (até)</label>
-          <input
-            type="date"
-            value={filtroDataFim}
-            onChange={(e) => setFiltroDataFim(e.target.value)}
-            className="w-44 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
-      </div>
+      <FilterBar>
+        <SelectFilter label="Tipo" value={filtroTipo} onChange={setFiltroTipo} allLabel="Todos os tipos" options={[
+          { value: 'ENTRADA', label: 'Entradas' },
+          { value: 'SAIDA', label: 'Saídas' },
+        ]} />
+        <SelectFilter label="Produto" value={filtroProduto} onChange={setFiltroProduto} allLabel="Todos os produtos" options={produtos.map((produto) => ({ value: produto.id, label: produto.nome }))} />
+        <SelectFilter label="Responsável" value={filtroResponsavel} onChange={setFiltroResponsavel} allLabel="Todos os responsáveis" options={opcoesResponsaveis.map((nome) => ({ value: nome, label: nome }))} />
+        <TextFilter label="Etiqueta" value={filtroEtiqueta} onChange={setFiltroEtiqueta} placeholder="Filtrar por etiqueta" />
+        <DateRangeFilter startDate={filtroDataInicio} endDate={filtroDataFim} onStartDateChange={setFiltroDataInicio} onEndDateChange={setFiltroDataFim} />
+      </FilterBar>
 
       <Table headers={['Tipo', 'Produto / Etiqueta', 'Valor Unit.', 'Destino', 'Responsável', 'Usuário', 'Data', ...(isAdmin ? [''] : [])]} empty={movimentacoesFiltradas.length === 0} sort={sort} onSort={alternarOrdenacao}>
         {movimentacoesFiltradas.map(m => (
