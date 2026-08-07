@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { Badge, Button, Input, Modal, Table } from '@/components/ui'
 import { Smartphone, Search, Edit2 } from 'lucide-react'
+import { FilterBar, TextFilter } from '@/components/ui/filters'
 
 interface ItemSmartphone {
   id: string
@@ -152,14 +153,9 @@ export default function SmartphonesPage() {
           </div>
         </div>
 
-        <div className="max-w-xl">
-          <Input
-            placeholder="Buscar por responsável, modelo, etiqueta ou número..."
-            value={busca}
-            onChange={(e) => setBusca(e.target.value)}
-            icon={<Search className="w-4 h-4" />}
-          />
-        </div>
+        <FilterBar>
+          <TextFilter label="Busca" value={busca} onChange={setBusca} placeholder="Buscar por responsavel, modelo, etiqueta ou numero..." className="flex-1 min-w-56" />
+        </FilterBar>
 
         {loading ? (
           <div className="flex items-center justify-center h-48">

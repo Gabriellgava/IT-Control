@@ -3,13 +3,14 @@ import { useEffect, useState } from 'react'
 import { AppLayout } from '@/components/layout/AppLayout'
 import { ProdutoForm } from '@/components/produtos/ProdutoForm'
 import type { Categoria, Fornecedor } from '@/types'
+import { fetchCachedList } from '@/lib/http/fetch-cached-list'
 
 export default function Page() {
   const [categorias, setCategorias] = useState<Categoria[]>([])
   const [fornecedores, setFornecedores] = useState<Fornecedor[]>([])
   useEffect(() => {
-    fetch('/api/categorias').then(r => r.json()).then(setCategorias)
-    fetch('/api/fornecedores').then(r => r.json()).then(setFornecedores)
+    fetchCachedList<Categoria>('/api/categorias').then(setCategorias).catch(() => setCategorias([]))
+    fetchCachedList<Fornecedor>('/api/fornecedores').then(setFornecedores).catch(() => setFornecedores([]))
   }, [])
   return (
     <AppLayout>

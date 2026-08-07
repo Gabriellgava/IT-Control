@@ -79,12 +79,13 @@ export function Select({ label, children, className = '', ...props }: SelectProp
   )
 }
 
-interface TextareaProps extends TextareaHTMLAttributes<HTMLTextAreaElement> { label?: string }
-export function Textarea({ label, className = '', ...props }: TextareaProps) {
+interface TextareaProps extends TextareaHTMLAttributes<HTMLTextAreaElement> { label?: string; error?: string }
+export function Textarea({ label, error, className = '', ...props }: TextareaProps) {
   return (
     <div className="space-y-1">
       {label && <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide">{label}</label>}
-      <textarea {...props} className={`w-full border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg px-3 py-2 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all resize-none ${className}`} />
+      <textarea {...props} className={`w-full border ${error ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 dark:border-gray-700 focus:ring-blue-500'} dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg px-3 py-2 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:border-transparent transition-all resize-none ${className}`} />
+      {error && <p className="text-xs text-red-500">{error}</p>}
     </div>
   )
 }

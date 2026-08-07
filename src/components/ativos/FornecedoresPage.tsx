@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { Plus, Edit2, Trash2, Globe, Mail, Phone } from 'lucide-react'
-import { Button, Card, Modal, Input, PageHeader, LoadingState, ErrorState } from '@/components/ui'
+import { Button, Card, Modal, Input, PageHeader, LoadingState, ErrorState , ConfirmDeleteModal} from '@/components/ui'
 import { mascaraTelefone } from '@/lib/mascaras'
 import type { Fornecedor } from '@/types'
 
@@ -137,14 +137,12 @@ export function FornecedoresPage() {
           </div>
         </div>
       </Modal>
-
-      <Modal open={!!deletandoId} onClose={() => setDeletandoId(null)} title="Confirmar exclusão">
-        <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">Deseja excluir este fornecedor?</p>
-        <div className="flex gap-3 justify-end">
-          <Button variant="secondary" onClick={() => setDeletandoId(null)}>Cancelar</Button>
-          <Button variant="danger" onClick={deletar}>Excluir</Button>
-        </div>
-      </Modal>
+      <ConfirmDeleteModal
+        open={!!deletandoId}
+        onClose={() => setDeletandoId(null)}
+        onConfirm={deletar}
+        message="Deseja excluir este fornecedor?"
+      />
     </div>
   )
 }

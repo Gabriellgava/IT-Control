@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button, Input, Select, Textarea } from '@/components/ui'
 import type { Produto, Categoria, Fornecedor } from '@/types'
+import { invalidateCachedList } from '@/lib/http/fetch-cached-list'
 
 export function ProdutoForm({ produto, categorias, fornecedores, onSuccess, onCancel }: {
   produto?: Produto
@@ -35,6 +36,7 @@ export function ProdutoForm({ produto, categorias, fornecedores, onSuccess, onCa
     })
     const data = await res.json()
     if (!res.ok) { setErro(data.error || 'Erro ao salvar'); setLoading(false); return }
+    invalidateCachedList('/api/produtos?limit=10000')
     if (onSuccess) onSuccess(); else router.push('/produtos')
   }
 
