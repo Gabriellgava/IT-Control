@@ -1,6 +1,6 @@
 services:
   postgres:
-    image: postgres:16
+    image: postgres:17
     container_name: itcontrol-postgres
 
     restart: unless-stopped
@@ -14,7 +14,7 @@ services:
       - "5432:5432"
 
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres17_data:/var/lib/postgresql/data
 
 volumes:
-  postgres_data:
+  postgres17_data:

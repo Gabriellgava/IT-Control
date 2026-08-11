@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { requireAuthenticatedUser } from '@/lib/api-security'
 
 export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
+  const { response } = await requireAuthenticatedUser()
+  if (response) return response
+
   try {
     await prisma.assinatura.delete({
       where: { id: params.id },
