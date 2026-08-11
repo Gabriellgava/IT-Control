@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { requireAuthenticatedUser } from '@/lib/api-security'
 
 export async function GET(request: NextRequest) {
+  const { response } = await requireAuthenticatedUser()
+  if (response) return response
+
   try {
     const assinaturas = await prisma.assinatura.findMany({
       orderBy: { criadoEm: 'desc' },
@@ -14,6 +18,9 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const { response } = await requireAuthenticatedUser()
+  if (response) return response
+
   try {
     const body = await request.json()
     

@@ -8,7 +8,7 @@ export default withAuth({
       if (pathname.startsWith('/api/auth')) return true
 
       // liberar assinatura pública
-      if (pathname.startsWith('/api/assinatura')) {
+      if (/^\/api\/assinatura\/[^/]+$/.test(pathname)) {
         return true
       }
 
@@ -29,6 +29,7 @@ export const config = {
     '/produtos/:path*',
     '/movimentacoes/:path*',
     '/fornecedores/:path*',
+    '/licencas-assinaturas/:path*',
     '/admin/:path*',
     '/inventario/:path*',
     '/api/:path*',
